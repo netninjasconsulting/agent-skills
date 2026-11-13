@@ -1,0 +1,34 @@
+# Checks for every pull request: the validator, the scanner test, and shellcheck.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege by default. No job needs more.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run. Runs on main always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Validate the skills
+        run: node scripts/validate.mjs
+      - name: Test the secret scanner
+        run: sh tests/scan-secrets.test.sh
+      - name: Lint the shell scripts
+        run: shellcheck -s sh skills/*/scripts/*.sh tests/*.sh tests/fixtures/*/make-repo.sh

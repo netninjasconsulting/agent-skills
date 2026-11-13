@@ -1,0 +1,19 @@
+{
+  "name": "parcel-api",
+  "version": "1.4.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc -p . && node scripts/zip.js",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@sentry/node": "^8.30.0",
+    "pg": "^8.13.0",
+    "stripe": "^17.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
