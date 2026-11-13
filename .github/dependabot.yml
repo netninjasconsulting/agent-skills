@@ -1,0 +1,7 @@
+# Weekly updates for the actions used in CI. The SHA and the version comment move together.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
