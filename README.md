@@ -2,7 +2,7 @@
 
 Four free agent skills for people who build with AI coding tools: a pre-launch security check, a GitOps hygiene check, a handover runbook generator, and a guided app starter.
 
-[Net Ninjas Consulting](https://www.netninjas.eu) is a one-person cloud, DevOps, and AI consultancy in Amsterdam. I keep seeing the same gaps in products built fast with an assistant: a key in the browser bundle, a pipeline that can't say no, and nobody who can explain how it deploys. These skills carry the checks I run by hand. They are free, there is no sign-up, and there is no obligation.
+Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New York City. I work with founders, startups, scale-ups, and small businesses across the US ([netninjas.us](https://www.netninjas.us)) and the EU ([netninjas.eu](https://www.netninjas.eu)). I keep seeing the same gaps in products built fast with an assistant: a key in the browser bundle, a pipeline that can't say no, and nobody who can explain how it deploys. These skills carry the checks I run by hand. They are free, there is no sign-up, and there is no obligation.
 
 ## The four skills
 
@@ -65,4 +65,4 @@ The guided app starter depends on four third-party skills, and the pre-launch ch
 
 [CONTRIBUTING.md](CONTRIBUTING.md) lists the rules every change keeps. [SECURITY.md](SECURITY.md) says how to report a flaw in a skill. Releases are versioned, and [CHANGELOG.md](CHANGELOG.md) says what changed and what was re-verified.
 
-Which check would you want next? The guides and checklists behind these skills are free at [netninjas.eu/skills](https://www.netninjas.eu/skills).
+Which check would you want next? The guides and checklists behind these skills are free at [netninjas.eu/skills](https://www.netninjas.eu/skills) and [netninjas.us/skills](https://www.netninjas.us/skills).
