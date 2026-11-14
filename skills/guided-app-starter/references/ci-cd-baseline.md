@@ -162,7 +162,7 @@ The goal is the same everywhere: every pull request gets a preview, only the pip
 
 ### Firebase (W5, M2)
 
-- Cards, one each: the Firebase project, the Firestore database with location `nam5` for the United States or `eur3` for the EU (cannot be changed later), and the App Hosting backend in a US region or in `europe-west4`, connected to the GitHub repository.
+- Cards, one each: the Firebase project, the Firestore database with location `nam5` for the United States or `eur3` for the EU (cannot be changed later), and the App Hosting backend in `us-east4` or in `europe-west4`, connected to the GitHub repository.
 - Local: `firestore.rules` and `storage.rules` that deny by default and allow each user their own data. No "test mode" rules.
 - Result: App Hosting builds and rolls out the live branch from GitHub with no key stored in GitHub. Previews for pull requests: verify what App Hosting offers on the check date. If it offers none, say so in the closing summary.
 - Say that Firebase Authentication has no documented data location setting (stack matrix).

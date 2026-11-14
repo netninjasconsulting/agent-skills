@@ -81,8 +81,8 @@ Use these values when the user chose the United States or gave no answer. Each o
 | Supabase | A specific region: `us-east-1` (N. Virginia), `us-east-2` (Ohio), `us-west-1` (N. California), or `us-west-2` (Oregon) | Checked. Choose a specific region, not the general "Americas" group. Database, Auth, and Storage stay in the project's region |
 | Cloudflare D1 | Location hint `enam` (Eastern North America) or `wnam` (Western North America) | Checked. D1 has no United States jurisdiction: the jurisdictions are `eu` and `fedramp`. A hint is a preference, not a guarantee |
 | Cloudflare R2 | Location hint `enam` or `wnam` | Checked. R2 has no United States jurisdiction either. A location hint is not a guarantee |
-| Cloudflare Durable Objects | Location hint `enam` or `wnam` | Verify whether a `us` jurisdiction is available in the Durable Objects documentation |
-| Firebase | Firestore location `nam5` (United States multi-region) or a single US region such as `us-east4` (Northern Virginia). App Hosting in a US region | Checked for Firestore: the location cannot be changed later. Verify the US regions that App Hosting offers |
+| Cloudflare Durable Objects | The `us` jurisdiction | Checked. Durable Objects have three jurisdictions: `eu`, `us`, and `fedramp`. A jurisdiction is a guarantee. The location hints `enam` and `wnam` are a best effort and not a guarantee |
+| Firebase | Firestore location `nam5` (United States multi-region) or a single US region such as `us-east4` (Northern Virginia). App Hosting in `us-east4` (N. Virginia), `us-central1` (Iowa), or `us-east5` (Columbus) | Checked. The Firestore location cannot be changed later. App Hosting has six regions: these three, `europe-west4`, `asia-east1`, and `asia-southeast1` |
 | AWS | Region `us-east-1` (N. Virginia), or `us-east-2` (Ohio), `us-west-2` (Oregon) | Global services such as IAM, CloudFront, and Route 53 are not regional |
 
 A US region is a location, not a legal guarantee. Where a provider offers only a hint, say so on the card.
@@ -131,7 +131,7 @@ Read on 13 November 2026.
 - Cloudflare Durable Objects data location: https://developers.cloudflare.com/durable-objects/reference/data-location/
 - Cloudflare Workers Builds: https://developers.cloudflare.com/workers/ci-cd/builds/
 - Firestore locations: https://firebase.google.com/docs/firestore/locations
-- Firebase App Hosting: https://firebase.google.com/docs/app-hosting/about-app-hosting
+- Firebase App Hosting, with its locations: https://firebase.google.com/docs/app-hosting/about-app-hosting#locations
 - Firebase privacy and security: https://firebase.google.com/support/privacy
 - AWS Amplify Hosting: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html
 - Expo CI/CD: https://docs.expo.dev/tutorial/cicd/introduction/
