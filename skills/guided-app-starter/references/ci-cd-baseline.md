@@ -135,7 +135,7 @@ The goal is the same everywhere: every pull request gets a preview, only the pip
 
 ### Vercel (W1, W2)
 
-- Local: `vercel.json` with `"regions": ["fra1"]`.
+- Local: `vercel.json` with `"regions": ["iad1"]` for the United States, or `"regions": ["fra1"]` for the EU.
 - Card: the Vercel project, linked to the GitHub repository (`vercel link`, then `vercel git connect`).
 - Result: a preview deployment for every pull request and a production deployment from `main`. No Vercel token sits in GitHub.
 - Environment variables are added by the user in Vercel's interface or with `vercel env add`, which prompts them. Never pass a value on the command line.
@@ -143,33 +143,33 @@ The goal is the same everywhere: every pull request gets a preview, only the pip
 ### Cloudflare (W3, W4)
 
 - Local: `wrangler.jsonc` with the Worker's name, the bindings, and for R2 the bucket's jurisdiction.
-- Cards, one each: the D1 database (`wrangler d1 create <name> --jurisdiction eu`), the R2 bucket (`wrangler r2 bucket create <name> --jurisdiction eu`), and the Worker's connection to the repository through Workers Builds.
+- Cards, one each: the D1 database (`wrangler d1 create <name> --location enam` for the United States, or `wrangler d1 create <name> --jurisdiction eu` for the EU), the R2 bucket (`wrangler r2 bucket create <name> --location enam`, or `wrangler r2 bucket create <name> --jurisdiction eu`), and the Worker's connection to the repository through Workers Builds.
 - Result: Workers Builds deploys `main` and gives each other branch a preview URL, posted on the pull request. Cloudflare creates its own token for the builds, so none sits in GitHub.
-- The D1 and R2 jurisdiction cannot be changed later. Put that on the card.
+- The D1 and R2 jurisdiction cannot be changed later. Put that on the card. A location hint for the United States is a preference, not a guarantee. Put that on the card too.
 - Secrets: the user runs `wrangler secret put <NAME>`, which prompts them.
 
 ### Neon (W1, W4)
 
-- Card: the project (`neonctl projects create --name <name> --region-id aws-eu-central-1`). The region cannot be changed later.
+- Card: the project (`neonctl projects create --name <name> --region-id aws-us-east-1` for the United States, or `--region-id aws-eu-central-1` for the EU). The region cannot be changed later.
 - A database branch per pull request needs Neon's integration with the hosting provider or a Neon API key in GitHub (verify which the chosen hosting offers). An API key is a stored token: see section 8.
 
 ### Supabase (W2, M1)
 
-- Card: the project, in one specific EU region (`supabase projects create <name> --region eu-central-1`). The CLI prompts the user for the database password. Do not pass it or read it.
+- Card: the project, in one specific region (`supabase projects create <name> --region us-east-1` for the United States, or `--region eu-central-1` for the EU). The CLI prompts the user for the database password. Do not pass it or read it.
 - Local: migrations under `supabase/migrations/`. The first migration turns on row level security for every table and adds per-user policies. No table ships without it.
 - Applying migrations from the pipeline: Supabase's GitHub integration (verify plan and availability), or a `supabase db push` job in the `production` environment with a stored access token (section 8).
 - Only the publishable key goes in client code. The secret key stays in the host's secret store.
 
 ### Firebase (W5, M2)
 
-- Cards, one each: the Firebase project, the Firestore database with location `eur3` (cannot be changed later), and the App Hosting backend in `europe-west4`, connected to the GitHub repository.
+- Cards, one each: the Firebase project, the Firestore database with location `nam5` for the United States or `eur3` for the EU (cannot be changed later), and the App Hosting backend in `us-east4` or in `europe-west4`, connected to the GitHub repository.
 - Local: `firestore.rules` and `storage.rules` that deny by default and allow each user their own data. No "test mode" rules.
 - Result: App Hosting builds and rolls out the live branch from GitHub with no key stored in GitHub. Previews for pull requests: verify what App Hosting offers on the check date. If it offers none, say so in the closing summary.
 - Say that Firebase Authentication has no documented data location setting (stack matrix).
 
 ### AWS (W6, W7)
 
-- Card: the Amplify Hosting app in `eu-central-1`, connected to the GitHub repository, with pull request previews on.
+- Card: the Amplify Hosting app in `us-east-1` for the United States or `eu-central-1` for the EU, connected to the GitHub repository, with pull request previews on.
 - Any job in GitHub Actions that touches AWS uses OIDC: GitHub's identity provider in the account, and a role whose trust policy accepts only `repo:<owner>/<name>:environment:production`. Creating the identity provider and the role are two more cards. No access key is created.
 - A database billed by the hour goes on its card as "billed by the hour".
 

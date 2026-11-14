@@ -10,9 +10,10 @@ Platform by provider, to framework, data layer, and deploy target.
 2. [Web](#web)
 3. [Mobile](#mobile)
 4. [Desktop](#desktop)
-5. [EU regions and what still leaves the EU](#eu-regions-and-what-still-leaves-the-eu)
-6. [What each GitHub plan allows](#what-each-github-plan-allows)
-7. [Sources](#sources)
+5. [US regions](#us-regions)
+6. [EU regions and what still leaves the EU](#eu-regions-and-what-still-leaves-the-eu)
+7. [What each GitHub plan allows](#what-each-github-plan-allows)
+8. [Sources](#sources)
 
 ## How to choose
 
@@ -20,10 +21,10 @@ Platform by provider, to framework, data layer, and deploy target.
 2. **Remove rows that fail a hard need.**
    - Data shape "rows and relations" removes rows whose data layer is a document store. "Documents and feeds" removes nothing: a relational database can hold documents.
    - Real-time "yes" removes rows where real-time is "extra provider".
-   - EU data residency "must stay" removes rows marked "not for strict EU residency".
-   - A monthly budget under €25 removes rows marked "hourly-billed parts".
+   - Region "the EU, and the data must stay" removes rows marked "not for strict EU residency". Region "the United States", which is also the default when the user gives no answer, removes nothing.
+   - A monthly budget under 25 US dollars or euros removes rows marked "hourly-billed parts".
 3. **Score what is left.**
-   - Fit: one point for each of these needs that the user has and that the row meets with no extra provider: sign-in, the data shape, real-time, file storage, EU residency. A relational row meets either data shape. EU residency counts as a need for "must stay" and for "a preference" alike, and a row marked "not for strict EU residency" does not meet it. Payments score nothing: every row takes payments the same way, through a payment provider's webhook.
+   - Fit: one point for each of these needs that the user has and that the row meets with no extra provider: sign-in, the data shape, real-time, file storage, EU residency. A relational row meets either data shape. EU residency is a need only when the user chose the EU. It then counts for "must stay" and for "a preference" alike, and a row marked "not for strict EU residency" does not meet it. For the United States it is not a need, so it scores nothing for any row. Payments score nothing: every row takes payments the same way, through a payment provider's webhook.
    - Comfort: the average of the user's ratings (0 to 3) for the providers in the row's "Rated providers" column.
    - Score = fit + 2 × comfort.
 4. **Pick the highest score.** On a tie, take the row with fewer providers. If still tied, take the first row in the table.
@@ -69,9 +70,26 @@ Builds, store submission, and over-the-air updates run on Expo Application Servi
 
 Tauri 2 is stable (checked). `tauri-apps/tauri-action` builds for macOS, Windows, and Linux on GitHub Actions and uploads to a GitHub Release, and Tauri's updater reads from that release (checked). Code-signing certificates belong to the user: they add them as repository secrets in GitHub's interface, and this skill never sees them.
 
+## US regions
+
+Use these values when the user chose the United States or gave no answer. Each one goes on the confirmation card.
+
+| Provider | US setting to use | What to know |
+| --- | --- | --- |
+| Vercel | Function region `iad1` (Washington, D.C.), which is also Vercel's default | Checked. Static files are cached on a global network |
+| Neon | Region `aws-us-east-1` (N. Virginia). Other US regions: `aws-us-east-2` (Ohio), `aws-us-west-2` (Oregon) | Checked. The region is set when the project is created and cannot be changed |
+| Supabase | A specific region: `us-east-1` (N. Virginia), `us-east-2` (Ohio), `us-west-1` (N. California), or `us-west-2` (Oregon) | Checked. Choose a specific region, not the general "Americas" group. Database, Auth, and Storage stay in the project's region |
+| Cloudflare D1 | Location hint `enam` (Eastern North America) or `wnam` (Western North America) | Checked. D1 has no United States jurisdiction: the jurisdictions are `eu` and `fedramp`. A hint is a preference, not a guarantee |
+| Cloudflare R2 | Location hint `enam` or `wnam` | Checked. R2 has no United States jurisdiction either. A location hint is not a guarantee |
+| Cloudflare Durable Objects | The `us` jurisdiction | Checked. Durable Objects have three jurisdictions: `eu`, `us`, and `fedramp`. A jurisdiction is a guarantee. The location hints `enam` and `wnam` are a best effort and not a guarantee |
+| Firebase | Firestore location `nam5` (United States multi-region) or a single US region such as `us-east4` (Northern Virginia). App Hosting in `us-east4` (N. Virginia), `us-central1` (Iowa), or `us-east5` (Columbus) | Checked. The Firestore location cannot be changed later. App Hosting has six regions: these three, `europe-west4`, `asia-east1`, and `asia-southeast1` |
+| AWS | Region `us-east-1` (N. Virginia), or `us-east-2` (Ohio), `us-west-2` (Oregon) | Global services such as IAM, CloudFront, and Route 53 are not regional |
+
+A US region is a location, not a legal guarantee. Where a provider offers only a hint, say so on the card.
+
 ## EU regions and what still leaves the EU
 
-Use these values when creating resources. Each one goes on the confirmation card.
+Use these values when the user chose the EU. Each one goes on the confirmation card.
 
 | Provider | EU setting to use | What to know |
 | --- | --- | --- |
@@ -110,9 +128,10 @@ Read on 13 November 2026.
 - Supabase regions: https://supabase.com/docs/guides/platform/regions and https://supabase.com/regions
 - Cloudflare D1 data location: https://developers.cloudflare.com/d1/configuration/data-location/
 - Cloudflare R2 data location: https://developers.cloudflare.com/r2/reference/data-location/
+- Cloudflare Durable Objects data location: https://developers.cloudflare.com/durable-objects/reference/data-location/
 - Cloudflare Workers Builds: https://developers.cloudflare.com/workers/ci-cd/builds/
 - Firestore locations: https://firebase.google.com/docs/firestore/locations
-- Firebase App Hosting: https://firebase.google.com/docs/app-hosting/about-app-hosting
+- Firebase App Hosting, with its locations: https://firebase.google.com/docs/app-hosting/about-app-hosting#locations
 - Firebase privacy and security: https://firebase.google.com/support/privacy
 - AWS Amplify Hosting: https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html
 - Expo CI/CD: https://docs.expo.dev/tutorial/cicd/introduction/
