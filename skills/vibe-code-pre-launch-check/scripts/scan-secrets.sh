@@ -3,6 +3,7 @@
 #
 # Copyright 2026 Net Ninjas Consulting
 # SPDX-License-Identifier: Apache-2.0
+# Modified from the Net Ninjas original to close masking and history gaps.
 #
 # Usage:
 #   sh scan-secrets.sh [path]            scan the working tree
@@ -106,9 +107,16 @@ scan() {
 history() {
   is_git || { echo "scan-secrets: not a Git repository: $ROOT" >&2; exit 2; }
   combined=$(echo "$PATTERNS" | sed 's/^[^|]*|//' | paste -sd '|' -)
-  git -C "$ROOT" log --all --no-color --format='@%h' --name-only -G"($combined)" 2>/dev/null |
+  git -C "$ROOT" log --all --no-color --format='@%h' --name-only -G"($combined)|($ENV_LINE)" 2>/dev/null |
     awk '/^@/ { commit = substr($0, 2); next } NF { print commit "\t" $0 }' |
     while IFS="$(printf '\t')" read -r commit path; do
+      case "${path##*/}" in
+        .env | .env.*)
+          if git -C "$ROOT" show --no-color --format= "$commit" -- "$path" 2>/dev/null | grep -qE -e "^[+-](${ENV_LINE#^})"; then
+            echo "history:$commit:$path:env-file-value"
+          fi
+          ;;
+      esac
       echo "$PATTERNS" | while IFS= read -r entry; do
         type=${entry%%|*}
         regex=${entry#*|}
@@ -144,6 +152,8 @@ show() {
     -e 's#((postgres(ql)?|mysql|mongodb(\+srv)?|redis)://[^:/@[:space:]]+:)[^@[:space:]]+@#\1<redacted>@#g' \
     -e 's/((SECRET|TOKEN|PASSWORD|PASSWD|API_?KEY|PRIVATE_?KEY|ACCESS_?KEY)[A-Za-z0-9_]*["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"'])[A-Za-z0-9\/+_.=-]{16,}(["'"'"'])/\1<redacted>\3/g' |
     if [ "$env_file" = 1 ]; then
+      # Secret names take precedence over the flag allowlist, even for numeric values.
+      sed -E '/^[[:space:]]*(export[[:space:]]+)?[A-Za-z0-9_]*(SECRET|TOKEN|PASSWORD|PASSWD|KEY|DATABASE_URL)[A-Za-z0-9_]*[[:space:]]*=/s/=.*/=<redacted>/' |
       # Flags and environment names stay readable: the check needs them (DEBUG=true, NODE_ENV=production).
       sed -E '/=["'"'"']?(true|false|TRUE|FALSE|True|False|[0-9]+|development|production|staging|test)["'"'"']?[[:space:]]*$/!s/^([[:space:]]*(export[[:space:]]+)?[A-Za-z0-9_]+)=.+$/\1=<redacted>/'
     else

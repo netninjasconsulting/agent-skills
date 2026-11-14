@@ -177,7 +177,7 @@ This is a quick check. It is not a penetration test and it is not legal advice.
 
 ---
 
-Built with the Guided app starter, a free skill from Net Ninjas Consulting: <https://www.netninjas.us/skills for the United States, or https://www.netninjas.eu/skills for the EU>
+Built with the Guided app starter, a free skill from Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City: <https://www.netninjas.us/skills for the United States, or https://www.netninjas.eu/skills for the EU>
 ````
 
 Credit only the skills that ran. A skill that was missing goes under "Skipped". The last line links the site for the region of this run: `https://www.netninjas.us/skills` for the United States, and `https://www.netninjas.eu/skills` for the EU.

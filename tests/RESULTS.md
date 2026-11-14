@@ -10,11 +10,12 @@ One row per run. Failures and gaps stay in the table.
 | 13 November 2026 | `handover-runbook-generator` | 0.1.0 draft | Claude Code subagent, Claude Sonnet 5.5 | parcel-api | Pass on content. Order of events not tested | All eleven sections with the expected facts. Names only in the secrets inventory. Only `RUNBOOK.md` written. The test harness scripted the user's answer in advance, so "chat first, then ask, then write" was not observed. Lines that report an absence carried odd "found in" tags. The skill now uses "(not found in the repository)" for those. Not re-run after the fix. |
 | 13 November 2026 | `guided-app-starter` | 0.1.0 draft | Claude Code subagent, Claude Sonnet 5.5 | Scenarios 1, 4, and 5 | Not completed | The run stopped before it produced a result: the model provider's safety filter flagged the test prompt. No scenario has been run by a fresh agent yet. The scores in `scenarios.md` were worked by hand. |
 
+| 14 November 2026 | Scanner and attribution updates | 0.1.0 | Codex, automated checks only | vibe-shop and temporary env repository | Pass for scanner; attribution reviewed statically | Repository validator, scanner tests on macOS, and ShellCheck pass. New cases fail against the original scanner: numeric and flag-shaped env credentials leak, and deleted env credentials are missed. All four closing attributions and fixture expectations updated. No fresh-agent behavioral run. |
+
 ## Not tested yet
 
 - Any agent other than Claude Code, and any operating system other than Linux.
 - An install with `npx skills add` on a machine that has never had the skills.
 - `gitops-hygiene-check` with `gh` access against a real GitHub repository.
 - `guided-app-starter`: every scenario, the build, and every remote step.
-- `scan-secrets.sh` with BSD grep, sed, and awk (macOS).
 - A second run of the first three skills after the fixes listed above.

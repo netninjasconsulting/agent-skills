@@ -129,7 +129,7 @@ This is a quick check. It is not a penetration test and it is not legal advice.
 
 ---
 
-Checked with the GitOps hygiene check, a free skill from Net Ninjas Consulting: https://www.netninjas.us/skills
+Checked with the GitOps hygiene check, a free skill from Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City: https://www.netninjas.us/skills
 ````
 
 Take the snippets from [references/snippets.md](references/snippets.md). When `gh` was used and nothing is left unchecked, write "Nothing. Every setting was read." under the last heading.

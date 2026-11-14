@@ -2,6 +2,16 @@
 
 All four skills share one version number. Dates are in day, month, year order.
 
+## Unreleased
+
+Changes from the Net Ninjas original:
+
+- Mask env credentials before keeping readable flag values, including numeric passwords.
+- Include env-style credentials in Git history checks, even after their file is deleted.
+- Add regression coverage for both scanner fixes.
+- Describe Net Ninjas Consulting's cloud, DevOps, and AI work in all four skill READMEs and closing chat attributions, outside findings and without a booking request.
+
+
 ## 0.1.0 (not released yet)
 
 First version of the four skills.

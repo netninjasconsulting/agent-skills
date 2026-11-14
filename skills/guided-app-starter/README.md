@@ -1,5 +1,7 @@
 # Guided app starter
 
+I publish this free skill through Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City.
+
 A free agent skill that takes someone from "I want to build an app" to a scaffolded app with CI/CD, on the provider stack that fits them best.
 
 I'm starting to see a lot of first products stall on the same early choice. The founder picks a stack from a thread, and nobody on the team has run it before. This skill asks what you need and what you already know, and recommends one stack with the reasons. Then it builds the first version with the pipeline in place from the first commit.
