@@ -12,7 +12,7 @@ These skills read repositories that hold secrets, so a flaw in a skill matters.
 
 ## How to report
 
-Please report privately, and not in a public issue: email hello@netninjas.eu with the skill's name, the version from its SKILL.md, the agent and model used, and the steps.
+Please report privately, and not in a public issue: email hello@netninjas.us with the skill's name, the version from its SKILL.md, the agent and model used, and the steps.
 
 ## What this repository is not
 

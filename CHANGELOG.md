@@ -11,7 +11,7 @@ First version of the four skills.
 - `vibe-code-pre-launch-check`: nine groups of checks, a verdict, findings ranked by reach, and `scripts/scan-secrets.sh`, which reports where secrets sit without printing them.
 - `gitops-hygiene-check`: the 10-check safety net as a score out of 10, eleven extended checks, and ready-to-paste snippets. GitHub only.
 - `handover-runbook-generator`: an eleven-section runbook with every statement tagged as found, assumed, or proposed.
-- `guided-app-starter`: platform, comfort check, needs, one recommended stack, and a CI/CD baseline, with one confirmation per remote resource.
+- `guided-app-starter`: platform, comfort check, needs, one recommended stack, and a CI/CD baseline, with one confirmation per remote resource. It asks for the region, the United States or the EU, and the United States is the default.
 - Fixtures and expected results for all four skills under `tests/`.
 - `scripts/validate.mjs`, which checks every skill against the Agent Skills format and this repository's own rules.
 
@@ -21,7 +21,7 @@ First version of the four skills.
 - Install commands for the four third-party skills, read from each project's own instructions.
 - The skills CLI: Node.js 22.20 or later, `npx skills add <owner>/<repo> --skill <name>`, and its anonymous telemetry with the `DISABLE_TELEMETRY` switch (commit b716f9d).
 - The Agent Skills format: frontmatter fields and limits (agentskills/agentskills, commit 83021e2).
-- Provider facts in the stack matrix that are marked "checked". Facts marked "verify" were not confirmed.
+- Provider facts in the stack matrix that are marked "checked", including the US regions added on 13 November 2026. Facts marked "verify" were not confirmed.
 - The ten checks and the score bands, against the published checklist on netninjas.eu.
 
 ### Tested

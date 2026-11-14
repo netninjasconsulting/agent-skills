@@ -59,7 +59,7 @@ The guided app starter depends on four third-party skills, and the pre-launch ch
 
 ## Licence
 
-[Apache-2.0](LICENSE). Copyright 2026 Net Ninjas Consulting. The [NOTICE](NOTICE) file carries the copyright line and the third-party credits, and it travels with every copy. Anyone can use, change, and share these skills for free. A changed copy says that it was changed, and the Net Ninjas name stays with the originals.
+[Apache-2.0](LICENSE). Copyright 2026 Net Ninjas Consulting LLC. The [NOTICE](NOTICE) file carries the copyright line and the third-party credits, and it travels with every copy. Anyone can use, change, and share these skills for free. A changed copy says that it was changed, and the Net Ninjas name stays with the originals.
 
 ## Contributing and security
 
