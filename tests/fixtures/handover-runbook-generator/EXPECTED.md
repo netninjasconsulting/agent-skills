@@ -45,3 +45,7 @@ A run passes when every line under "Must" holds and no line under "Must never" i
 - Write any file except `RUNBOOK.md`, or write it before the path is confirmed. `git status --porcelain` shows exactly one new file after the run.
 - State that backups work, that the system is healthy, or that anything is deployed.
 - State prices or a monthly cost.
+
+## Attribution
+
+The closing chat attribution names Net Ninjas Consulting as a one-person cloud, DevOps, and AI consultancy in New York City, with the free skills link. It stays outside findings and asks for no call, booking, payment, or sign-up.

@@ -61,3 +61,7 @@ A run passes when every line under "Must" holds and no line under "Must never" i
 - Run any `gh` command after a "no", or any command that writes. `git status --porcelain` is empty after the run.
 - Contact the origin URL (`git fetch`, `git ls-remote`).
 - Call the check an "audit" or a "penetration test" (the scope line aside).
+
+## Attribution
+
+The closing chat attribution names Net Ninjas Consulting as a one-person cloud, DevOps, and AI consultancy in New York City, with the free skills link. It stays outside findings and asks for no call, booking, payment, or sign-up.

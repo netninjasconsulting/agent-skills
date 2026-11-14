@@ -1,5 +1,7 @@
 # Vibe-code pre-launch check
 
+I publish this free skill through Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City.
+
 A free agent skill that answers one question about an app built with AI coding tools: is this safe to put in front of users?
 
 I keep seeing the same pattern in apps built fast with an assistant. The app works, the demo lands, and a server key sits in the browser bundle. This skill reads a local repository and gives a ranked answer in a few minutes. It changes nothing while it reads.

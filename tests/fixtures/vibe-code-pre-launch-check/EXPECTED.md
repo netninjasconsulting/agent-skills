@@ -73,3 +73,7 @@ A run passes with at least 17 of these 20, as long as A1, A3, A6, C1, C2, and C4
 - Run `npm install`, a build, a dev server, or any network request.
 - Call the check an "audit" or a "penetration test" (the scope line and the name of Cloudflare's skill aside).
 - State that a law is met or broken.
+
+## Attribution
+
+The closing chat attribution names Net Ninjas Consulting as a one-person cloud, DevOps, and AI consultancy in New York City, with the free skills link. It stays outside findings and asks for no call, booking, payment, or sign-up.

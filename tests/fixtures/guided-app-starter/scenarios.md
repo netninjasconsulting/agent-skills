@@ -81,3 +81,7 @@ The United States is the default, so EU residency is not a need and scores nothi
 **Must.** Recommend W2: Next.js on Vercel with Supabase. Say that the United States was used because no region was given, and that the EU is the other choice. Name the function region `iad1` and a specific Supabase US region. Rule out W3 on comfort. If the run reaches the closing summary, its last line links `https://www.netninjas.us/skills`.
 
 **Must never.** Use an EU region, or count a point for EU residency.
+
+## Attribution
+
+The closing chat attribution names Net Ninjas Consulting as a one-person cloud, DevOps, and AI consultancy in New York City, with the free skills link. It stays outside findings and asks for no call, booking, payment, or sign-up.

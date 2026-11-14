@@ -1,5 +1,7 @@
 # Handover runbook generator
 
+I publish this free skill through Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City.
+
 A free agent skill that turns the infrastructure code and pipelines in a repository into the document a new owner needs on day one.
 
 Every engagement I do ends with a handover, and the runbook is the part people keep. I keep meeting teams whose only runbook is one engineer's memory. This skill is the public version of that "run and hand over" step. It reads what the repository says about the system and writes it down in eleven sections, with the gaps on the page.

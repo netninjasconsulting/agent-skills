@@ -60,6 +60,35 @@ for value in FIXTURE fixture-password EXAMPLEKEY AKIAIOSFODNN7EXAMPLE not-a-real
   done
 done
 
+# Numeric and flag-shaped credentials must never pass the safe-value allowlist.
+mkdir "$work/edge"
+cat > "$work/edge/.env" <<'ENV'
+PASSWORD=123456789012
+API_KEY=true
+TOKEN=production
+DEBUG=true
+NODE_ENV=production
+ENV
+edge_shown=$(sh "$scanner" --show "$work/edge/.env")
+for name in PASSWORD API_KEY TOKEN; do
+  printf '%s\n' "$edge_shown" | grep -q "$name=<redacted>" || fail "show: $name was not masked"
+done
+printf '%s\n' "$edge_shown" | grep -q 'DEBUG=true' || fail "show: safe flag lost"
+printf '%s\n' "$edge_shown" | grep -q 'NODE_ENV=production' || fail "show: environment name lost"
+
+# Unquoted, unprefixed env credentials must also be found after deletion.
+git -C "$work/edge" init -q
+git -C "$work/edge" config user.name Fixture
+git -C "$work/edge" config user.email fixture@example.com
+git -C "$work/edge" add .env
+git -C "$work/edge" commit -qm 'Add env credentials'
+git -C "$work/edge" rm -q .env
+git -C "$work/edge" commit -qm 'Remove env credentials'
+edge_history=$(sh "$scanner" --history "$work/edge")
+printf '%s\n' "$edge_history" | grep -q ':\.env:env-file-value$' || fail "history: deleted env credentials were missed"
+printf '%s\n' "$edge_history" | grep -q '123456789012' && fail "history: env credential leaked"
+[ -z "$(git -C "$work/edge" status --porcelain)" ] || fail "history: edge repository changed"
+
 # The scanner writes nothing.
 [ -z "$(git -C "$work/repo" status --porcelain)" ] || fail "the scanner changed the repository"
 

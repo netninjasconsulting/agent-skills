@@ -1,5 +1,7 @@
 # GitOps hygiene check
 
+I publish this free skill through Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City.
+
 A free agent skill that shows whether a repository's pipeline can be trusted to say no to a bad change, whoever or whatever wrote it.
 
 AI tools made writing code cheap. The hard part moved to checking it and shipping it. I'm starting to see a lot of repositories where an assistant opens the pull request and nothing between that pull request and production can refuse it. This skill reads the repository and scores the pipeline that is supposed to do the refusing.

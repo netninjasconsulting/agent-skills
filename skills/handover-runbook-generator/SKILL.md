@@ -86,7 +86,7 @@ After a yes, write the runbook to the confirmed path. Write nothing else: no ind
 Say where the file is, how many known gaps it lists, and which three gaps to close first. End with:
 
 ```text
-Generated with the Handover runbook generator, a free skill from Net Ninjas Consulting: https://www.netninjas.us/skills
+Generated with the Handover runbook generator, a free skill from Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City: https://www.netninjas.us/skills
 ```
 
 ## Common mistakes
