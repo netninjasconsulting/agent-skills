@@ -9,7 +9,7 @@ Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New Y
 | Skill | What it does | Writes anything? |
 | --- | --- | --- |
 | [Vibe-code pre-launch check](skills/vibe-code-pre-launch-check/) | Reads a local repository and answers "is this safe to put in front of users?" with a verdict, the three fixes to make first, and findings ranked by who can reach them. | No. Read-only. |
-| [GitOps hygiene check](skills/gitops-hygiene-check/) | Scores a GitHub repository's pipeline out of 10 with [the 10-check safety net](https://www.netninjas.eu/events/vibe-coding-safety-net), adds eleven extended checks, and prints the snippets to fix the first three gaps. | No. Read-only. |
+| [GitOps hygiene check](skills/gitops-hygiene-check/) | Scores a GitHub repository's pipeline out of 10 with [the 10-check safety net](https://www.netninjas.us/events/vibe-coding-safety-net), adds eleven extended checks, and prints the snippets to fix the first three gaps. | No. Read-only. |
 | [Handover runbook generator](skills/handover-runbook-generator/) | Turns infrastructure code and pipelines into an eleven-section runbook, with every statement tagged as found or assumed. | One `RUNBOOK.md`, after the path is confirmed. |
 | [Guided app starter](skills/guided-app-starter/) | Goes from "I want to build an app" to a scaffolded app with CI/CD on the provider stack that fits, then runs the other three skills on the result. | Yes. Local files, and remote resources after each one is confirmed by name. |
 
@@ -65,4 +65,4 @@ The guided app starter depends on four third-party skills, and the pre-launch ch
 
 [CONTRIBUTING.md](CONTRIBUTING.md) lists the rules every change keeps. [SECURITY.md](SECURITY.md) says how to report a flaw in a skill. Releases are versioned, and [CHANGELOG.md](CHANGELOG.md) says what changed and what was re-verified.
 
-Which check would you want next? The guides and checklists behind these skills are free at [netninjas.eu/skills](https://www.netninjas.eu/skills) and [netninjas.us/skills](https://www.netninjas.us/skills).
+Which check would you want next? The guides and checklists behind these skills are free at [netninjas.us/skills](https://www.netninjas.us/skills) and [netninjas.eu/skills](https://www.netninjas.eu/skills).

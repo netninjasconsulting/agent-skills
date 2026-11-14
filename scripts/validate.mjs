@@ -100,7 +100,7 @@ for (const name of skills) {
   const files = walk(dir);
   const all = files.filter((file) => file.endsWith(".md")).map(read).join("\n");
   if (!all.includes(scopeLine)) fail(dir, "the scope line is missing from the skill's report format");
-  if (!all.includes("https://www.netninjas.eu")) fail(dir, "no link to netninjas.eu");
+  if (!all.includes("https://www.netninjas.us")) fail(dir, "no link to netninjas.us");
   for (const credit of credits) {
     if (all.includes(credit.source) && !read(path.join(root, "NOTICE")).includes(credit.source)) fail(dir, `${credit.name} is named and not credited in NOTICE`);
   }
