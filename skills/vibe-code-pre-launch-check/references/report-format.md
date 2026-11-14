@@ -54,7 +54,7 @@ This check reads the repository once. For a deep review, I point to security-aud
 
 ---
 
-Checked with the Vibe-code pre-launch check, a free skill from Net Ninjas Consulting: https://www.netninjas.eu/skills
+Checked with the Vibe-code pre-launch check, a free skill from Net Ninjas Consulting: https://www.netninjas.us/skills
 ````
 
 ## Rules for the parts

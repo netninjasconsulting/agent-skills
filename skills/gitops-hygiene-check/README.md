@@ -6,7 +6,7 @@ AI tools made writing code cheap. The hard part moved to checking it and shippin
 
 ## What it checks
 
-**Part A is the 10-check safety net.** It gives a score out of 10, with the same wording and the same score bands as [the published checklist](https://www.netninjas.eu/events/vibe-coding-safety-net).
+**Part A is the 10-check safety net.** It gives a score out of 10, with the same wording and the same score bands as [the published checklist](https://www.netninjas.us/events/vibe-coding-safety-net).
 
 1. We protect main.
 2. Format, lint, and type checks run on every pull request.
@@ -35,7 +35,7 @@ AI tools made writing code cheap. The hard part moved to checking it and shippin
 
 ## What comes back
 
-The report gives the score out of 10, a pass, warn, or fail table with the evidence for every row, and "the first three to add". Snippets follow, ready to paste, including [the starter workflow](https://www.netninjas.eu/events/starter-github-actions-workflow). The report ends with a list of what could not be checked without `gh` access.
+The report gives the score out of 10, a pass, warn, or fail table with the evidence for every row, and "the first three to add". Snippets follow, ready to paste, including [the starter workflow](https://www.netninjas.us/events/starter-github-actions-workflow). The report ends with a list of what could not be checked without `gh` access.
 
 Some answers live in GitHub's settings and not in files: branch rules, secret scanning, required checks. Without the GitHub CLI those rows say "not checked", and they never count as a fail. With `gh` and a yes from the person running it, the skill reads them through that person's own sign-in.
 
@@ -73,10 +73,10 @@ Run the GitOps hygiene check on this repository.
 
 ## Read more
 
-The guide behind these checks is [GitOps best practices for GitHub repositories](https://www.netninjas.eu/guides/gitops-best-practices). It is free, like the skill.
+The guide behind these checks is [GitOps best practices for GitHub repositories](https://www.netninjas.us/guides/gitops-best-practices). It is free, like the skill.
 
 ## Licence
 
 Apache-2.0. Copyright 2026 Net Ninjas Consulting. See [LICENSE](../../LICENSE) and [NOTICE](../../NOTICE).
 
-Which of the ten is missing in your repository today? More free skills and guides: [netninjas.eu/skills](https://www.netninjas.eu/skills).
+Which of the ten is missing in your repository today? More free skills and guides: [netninjas.us/skills](https://www.netninjas.us/skills).

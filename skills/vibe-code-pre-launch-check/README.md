@@ -66,4 +66,4 @@ This skill is a quick check, and it is honest about that. For a deep review, the
 
 Apache-2.0. Copyright 2026 Net Ninjas Consulting. See [LICENSE](../../LICENSE) and [NOTICE](../../NOTICE).
 
-Which of these checks would your app fail today? More free skills and guides: [netninjas.eu/skills](https://www.netninjas.eu/skills).
+Which of these checks would your app fail today? More free skills and guides: [netninjas.us/skills](https://www.netninjas.us/skills).

@@ -19,11 +19,11 @@ Ready to paste. Adapt names, paths, and commands to the repository, and say whic
 
 ## Starter workflow
 
-The workflow published at https://www.netninjas.eu/events/starter-github-actions-workflow, as it stood on 13 November 2026. It assumes a Node.js project. For another language, keep the shape and swap the four commands in the `checks` job. The published page is the current copy.
+The workflow published at https://www.netninjas.us/events/starter-github-actions-workflow, as it stood on 13 November 2026. It assumes a Node.js project. For another language, keep the shape and swap the four commands in the `checks` job. The published page is the current copy.
 
 ```yaml
 # .github/workflows/ci.yml
-# Starter pipeline from the talk "Ship fast, break nothing" (netninjas.eu/events).
+# Starter pipeline from the talk "Ship fast, break nothing" (netninjas.us/events).
 # Assumes a Node.js project whose package.json has lint, typecheck, test, and build scripts.
 name: ci
 

@@ -1,6 +1,6 @@
 # CI/CD baseline
 
-What step 8 scaffolds, in order. The target is the 10-check safety net published at https://www.netninjas.eu/events/vibe-coding-safety-net: a pipeline that can say no.
+What step 8 scaffolds, in order. The target is the 10-check safety net published at https://www.netninjas.us/events/vibe-coding-safety-net: a pipeline that can say no.
 
 Every remote change in this file needs its own confirmation card (SKILL.md, rule 2). Local files need none. Commands are shown in the shape to use. Check each one against the CLI's own `--help` before running it, because flags change between versions.
 
@@ -40,7 +40,7 @@ Create these in the project folder before the first commit.
 - **`.gitignore`**: dependencies, build output, `.env*` with an exception for `.env.example`, and for infrastructure code `*.tfstate*` and `.terraform/`.
 - **`.env.example`**: every variable name the app reads, with no values.
 - **The lockfile**, committed.
-- **`.github/workflows/ci.yml`**: lint, type check, tests, and build on every pull request and on pushes to main. Start from the starter workflow at https://www.netninjas.eu/events/starter-github-actions-workflow and fit it to the stack. Keep these properties:
+- **`.github/workflows/ci.yml`**: lint, type check, tests, and build on every pull request and on pushes to main. Start from the starter workflow at https://www.netninjas.us/events/starter-github-actions-workflow and fit it to the stack. Keep these properties:
   - `permissions: contents: read` at the top, and more only on the job that needs it.
   - `concurrency` that cancels older runs of the same pull request.
   - One job named `checks`, so branch protection has a stable name to require.

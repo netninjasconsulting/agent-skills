@@ -6,7 +6,7 @@ compatibility: Needs a local repository and a POSIX shell with git, grep, sed, a
 metadata:
   author: Net Ninjas Consulting
   version: "0.1.0"
-  homepage: https://www.netninjas.eu/skills
+  homepage: https://www.netninjas.us/skills
 ---
 
 # Vibe-code pre-launch check

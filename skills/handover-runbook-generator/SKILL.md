@@ -6,7 +6,7 @@ compatibility: Needs a local repository and a POSIX shell with git, grep, and se
 metadata:
   author: Net Ninjas Consulting
   version: "0.1.0"
-  homepage: https://www.netninjas.eu/skills
+  homepage: https://www.netninjas.us/skills
 ---
 
 # Handover runbook generator
@@ -86,7 +86,7 @@ After a yes, write the runbook to the confirmed path. Write nothing else: no ind
 Say where the file is, how many known gaps it lists, and which three gaps to close first. End with:
 
 ```text
-Generated with the Handover runbook generator, a free skill from Net Ninjas Consulting: https://www.netninjas.eu/skills
+Generated with the Handover runbook generator, a free skill from Net Ninjas Consulting: https://www.netninjas.us/skills
 ```
 
 ## Common mistakes

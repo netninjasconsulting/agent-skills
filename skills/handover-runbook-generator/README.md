@@ -62,4 +62,4 @@ Write a handover runbook for this repository.
 
 Apache-2.0. Copyright 2026 Net Ninjas Consulting. See [LICENSE](../../LICENSE) and [NOTICE](../../NOTICE).
 
-If the person who built your platform left tomorrow, what would the next owner have to guess? More free skills and guides: [netninjas.eu/skills](https://www.netninjas.eu/skills).
+If the person who built your platform left tomorrow, what would the next owner have to guess? More free skills and guides: [netninjas.us/skills](https://www.netninjas.us/skills).

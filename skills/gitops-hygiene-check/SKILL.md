@@ -6,7 +6,7 @@ compatibility: Needs a local clone of a GitHub repository and a POSIX shell with
 metadata:
   author: Net Ninjas Consulting
   version: "0.1.0"
-  homepage: https://www.netninjas.eu/skills
+  homepage: https://www.netninjas.us/skills
 ---
 
 # GitOps hygiene check
@@ -39,7 +39,7 @@ List every file under `.github/workflows/`, plus `.github/dependabot.yml`, Renov
 
 ### 3. Part A: the 10-check safety net
 
-Score the ten checks with the evidence rules in [references/checks.md](references/checks.md), section "Part A". The wording of the ten checks and of the score bands comes from https://www.netninjas.eu/events/vibe-coding-safety-net and stays as published.
+Score the ten checks with the evidence rules in [references/checks.md](references/checks.md), section "Part A". The wording of the ten checks and of the score bands comes from https://www.netninjas.us/events/vibe-coding-safety-net and stays as published.
 
 1. We protect main.
 2. Format, lint, and type checks run on every pull request.
@@ -129,7 +129,7 @@ This is a quick check. It is not a penetration test and it is not legal advice.
 
 ---
 
-Checked with the GitOps hygiene check, a free skill from Net Ninjas Consulting: https://www.netninjas.eu/skills
+Checked with the GitOps hygiene check, a free skill from Net Ninjas Consulting: https://www.netninjas.us/skills
 ````
 
 Take the snippets from [references/snippets.md](references/snippets.md). When `gh` was used and nothing is left unchecked, write "Nothing. Every setting was read." under the last heading.

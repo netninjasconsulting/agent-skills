@@ -70,4 +70,4 @@ I want to build an app. Help me pick a stack and set it up.
 
 Apache-2.0. Copyright 2026 Net Ninjas Consulting. See [LICENSE](../../LICENSE) and [NOTICE](../../NOTICE).
 
-What are you building, and which of those seven providers do you already know? More free skills and guides: [netninjas.eu/skills](https://www.netninjas.eu/skills).
+What are you building, and which of those seven providers do you already know? More free skills and guides: [netninjas.us/skills](https://www.netninjas.us/skills).

@@ -6,7 +6,7 @@ compatibility: Needs git and a POSIX shell. Remote steps need the GitHub CLI (gh
 metadata:
   author: Net Ninjas Consulting
   version: "0.1.0"
-  homepage: https://www.netninjas.eu/skills
+  homepage: https://www.netninjas.us/skills
 ---
 
 # Guided app starter

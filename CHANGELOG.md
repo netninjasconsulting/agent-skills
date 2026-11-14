@@ -24,6 +24,10 @@ First version of the four skills.
 - Provider facts in the stack matrix that are marked "checked", including the US regions added on 13 November 2026. Facts marked "verify" were not confirmed.
 - The ten checks and the score bands, against the published checklist on netninjas.eu.
 
+### Changed (14 November 2026)
+
+- Every skill's `homepage`, report footer, and guide link points to www.netninjas.us. The guided app starter still links the site for the region of the run.
+
 ### Tested
 
 See `tests/RESULTS.md`. In short: the first three skills each passed one run against their fixture with Claude Code. The guided app starter has written scenarios and no passing run yet.
