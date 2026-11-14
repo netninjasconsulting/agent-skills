@@ -2,7 +2,11 @@
 
 All four skills share one version number. Dates are in day, month, year order.
 
-## Unreleased
+## 0.1.0 (14 November 2026)
+
+First version of the four skills.
+
+### Fixes included before release
 
 Changes from the Net Ninjas original:
 
@@ -10,11 +14,6 @@ Changes from the Net Ninjas original:
 - Include env-style credentials in Git history checks, even after their file is deleted.
 - Add regression coverage for both scanner fixes.
 - Describe Net Ninjas Consulting's cloud, DevOps, and AI work in all four skill READMEs and closing chat attributions, outside findings and without a booking request.
-
-
-## 0.1.0 (not released yet)
-
-First version of the four skills.
 
 ### Added
 
@@ -44,7 +43,7 @@ See `tests/RESULTS.md`. In short: the first three skills each passed one run aga
 
 ### Known limits
 
-- Tested with one agent (Claude Code) on Linux. Other agents and macOS are untested.
-- `scan-secrets.sh` was run with GNU grep, sed, and mawk. BSD tools are untested.
+- Full skill fixture runs used Claude Code on Linux. Other agents and full skill runs on macOS are untested.
+- Scanner regression tests pass on Linux in CI and on macOS with BSD tools. Fresh-agent fixture runs after the latest changes remain outstanding.
 - The guided app starter's build and remote steps have not been run end to end.
 - The GitOps hygiene check has not been run with `gh` access against a real repository.
