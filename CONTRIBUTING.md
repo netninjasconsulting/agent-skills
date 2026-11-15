@@ -19,12 +19,14 @@ Pull requests are welcome. These skills are free, and they stay free.
 
 ```sh
 node scripts/validate.mjs
+node tests/validate.test.mjs
 sh tests/scan-secrets.test.sh
 sh tests/list-agent-config.test.sh
+sh tests/read-serverless-config.test.sh
 sh tests/names-filter.test.sh
 ```
 
-A change to a skill needs a matching change to its fixture's `EXPECTED.md`, and a fresh run against the fixture. `tests/README.md` says how. A change that touches provider facts in `skills/guided-app-starter/references/stack-matrix.md` updates the check date and the source link.
+A change to a skill needs a matching change to its fixture's `EXPECTED.md`, and a fresh run against the fixture. `tests/README.md` says how. A change that touches provider facts in `skills/guided-app-starter/references/stack-matrix.md` or `skills/serverless-deploy-check/references/platforms.md` updates the check date and the source link.
 
 Copy is in UK English, with the Oxford comma and without em dashes. The READMEs follow the Net Ninjas voice: first person, active voice, short sentences.
 

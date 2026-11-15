@@ -351,6 +351,65 @@ if (existsSync(aiSkill)) {
   }
 }
 
+// The serverless deploy check keeps one wording for its eighteen checks, its statuses,
+// its verdicts, and the order of the first three, so that a takeaway can be cut from them.
+const eighteenChecks = [
+  "E1. Every function sets its memory, and its CPU, where the platform has a setting.",
+  "E2. Every function has a time limit that is set on purpose and sits below the platform's maximum.",
+  "E3. Concurrency and fan-out have a ceiling.",
+  "E4. The runtime and the CPU architecture are current.",
+  "E5. The deploy package holds only what the function runs.",
+  "E6. Clients and connections are created once and reused, through a pooler where the database needs one.",
+  "E7. Large request and response bodies are streamed, not held in memory.",
+  "E8. Start-up work is small.",
+  "S1. Every public entry point checks who is calling, or is public on purpose.",
+  "S2. Each function's permissions cover only what it uses.",
+  "S3. Secrets live in the platform's secret store, not in configuration or code.",
+  "S4. No server secret reaches the browser bundle.",
+  "S5. The data layer enforces access itself.",
+  "S6. Webhook and scheduled endpoints verify the caller.",
+  "S7. Requests meet a size limit and a rate limit before they cost money.",
+  "S8. Cross-origin rules name their origins.",
+  "S9. Deploys use short-lived credentials.",
+  "S10. Logs leave out secrets and request bodies, and have a retention period.",
+];
+const serverlessStatuses = [
+  "| pass | Every part of the check is met, with evidence. | 1 |",
+  "| warn | Part of the check is met, and the missing part would be in the repository. | 0 |",
+  "| fail | The check is not met, or nothing for it is found in the repository. | 0 |",
+  "| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |",
+  "| does not apply | No platform in the repository has this setting. | not counted |",
+];
+const serverlessVerdicts = [
+  "| Not ready to deploy | Any of S1 to S5 is a fail. |",
+  "| Ready after the first three | No fail in S1 to S5, and at least one of the eighteen checks is a fail or a warn. |",
+  "| Ready from what the repository shows | No fail and no warn. |",
+];
+const firstThreeOrder = "Order: S3, S4, S1, S5, S2, S6, S7, E3, S8, S9, S10, E1, E2, E4, E5, E6, E7, E8.";
+const serverlessSkill = path.join(skillsDir, "serverless-deploy-check");
+if (existsSync(serverlessSkill)) {
+  const linesOf = (file) => (existsSync(file) ? visibleLines(read(file).split("\n")) : []);
+  const skillFile = path.join(serverlessSkill, "SKILL.md");
+  const skillLines = linesOf(skillFile);
+  const checksFile = path.join(serverlessSkill, "references", "checks.md");
+  const checksLines = linesOf(checksFile);
+  const checksSection = sectionLines(skillLines, "## The eighteen checks");
+  // Whole lines, in their own sections, so that "S1. ..." is not found inside "S10. ...".
+  sameLines(skillFile, checksSection.filter((line) => /^[ES]\d+\. /.test(line)), eighteenChecks, "the eighteen checks");
+  sameLines(checksFile, checksLines.filter((line) => /^#+ [ES]\d+\. /.test(line)), eighteenChecks.map((check) => `### ${check}`), "the eighteen check headings");
+  sameLines(skillFile, checksSection.filter((line) => /^\| (pass|warn|fail|ask the team|does not apply) \|/.test(line)), serverlessStatuses, "the status table");
+  sameLines(skillFile, sectionLines(skillLines, "## The verdict").filter((line) => /^\| (Not ready|Ready)/.test(line)), serverlessVerdicts, "the verdict table");
+  sameLines(skillFile, sectionLines(skillLines, "## The first three to change").filter((line) => /^Order:/.test(line)), [firstThreeOrder], "the order of the first three");
+  sameLines(checksFile, sectionLines(checksLines, "## The first three to change").filter((line) => /^Order:/.test(line)), [firstThreeOrder], "the order of the first three");
+  eighteenChecks.forEach((check) => {
+    if (!skillLines.includes(check)) fail(skillFile, `a check does not match its fixed wording: ${check}`);
+    if (!checksLines.includes(`### ${check}`)) fail(checksFile, `a check heading does not match its fixed wording: ${check}`);
+  });
+  [...serverlessStatuses, ...serverlessVerdicts, firstThreeOrder].forEach((line) => {
+    if (!skillLines.includes(line)) fail(skillFile, `a line does not match its fixed wording: ${line}`);
+  });
+}
+
 // The nine rows of the agent permissions check keep the wording of the published policy.
 const nineRows = [
   ["Repository", "Open branches and pull requests, and comment.", "Push to main, merge, approve its own work, or edit workflow files.", "A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/."],

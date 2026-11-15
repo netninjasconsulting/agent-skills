@@ -1,0 +1,40 @@
+service: quickship-import
+frameworkVersion: "4"
+
+provider:
+  name: aws
+  region: us-east-1
+  logRetentionInDays: 30
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: "*"
+          Resource: "*"
+  apiGateway:
+    apiKeys:
+      - quickship-import
+    usagePlan:
+      throttle:
+        burstLimit: 20
+        rateLimit: 10
+      quota:
+        limit: 5000
+        period: DAY
+
+functions:
+  ingest:
+    handler: handler.ingest
+    runtime: nodejs20.x
+    architecture: x86_64
+    memorySize: 1769
+    timeout: 900
+    url: true
+    events:
+      - http:
+          path: ingest
+          method: post
+          private: true
+    environment:
+      DB_PASSWORD: |
+        FIXTUREVALUE-serverless-block-01

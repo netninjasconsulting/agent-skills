@@ -1,0 +1,11 @@
+project_id = "quickship"
+
+[api]
+enabled = true
+schemas = ["public"]
+
+[functions.notify]
+verify_jwt = false
+
+[functions.label]
+verify_jwt = true

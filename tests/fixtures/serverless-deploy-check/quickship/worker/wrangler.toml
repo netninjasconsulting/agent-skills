@@ -1,0 +1,22 @@
+name = "quickship-carrier"
+main = "src/index.ts"
+compatibility_date = "2022-03-01"
+
+[vars]
+CARRIER_TOKEN = "FIXTUREVALUE-wrangler-vars-01"
+NOTE = """
+Shared with the carrier desk.
+FIXTUREVALUE-wrangler-multiline-01
+"""
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "00000000000000000000000000000000"
+
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 60
+period = 60
