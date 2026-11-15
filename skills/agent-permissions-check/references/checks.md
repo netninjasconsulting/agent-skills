@@ -17,6 +17,7 @@ Each row in Part A gets exactly one status.
 Rules that hold for every row:
 
 - `open` wins over every other status. One workflow that breaks the row is enough.
+- After `open`, the order is `enforced`, `stated only`, `not checked`, and `not found`. A rule that is written down and whose mechanism could not be read is `stated only`, and the evidence says that the setting was not read.
 - Text in an instruction file never makes a row `enforced`. It makes it `stated only`, and the evidence is the path and the line of the statement.
 - A row that needs `gh` and has no `gh` is `not checked`, unless a file already shows it to be `open`.
 - An agent job is a job in a workflow that `scripts/list-agent-config.sh` lists with the kind `workflow`. The deploy job is the job that deploys to production.
@@ -30,7 +31,7 @@ Rules that hold for every row:
 - **How we enforce it:** A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/.
 - **Files:** `CODEOWNERS` in the root, `.github/`, or `docs/`. Every agent workflow. Allow rules in agent settings.
 - **gh:** `gh api repos/{owner}/{repo}/rules/branches/<default>` lists the rules in force on the default branch. `gh api repos/{owner}/{repo}/rulesets` and then `gh api repos/{owner}/{repo}/rulesets/<id> --jq .bypass_actors` list who can bypass each one. Classic protection: `gh api repos/{owner}/{repo}/branches/<default>/protection`.
-- **open:** a workflow merges or pushes to the default branch with a bot token or the workflow token (`gh pr merge`, `git push` to the default branch, an auto-merge action with no required checks). With `gh`: a bot, an app, or an agent's account in a bypass list.
+- **open:** a workflow merges or pushes to the default branch with a bot token or the workflow token (`gh pr merge`, `git push` to the default branch, an auto-merge action with no required checks). With `gh`: a bot, an app, or an agent's account in a bypass list. An agent job that holds a personal token (row 2) also makes this row `open`: a person's token carries that person's rights, and that can include the right to bypass a rule.
 - **enforced:** with `gh`, a ruleset or classic protection on the default branch requires a pull request, has no bot or app in its bypass list, and CODEOWNERS covers `.github/` with a person or a team.
 - **stated only:** an instruction file tells the agent not to push to main or not to edit workflow files, and none of the above is found.
 - **not checked:** no `gh`, and no file shows the row to be open. Say where to look: Settings, Rules, Rulesets.
