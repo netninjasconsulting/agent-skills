@@ -1914,6 +1914,353 @@ Resources:
             DefaultAuthorizer: FIXTUREVALUE
 YAML
 
+# 5w. Final review.
+# The never-shown list, the credential-word test, and the Serverless
+# parameters rule: below such a key, no child name prints. Nothing else in
+# this file fails when one of the three is turned off.
+put fr/never/serverless.yml <<'YAML'
+service: s
+functions:
+  f:
+    handler: a.b
+    events:
+      - schedule:
+          rate: rate(1 hour)
+          input:
+            zqfmInputChild: FIXTUREVALUE
+      - http:
+          path: a
+          method: get
+          parameters:
+            zqfmParamChild: FIXTUREVALUE
+          request:
+            zqfmRequestChild: FIXTUREVALUE
+custom:
+  stripeCredentials:
+    zqfmWordChild: FIXTUREVALUE
+  buildCommand:
+    zqfmBuildChild: FIXTUREVALUE
+  private_key:
+    zqfmKeyChild: FIXTUREVALUE
+YAML
+put fr/never/template.json <<'JSON'
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": {
+    "input": { "zqfmJsonInput": "FIXTUREVALUE" },
+    "dbCredentials": { "zqfmJsonWord": "FIXTUREVALUE" }
+  }
+}
+JSON
+put fr/never/supabase/config.toml <<'TOML'
+[custom.run]
+zqfmTomlRun = "FIXTUREVALUE"
+[custom.sessionToken]
+zqfmTomlWord = "FIXTUREVALUE"
+[api]
+enabled = true
+TOML
+put fr/never/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  timeout = 21
+  request {
+    zqfmHclRequest = "FIXTUREVALUE"
+  }
+  accessKeys {
+    zqfmHclWord = "FIXTUREVALUE"
+  }
+}
+HCL
+
+# I1. The name of a container is a name, not a value: a function, a resource,
+# a job, a route glob, or an environment whose name holds a credential word is
+# still a home, and a leaf key with such a word still hides its value.
+put fr/names/serverless.yml <<'YAML'
+service: s
+provider:
+  name: aws
+functions:
+  refreshToken:
+    handler: src/token.handler
+    memorySize: 512
+    timeout: 900
+    url: true
+    apiToken: FIXTUREVALUE
+    environment:
+      DB_PASSWORD: FIXTUREVALUE
+  resetPassword:
+    handler: src/reset.handler
+    timeout: 31
+  secrets:
+    handler: src/secrets.handler
+    timeout: 32
+    password: FIXTUREVALUE
+  token: FIXTUREVALUE
+  apiKeys:
+    FIXTUREVALUE
+YAML
+put fr/names/template.yaml <<'YAML'
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  PasswordResetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 33
+      FunctionUrlConfig:
+        AuthType: NONE
+      Environment:
+        Variables:
+          API_TOKEN: FIXTUREVALUE
+  GetTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Timeout: 34
+      Events:
+        GetToken:
+          Type: Api
+          Properties:
+            Path: /token
+            Method: get
+  DbPassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      SecretString: FIXTUREVALUE
+      MasterUserPassword: FIXTUREVALUE
+YAML
+put fr/names/template.json <<'JSON'
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "RotateSecretFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": { "Timeout": 35, "SecretString": "FIXTUREVALUE" }
+    }
+  }
+}
+JSON
+put fr/names/supabase/config.toml <<'TOML'
+[functions.reset-password]
+verify_jwt = false
+password = "FIXTUREVALUE"
+[functions.verify-token]
+verify_jwt = true
+secret = "FIXTUREVALUE"
+[auth.external.token]
+enabled = true
+secret = "FIXTUREVALUE"
+TOML
+put fr/names/vercel.json <<'JSON'
+{
+  "functions": {
+    "app/api/auth/token/route.ts": { "maxDuration": 800, "apiToken": "FIXTUREVALUE" },
+    "app/api/secret/route.ts": "FIXTUREVALUE"
+  },
+  "schedules": {
+    "rotate-secrets": { "schedule": "0 4 * * *", "token": "FIXTUREVALUE" }
+  }
+}
+JSON
+put fr/names/.github/workflows/w.yml <<'YAML'
+name: deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  rotate-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: FIXTUREVALUE
+          aws-region: eu-west-1
+    token: FIXTUREVALUE
+YAML
+put fr/names/wrangler.toml <<'TOML'
+name = "w"
+[env.token-staging]
+name = "w-staging"
+workers_dev = false
+api_token = "FIXTUREVALUE"
+[env.token-staging.vars]
+API_TOKEN = "FIXTUREVALUE"
+[[env.token-staging.kv_namespaces]]
+binding = "KV"
+id = "FIXTUREVALUE"
+TOML
+put fr/names/wrangler.json <<'JSON'
+{
+  "env": {
+    "secret-preview": {
+      "name": "w-preview",
+      "token": "FIXTUREVALUE",
+      "vars": { "API_TOKEN": "FIXTUREVALUE" }
+    }
+  }
+}
+JSON
+put fr/names/samconfig.toml <<'TOML'
+version = 0.1
+[secrets.deploy.parameters]
+stack_name = "kept-stack"
+parameter_overrides = "Token=FIXTUREVALUE"
+TOML
+
+# I2. The credentials setting of a cross-origin rule shows a boolean only.
+put fr/cors/template.yaml <<'YAML'
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  A:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: "*"
+          AllowCredentials: true
+  B:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionUrlConfig:
+        Cors:
+          AllowCredentials: FIXTUREVALUE
+  C:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionUrlConfig:
+        Cors:
+          AllowCredentials:
+            zqfmCorsChild: FIXTUREVALUE
+YAML
+put fr/cors/template.json <<'JSON'
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "A": { "Type": "AWS::Serverless::Function", "Properties": { "FunctionUrlConfig": { "Cors": { "AllowCredentials": true } } } },
+    "B": { "Type": "AWS::Serverless::Function", "Properties": { "FunctionUrlConfig": { "Cors": { "AllowCredentials": "FIXTUREVALUE" } } } },
+    "C": { "Type": "AWS::Serverless::Function", "Properties": { "AllowCredentials": true } }
+  }
+}
+JSON
+put fr/cors/main.tf <<'HCL'
+resource "aws_lambda_function_url" "u" {
+  authorization_type = "NONE"
+  cors {
+    allow_origins     = ["*"]
+    allow_credentials = true
+  }
+}
+resource "aws_lambda_function_url" "v" {
+  cors {
+    allow_credentials = "FIXTUREVALUE"
+  }
+}
+resource "aws_lambda_function" "f" {
+  allow_credentials = true
+}
+HCL
+put fr/cors/serverless.yml <<'YAML'
+service: s
+provider:
+  name: aws
+  httpApi:
+    cors:
+      allowedOrigins: "*"
+      allowCredentials: true
+functions:
+  f:
+    handler: a.b
+    url:
+      cors:
+        allowCredentials: false
+    events:
+      - http:
+          path: a
+          method: get
+          cors:
+            allowCredentials: FIXTUREVALUE
+  g:
+    handler: a.b
+    allowCredentials: true
+YAML
+
+# A resource or data block is a home only when its name is a valid name.
+put fr/hcl-name/main.tf <<'HCL'
+resource "aws_lambda_function" "" {
+  handler = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "a b" {
+  handler = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "9lives" {
+  handler = "FIXTUREVALUE"
+}
+data "aws_iam_policy_document" "" {
+  statement {
+    effect = "Allow"
+    actions = ["zqfm:EmptyName"]
+  }
+}
+resource "aws_lambda_function" "good-name_1" {
+  timeout = 22
+}
+HCL
+
+# The Auth of a resource that is not an event shows the settings of an API
+# only, so Authorizer, which belongs to an event, hides there.
+put fr/sam-auth/template.yaml <<'YAML'
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Deployer:
+    Type: Custom::Deployer
+    Properties:
+      Auth:
+        Authorizer: FIXTUREVALUE
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Auth:
+        DefaultAuthorizer: KeptAuth
+        ApiKeyRequired: true
+        AddDefaultAuthorizerToCorsPreflight: false
+  Fn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Events:
+        Get:
+          Type: Api
+          Properties:
+            Path: /a
+            Method: get
+            Auth:
+              Authorizer: KeptEventAuth
+YAML
+
+# A variable file in JSON prints its top-level names only.
+put fr/tfvars/prod.tfvars.json <<'JSON'
+{
+  "region": "FIXTUREVALUE",
+  "db_password": "FIXTUREVALUE",
+  "ref": "env(FIXTUREVALUE_NAME)",
+  "tags": { "zqfmVarChild": "FIXTUREVALUE" },
+  "list": ["FIXTUREVALUE", { "zqfmVarItem": "FIXTUREVALUE" }],
+  "AWSTemplateFormatVersion": "FIXTUREVALUE"
+}
+JSON
+# A package.json that mentions a template marker is not a template.
+put fr/pkg/package.json <<'JSON'
+{ "name": "p", "description": "Deploys an AWS::Serverless application" }
+JSON
+put fr/tfvars/dev.auto.tfvars.json <<'JSON'
+{ "stage": "FIXTUREVALUE" }
+JSON
+put fr/tfvars/list.tfvars.json <<'JSON'
+[
+  { "zqfmVarInList": "FIXTUREVALUE" },
+  "env(FIXTUREVALUE_NAME)"
+]
+JSON
+
 attack_count=0
 for file in $(cd "$a" && find . -type f | sort); do
   attack_count=$((attack_count + 1))
@@ -1924,7 +2271,7 @@ for file in $(cd "$a" && find . -type f | sort); do
   # A second marker, in lower case, for a path: the capitals of the first one hide a path by themselves.
   case "$out" in *leakpath*) fail "attack $file: a planted path leaked" ;; esac
 done
-[ "$attack_count" -ge 165 ] || fail "attack: only $attack_count files were written"
+[ "$attack_count" -ge 185 ] || fail "attack: only $attack_count files were written"
 
 # The attack files still show what the checks need.
 expect_text "$(sh "$reader" --show "$a/span/vercel.json")" '"framework": "kept"' "attack span/vercel.json"
@@ -2101,6 +2448,134 @@ expect_text "$r5" 'resources = ["${aws_dynamodb_table.t.arn}/*", <redacted>]' "r
 r5=$(sh "$reader" --show "$a/r5/sam-auth/template.yaml")
 expect_text "$r5" 'DefaultAuthorizer: MyAuth' "round 5 sam api auth"
 expect_text "$r5" 'ApiKeyRequired: true' "round 5 sam api auth"
+
+# Final review: the never-shown list, the credential-word test, and the
+# Serverless parameters rule hide the names below a key.
+fr=$(for file in serverless.yml template.json supabase/config.toml main.tf; do sh "$reader" --show "$a/fr/never/$file"; done)
+for name in zqfmInputChild zqfmRequestChild zqfmBuildChild zqfmJsonInput zqfmTomlRun zqfmHclRequest; do
+  case "$fr" in *"$name"*) fail "never-shown list: the name $name below a never-shown key is printed" ;; esac
+done
+for name in zqfmWordChild zqfmKeyChild zqfmJsonWord zqfmTomlWord zqfmHclWord; do
+  case "$fr" in *"$name"*) fail "credential word: the name $name below a key with a credential word is printed" ;; esac
+done
+case "$fr" in *zqfmParamChild*) fail "serverless parameters: a name below parameters is printed" ;; esac
+expect_re "$fr" 'rate: rate\(1 hour\)$' "final review never-shown"
+expect_re "$fr" 'timeout = 21$' "final review never-shown"
+expect_text "$fr" 'enabled = true' "final review never-shown"
+
+# The token filters. Each value is joined here from two parts, so that this
+# file holds no text with the shape of a provider key. Each sits under a key
+# that shows a word, and only the filter stage hides it.
+tk="$work/tokens"
+mkdir -p "$tk/.github/workflows"
+tok_aws="AKIA""ABCDEFGHIJKLMNOP"
+tok_gh="ghp_""abcdefghijklmnopqrstuv"
+tok_stripe="sk_live_""abcdefghijkl"
+tok_slack="xoxb-""abcdefghijkl"
+tok_jwt="eyJ""abcdefghijkl.eyJ""abcdefghijkl.abcdefghijkl"
+tok_bearer="abcdefghijkl""mnop"
+printf 'service: s\nfunctions:\n  a:\n    handler: %s\n  b:\n    handler: %s\n  c:\n    handler: %s\n  d:\n    handler: %s\n  e:\n    handler: %s\n' \
+  "$tok_aws" "$tok_gh" "$tok_stripe" "$tok_slack" "$tok_jwt" > "$tk/serverless.yml"
+printf 'name: Bearer %s\non: push\n' "$tok_bearer" > "$tk/.github/workflows/w.yml"
+tkout=$(sh "$reader" --show "$tk/serverless.yml"; sh "$reader" --show "$tk/.github/workflows/w.yml")
+for value in "$tok_aws" "$tok_gh" "$tok_stripe" "$tok_slack" "$tok_jwt" "$tok_bearer"; do
+  case "$tkout" in *"$value"*) fail "token filters: a value with the shape of a provider key is printed" ;; esac
+done
+expect_text "$tkout" 'handler: <redacted:aws-access-key-id>' "token filters"
+expect_text "$tkout" 'handler: <redacted:github-token>' "token filters"
+expect_text "$tkout" 'handler: <redacted:stripe-secret-key>' "token filters"
+expect_text "$tkout" 'handler: <redacted:slack-token>' "token filters"
+expect_text "$tkout" 'handler: <redacted:json-web-token>' "token filters"
+expect_text "$tkout" 'name: Bearer <redacted>' "token filters"
+
+# I1: a container whose name holds a credential word still shows its settings.
+fr=$(sh "$reader" --show "$a/fr/names/serverless.yml")
+expect_re "$fr" 'handler: src/token\.handler$' "name with a credential word, serverless"
+expect_re "$fr" 'memorySize: 512$' "name with a credential word, serverless"
+expect_re "$fr" 'timeout: 900$' "name with a credential word, serverless"
+expect_re "$fr" 'url: true$' "name with a credential word, serverless"
+expect_re "$fr" 'timeout: 31$' "name with a credential word, serverless"
+expect_re "$fr" 'timeout: 32$' "name with a credential word, serverless"
+expect_re "$fr" 'apiToken: <redacted>$' "name with a credential word, serverless"
+expect_re "$fr" 'DB_PASSWORD: <redacted>$' "name with a credential word, serverless"
+expect_re "$fr" '^ +[0-9]+	    password: <redacted>$' "name with a credential word, serverless"
+expect_re "$fr" '^ +[0-9]+	  token: <redacted>$' "name with a credential word, serverless"
+fr=$(sh "$reader" --show "$a/fr/names/template.yaml")
+expect_re "$fr" 'Timeout: 33$' "name with a credential word, sam"
+expect_re "$fr" 'AuthType: NONE$' "name with a credential word, sam"
+expect_re "$fr" 'Timeout: 34$' "name with a credential word, sam"
+expect_re "$fr" 'Path: /token$' "name with a credential word, sam"
+expect_re "$fr" 'API_TOKEN: <redacted>$' "name with a credential word, sam"
+expect_re "$fr" 'SecretString: <redacted>$' "name with a credential word, sam"
+expect_re "$fr" 'MasterUserPassword: <redacted>$' "name with a credential word, sam"
+fr=$(sh "$reader" --show "$a/fr/names/template.json")
+expect_text "$fr" '"Timeout": 35' "name with a credential word, json template"
+expect_text "$fr" '"SecretString": "<redacted>"' "name with a credential word, json template"
+fr=$(sh "$reader" --show "$a/fr/names/supabase/config.toml")
+expect_text "$fr" 'verify_jwt = false' "name with a credential word, supabase"
+expect_text "$fr" 'verify_jwt = true' "name with a credential word, supabase"
+expect_text "$fr" 'enabled = true' "name with a credential word, supabase"
+expect_text "$fr" 'password = <redacted>' "name with a credential word, supabase"
+fr=$(sh "$reader" --show "$a/fr/names/vercel.json")
+expect_text "$fr" '"maxDuration": 800' "name with a credential word, vercel"
+expect_text "$fr" '"schedule": "0 4 * * *"' "name with a credential word, vercel"
+expect_text "$fr" '"apiToken": "<redacted>"' "name with a credential word, vercel"
+fr=$(sh "$reader" --show "$a/fr/names/.github/workflows/w.yml")
+expect_re "$fr" 'runs-on: ubuntu-latest$' "name with a credential word, workflow"
+expect_re "$fr" 'uses: aws-actions/configure-aws-credentials@v4$' "name with a credential word, workflow"
+# shellcheck disable=SC2016  # the expression is literal text in the workflow
+expect_text "$fr" 'aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}' "name with a credential word, workflow"
+expect_re "$fr" 'aws-secret-access-key: <redacted>$' "name with a credential word, workflow"
+expect_re "$fr" 'aws-region: eu-west-1$' "name with a credential word, workflow"
+fr=$(sh "$reader" --show "$a/fr/names/wrangler.toml")
+expect_text "$fr" 'name = "w-staging"' "name with a credential word, wrangler"
+expect_text "$fr" 'workers_dev = false' "name with a credential word, wrangler"
+expect_text "$fr" 'binding = "KV"' "name with a credential word, wrangler"
+expect_text "$fr" 'API_TOKEN = <redacted>' "name with a credential word, wrangler"
+expect_text "$fr" 'api_token = <redacted>' "name with a credential word, wrangler"
+fr=$(sh "$reader" --show "$a/fr/names/wrangler.json")
+expect_text "$fr" '"name": "w-preview"' "name with a credential word, wrangler json"
+expect_text "$fr" '"token": "<redacted>"' "name with a credential word, wrangler json"
+expect_text "$(sh "$reader" --show "$a/fr/names/samconfig.toml")" 'stack_name = "kept-stack"' "name with a credential word, samconfig"
+
+# I2: the credentials setting of a cross-origin rule shows a boolean, in its home.
+fr=$(sh "$reader" --show "$a/fr/cors/template.yaml")
+expect_re "$fr" 'AllowCredentials: true$' "cors credentials, sam"
+expect_re "$fr" 'AllowCredentials: <redacted>$' "cors credentials, sam"
+case "$fr" in *zqfmCorsChild*) fail "cors credentials, sam: a name below AllowCredentials is printed" ;; esac
+fr=$(sh "$reader" --show "$a/fr/cors/template.json")
+expect_text "$fr" '"Cors": { "AllowCredentials": true }' "cors credentials, json template"
+expect_text "$fr" '"Properties": { "AllowCredentials": <redacted> }' "cors credentials, json template"
+fr=$(sh "$reader" --show "$a/fr/cors/main.tf")
+expect_re "$fr" 'allow_credentials = true$' "cors credentials, hcl"
+expect_re "$fr" '^ +[0-9]+	    allow_credentials = <redacted>$' "cors credentials, hcl"
+expect_re "$fr" '^ +[0-9]+	  allow_credentials = <redacted>$' "cors credentials, hcl outside its home"
+fr=$(sh "$reader" --show "$a/fr/cors/serverless.yml")
+expect_re "$fr" 'allowCredentials: true$' "cors credentials, serverless"
+expect_re "$fr" 'allowCredentials: false$' "cors credentials, serverless"
+expect_re "$fr" '^ +[0-9]+	            allowCredentials: <redacted>$' "cors credentials, serverless"
+expect_re "$fr" '^ +[0-9]+	    allowCredentials: <redacted>$' "cors credentials, serverless outside its home"
+
+# A resource with a valid name is still a home, and a SAM Auth still shows.
+fr=$(sh "$reader" --show "$a/fr/hcl-name/main.tf")
+expect_re "$fr" 'timeout = 22$' "hcl resource name"
+case "$fr" in *zqfm:EmptyName*) fail "hcl resource name: a data block with an empty name is a home" ;; esac
+fr=$(sh "$reader" --show "$a/fr/sam-auth/template.yaml")
+expect_re "$fr" 'DefaultAuthorizer: KeptAuth$' "sam auth of an api"
+expect_re "$fr" 'ApiKeyRequired: true$' "sam auth of an api"
+expect_re "$fr" 'AddDefaultAuthorizerToCorsPreflight: false$' "sam auth of an api"
+expect_re "$fr" 'Authorizer: KeptEventAuth$' "sam auth of an event"
+
+# A variable file in JSON: top-level names only, and no name below them.
+fr=$(sh "$reader" --show "$a/fr/tfvars/prod.tfvars.json" 2>/dev/null || true)
+expect_text "$fr" '"region": "<redacted>"' "tfvars.json"
+expect_text "$fr" '"db_password": "<redacted>"' "tfvars.json"
+expect_text "$fr" '"ref": "<redacted>"' "tfvars.json"
+expect_text "$fr" '"AWSTemplateFormatVersion": "<redacted>"' "tfvars.json"
+case "$fr" in *zqfmVar*) fail "tfvars.json: a name below the top level is printed" ;; esac
+case "$(sh "$reader" --show "$a/fr/tfvars/list.tfvars.json" 2>/dev/null || true)" in
+  *zqfmVar*) fail "tfvars.json: a name inside a top-level list is printed" ;;
+esac
 for file in longseg2/wrangler.toml longseg2/vercel.json; do
   sh "$reader" --show "$a/$file" | grep -q lowercasesharedsecretvalue && fail "long segment: $file shows a lowercase segment over 15 characters"
 done
@@ -2113,6 +2588,9 @@ expect_line "$attack_list" "more/stack.json:aws-lambda:infrastructure:untracked"
 expect_line "$attack_list" "block/template.yaml:aws-lambda:infrastructure:untracked" "list template.yaml"
 expect_line "$attack_list" "comment/prod.tfvars:shared:env:untracked" "list *.tfvars"
 expect_line "$attack_list" "crlf-env/.dev.vars:cloudflare-workers:env:untracked" "list .dev.vars"
+expect_line "$attack_list" "fr/tfvars/prod.tfvars.json:shared:env:untracked" "list *.tfvars.json"
+expect_line "$attack_list" "fr/tfvars/dev.auto.tfvars.json:shared:env:untracked" "list *.tfvars.json"
+printf '%s\n' "$attack_list" | grep -q 'package\.json' && fail "list: a package.json is listed as a template"
 printf '%s\n' "$attack_list" | grep -q 'more/.github/workflows' && fail "list: a workflow outside the top .github folder is listed"
 no_marker "$attack_list" "attack list"
 

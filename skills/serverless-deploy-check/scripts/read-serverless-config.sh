@@ -27,7 +27,7 @@
 # lines, a heredoc, a block scalar, a multi-line string, and a comment are
 # hidden whole. A value that only names where a secret lives, such as
 # ${{ secrets.NAME }} or env(NAME), is shown.
-#   env files, *.tfvars   Names only.
+#   env files, *.tfvars, *.tfvars.json   Names only.
 #   Exit 4                A file type this reader does not show. Nothing is printed.
 
 set -u
@@ -102,7 +102,7 @@ fn>reservedConcurrency:n fn>provisionedConcurrency:n fn>logRetentionInDays:n fn>
 fn>layers:lyr fn>url:b fn>url=url fn>events=evs fn>package=pkg
 fn>iam=fniam fniam>inheritStatements:b fniam>role=iamr
 url>authorizer:atype url>invokeMode:inv url>cors:b url>cors=cors
-cors>allowedOrigins:o cors>allowedHeaders:w cors>allowedMethods:w cors>allowCredentials:b
+cors>allowedOrigins:o cors>allowedHeaders:w cors>allowedMethods:w cors>allowCredentials:b!
 cors>exposedResponseHeaders:w cors>maxAge:n cors>origin:o cors>origins:o cors>headers:w
 evs>schedule:c evs>sqs:arn evs>http:r evs>httpApi:r
 evs>http=ev evs>httpApi=ev evs>schedule=ev evs>sqs=ev
@@ -120,7 +120,7 @@ props>Tracing:trc props>RetentionInDays:n
 props>ProvisionedConcurrencyConfig=pcc pcc>ProvisionedConcurrentExecutions:n
 props>EphemeralStorage=eph eph>Size:n
 props>FunctionUrlConfig=furl furl>AuthType:auth furl>InvokeMode:inv furl>Cors=scors
-scors>AllowOrigins:o scors>AllowMethods:w scors>AllowHeaders:w scors>AllowCredentials:b
+scors>AllowOrigins:o scors>AllowMethods:w scors>AllowHeaders:w scors>AllowCredentials:b!
 scors>MaxAge:n scors>ExposeHeaders:w
 props>LoggingConfig=logc logc>LogFormat:lfmt logc>ApplicationLogLevel:llvl logc>SystemLogLevel:llvl
 props>RuntimeManagementConfig=rmc rmc>UpdateRuntimeOn:upd props>SnapStart=snapc snapc>ApplyOn:snap
@@ -128,7 +128,7 @@ props>Events=sevs sevs>*=sev sev>Type:w sev>Properties=sevp
 sevp>Path:p sevp>Method:meth sevp>Schedule:c sevp>Auth=sauth
 sauth>Authorizer:w sauth>DefaultAuthorizer:w sauth>ApiKeyRequired:b! sauth>AddDefaultAuthorizerToCorsPreflight:b
 props>Policies=pols pols>Statement=stmts pols>[?] stmts>[?]
-props>Auth=sauth
+props>Auth=pauth pauth>DefaultAuthorizer:w pauth>ApiKeyRequired:b! pauth>AddDefaultAuthorizerToCorsPreflight:b
 props>PolicyDocument=pdoc props>AssumeRolePolicyDocument=pdoc pdoc>Statement=stmts
 stmts>Effect:eff stmts>Action:w stmts>Resource:w stmts>Principal:prsv stmts>Principal=prin
 prin>Service:svc prin>AWS:prin'
@@ -203,7 +203,7 @@ lam>ephemeral_storage=heph heph>size:n lam>tracing_config=htc htc>mode:trc
 lam>logging_config=hlc hlc>log_format:lfmt hlc>application_log_level:llvl hlc>system_log_level:llvl
 top>resource.aws_lambda_function_url=hfurl hfurl>authorization_type:auth hfurl>invoke_mode:inv
 hfurl>cors=hcors hcors>allow_origins:o hcors>allow_methods:w hcors>allow_headers:w
-hcors>allow_credentials:b hcors>max_age:n
+hcors>allow_credentials:b! hcors>max_age:n
 top>resource.aws_lambda_permission=hperm hperm>action:w hperm>principal:prsv
 hperm>function_url_auth_type:auth hperm>invoked_via_function_url:b hperm>function_name:w
 top>resource.aws_cloudwatch_log_group=hlg hlg>retention_in_days:n
@@ -264,7 +264,8 @@ classify() {
     serverless.yml | serverless.yaml) echo "aws-lambda functions" ;;
     template.yaml | template.yml | template.json | samconfig.toml) echo "aws-lambda infrastructure" ;;
     *.tf | *.tofu) echo "$(tf_platform "$ROOT/$1") infrastructure" ;;
-    *.tfvars) echo "shared env" ;;
+    *.tfvars | *.tfvars.json) echo "shared env" ;;
+    package.json | package-lock.json) ;;
     config.toml)
       case "$1" in
         supabase/config.toml | */supabase/config.toml) echo "supabase functions" ;;
@@ -316,6 +317,7 @@ show() {
         ;;
       *.tf | *.tofu) family=hcl; format=hcl ;;
       *.tfvars) family=tfvars; format=hcl ;;
+      *.tfvars.json) family=tfvars; format=json ;;
       .env | .env.* | .dev.vars | .dev.vars.*) family='env'; format='env' ;;
       *.yml | *.yaml)
         if grep -Eq -e "$TEMPLATE_MARK" "$SHOW_FILE" 2>/dev/null; then family=sam; format=yaml; fi
@@ -426,19 +428,26 @@ show() {
     }
 
     # The context of the container that key opens, inside context ctx.
-    # A key that no entry names opens "x", where only names print.
+    # A key that no entry names opens "x", where only names print. Where
+    # ctx>*=next makes every key a home, the key is a name the user picks (a
+    # function, a resource, a job, a route glob, an environment). A name is
+    # not a value, so the never-shown list does not judge it: refreshToken is
+    # a function like any other, and below it each key is still judged as a
+    # key, so apiToken and password hide their values there.
     function ctxof(ctx, key) {
       if (key == UNKNOWN || index(key, "\\")) return "x"
       if ((ctx ">" key) in HOME) return HOME[ctx ">" key]
-      if ((ctx ">*") in HOME && keyclass(key) < 2) return HOME[ctx ">*"]
+      if ((ctx ">*") in HOME) return HOME[ctx ">*"]
       return "x"
     }
 
     # The level below key: 2 hides names and values, 0 shows names. A key
-    # that an entry names as a home holds over the never-shown list.
+    # that an entry names as a home, by its name or as a name the user picks,
+    # holds over the never-shown list.
     function lvlof(ctx, key, lvl) {
       if (lvl >= 2) return 2
-      if ((ctx ">" key) in HOME && !index(key, "\\")) return lvl
+      if (key == UNKNOWN || index(key, "\\")) return 2
+      if ((ctx ">" key) in HOME || (ctx ">*") in HOME) return lvl
       return (keyclass(key) >= 2) ? 2 : lvl
     }
 
@@ -594,6 +603,8 @@ show() {
         if (t == "o") { if (!(c in LISTCTX)) c = "x" }
         else { k = UNKNOWN; c = "x"; pc = "x" }
       }
+      # A variable file shows its top-level names and nothing below them.
+      if (family == "tfvars" && jsp > 0) l = 2
       jsp++
       jt[jsp] = t; jk[jsp] = k; jc[jsp] = c; jl[jsp] = l; jpc[jsp] = pc; jpl[jsp] = pl
       jack[jsp] = 0; jpend[jsp] = 0; jln[jsp] = NR
@@ -612,7 +623,7 @@ show() {
           if (key == "key") jack[jsp] = (unq(tok) == "Access-Control-Allow-Origin") ? 1 : ((unq(tok) ~ /^Access-Control-/) ? 2 : 0)
           if (key == "value") shape = (jack[jsp] == 1) ? "o" : ((jack[jsp] == 2) ? "hl" : "")
         }
-        r = render(tok, shape, fl < 2)
+        r = render(tok, shape, fl < 2 && family != "tfvars")
         return (r == "<redacted>") ? hidden : r
       }
       # An element of an array: shown only on the line the array opens, and
@@ -1192,13 +1203,15 @@ show() {
         key = disp; sub(/^[ \t]+/, "", key); sub(/[ \t"{].*$/, "", key)
         # A block is a home only with the labels its type takes: a resource
         # or data block has two quoted labels and is named by the first, its
-        # type. Every other block that is a home has none.
+        # type, when the second is a valid name (a letter or an underscore,
+        # then letters, digits, underscores, and dashes). Every other block
+        # that is a home has none.
         lab = disp; sub(/^[ \t]*[A-Za-z_][A-Za-z0-9_-]*/, "", lab); sub(/[ \t]*[{]$/, "", lab)
         t = lab; nq = gsub(/"[^"\\]*"/, "", t)
         hl[hsp] = lvlof(ctx, key, fl); hb[hsp] = 1
         if (t !~ /^[ \t]*$/) hc[hsp] = "x"
         else if (key == "resource" || key == "data") {
-          if (nq == 2 && match(lab, /^[ \t]*"[A-Za-z0-9_]+"/)) {
+          if (nq == 2 && lab ~ /^[ \t]*"[A-Za-z0-9_]+"[ \t]+"[A-Za-z_][A-Za-z0-9_-]*"$/) {
             sub(/^[ \t]*"/, "", lab); sub(/".*$/, "", lab); key = key "." lab
           }
           hc[hsp] = ctxof(ctx, key)
