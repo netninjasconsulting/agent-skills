@@ -17,7 +17,7 @@ Two new skills. The four skills from 0.1.0 keep their checks.
 - `scripts/validate.mjs` pins the twelve checks, the three score bands with their ranges, the ten stops, the eight leak paths, the seven cost columns, and the cost query of the AI feature architecture check to their published wording. It matches whole lines, so a check with a wrong number fails.
 - `scripts/validate.mjs` pins the nine rows of the agent permissions check to their published wording.
 - `handover-runbook-generator` reads env files through a stricter filter. The old one printed comments and the later lines of a value that spans lines. `tests/names-filter.test.sh` runs the filter of both skills that use it, in CI.
-- Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same.
+- Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same. The guided app starter also carries the security scan corrections listed below.
 
 ### Verified for this release (15 November 2026)
 
@@ -45,6 +45,27 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - Correct hidden JSON arrays, escaped keys and values, and quoted or flow YAML credential handling. Escaped strings and the remainder of escaped text are now hidden conservatively.
 - Tighten evidence for enforced permissions, clarify status precedence, and update Claude Code and Codex facts from vendor documentation. A self-hosted label alone leaves the runner unconfirmed.
 - The plain fixture remains 1 of 9 enforced (1 not checked). The open-rows variant is now 0 of 9 enforced (1 not checked).
+
+### Guided app starter branch review (15 November 2026)
+
+- Redact sensitive values before quoting outside instructions; summarise when safe quotation is uncertain.
+- Name all direct packages, generators, and SDKs in the approved plan. Extra direct packages require approval; transitive dependencies are covered by the approved package.
+- Require enabled dependency review and CodeQL checks in the branch ruleset, using names observed on a pull request. Document unavailable checks instead of claiming they gate a merge.
+- Explain that compiled-language CodeQL jobs may need build configuration and steps between initialisation and analysis.
+- Reject extra top-level workflow permissions, and guard redaction and direct package approval with three additional mutation cases (twelve starter cases total).
+- JavaScript syntax and whitespace checks passed. Runtime validation was blocked by the review sandbox's unavailable virtual-memory limit on this macOS host; the mutation suite and scenarios 10 to 12 remain unrun for these changes. Prior recorded passes apply to the earlier revision. The external Snyk rescan and end-to-end deployment remain outstanding.
+
+### Security scan corrections (15 November 2026)
+
+Snyk's scan of `guided-app-starter` on skills.sh, dated 14 November 2026, reported two findings: E004 (critical) and W011 (medium). Both are addressed in the skill's text. These security scan corrections affect only the guided app starter.
+
+- E004, first point: the CI/CD baseline told the agent to write the ruleset body to a temporary folder outside the project, against rule 1. The three request bodies now go to `gh api` on standard input, and the skill writes no file for them. Rule 1 now rules out every create, change, and delete outside the project folder, and it names the one read outside it.
+- E004, second point: the baseline told the agent to start the CI workflow from a page on netninjas.us. The template now ships with the skill as `assets/ci.yml`, with placeholders where a version or a SHA would go. Rule 7 says that the skill fetches no workflow, script, or instruction from the web.
+- W011: step 6 has rules for dependencies. The build installs what the plan names, plus the framework and the provider SDKs of the recommended stack, and asks before it adds anything else. Rule 7 now says what to do with an instruction in a README, in install output, or on a web page: do not follow it, quote it to the user, and name the source.
+- `scripts/validate.mjs` guards all three corrections, and `tests/validate.test.mjs` has nine mutation cases for them. The guards failed on the old text and pass on the new text.
+- Scenarios 7 to 9 in `tests/fixtures/guided-app-starter/scenarios.md` describe the behaviour. Each one passed one run with a fresh agent in a sandbox. `tests/RESULTS.md` says what each run showed and what it could not show.
+- The scenario 9 run showed that npm writes its cache and its logs under the home folder. Rule 1 and the README now say that the rule covers the skill's own files, and that the tools it runs keep their caches and settings in their usual places.
+- The scan has not run again on the corrected text, so its new rating is not known. A build that installs packages from a public registry still reads text that other people wrote. The rules limit that exposure, and they do not remove it.
 
 ### Known limits
 

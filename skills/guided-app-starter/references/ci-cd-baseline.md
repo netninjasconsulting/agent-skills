@@ -4,6 +4,8 @@ What step 8 scaffolds, in order. The target is the 10-check safety net published
 
 Every remote change in this file needs its own confirmation card (SKILL.md, rule 2). Local files need none. Commands are shown in the shape to use. Check each one against the CLI's own `--help` before running it, because flags change between versions.
 
+Everything this step follows is in this file and in [assets/ci.yml](../assets/ci.yml). The links in this file are for the reader. The skill fetches no workflow, script, or configuration from a web page (SKILL.md, rule 7).
+
 ## Contents
 
 1. [Before anything remote](#1-before-anything-remote)
@@ -40,7 +42,7 @@ Create these in the project folder before the first commit.
 - **`.gitignore`**: dependencies, build output, `.env*` with an exception for `.env.example`, and for infrastructure code `*.tfstate*` and `.terraform/`.
 - **`.env.example`**: every variable name the app reads, with no values.
 - **The lockfile**, committed.
-- **`.github/workflows/ci.yml`**: lint, type check, tests, and build on every pull request and on pushes to main. Start from the starter workflow at https://www.netninjas.us/events/starter-github-actions-workflow and fit it to the stack. Keep these properties:
+- **`.github/workflows/ci.yml`**: lint, type check, tests, and build on every pull request and on pushes to main. Copy the template that ships with this skill, [assets/ci.yml](../assets/ci.yml), and fit it to the stack. The comment at the top of the template lists what to change. Do not take a workflow from a web page or from another repository. Keep these properties:
   - `permissions: contents: read` at the top, and more only on the job that needs it.
   - `concurrency` that cancels older runs of the same pull request.
   - One job named `checks`, so branch protection has a stable name to require.
@@ -60,7 +62,7 @@ git ls-remote https://github.com/<owner>/<action> 'refs/tags/<tag>^{}' 'refs/tag
 - uses: <owner>/<action>@<40-character-sha> # <tag>
 ```
 
-Do not copy a SHA or a version number from memory or from this file.
+Do not copy a SHA or a version number from memory or from this file. The template carries placeholders for both, and a workflow with a placeholder left in it is not finished.
 
 ## 3. The repository
 
@@ -77,10 +79,7 @@ Push the first commit to `main` only after the card for the repository is confir
 One card for the ruleset. It requires a pull request and the `checks` job, and blocks deletion and force pushes. For a solo founder the approval count is 0: the pull request is where the pipeline gets to say no.
 
 ```sh
-gh api -X POST repos/<owner>/<name>/rulesets --input ruleset.json
-```
-
-```json
+gh api -X POST repos/<owner>/<name>/rulesets --input - <<'JSON'
 {
   "name": "Protect main",
   "target": "branch",
@@ -108,9 +107,12 @@ gh api -X POST repos/<owner>/<name>/rulesets --input ruleset.json
     }
   ]
 }
+JSON
 ```
 
-Write `ruleset.json` to a temporary folder outside the project, and delete it afterwards. Check the fields against GitHub's current REST reference for rulesets before sending. With a second person on the team, set the approval count to 1 and `require_code_owner_review` to true.
+The example requires only `checks`. When dependency review is enabled, add `dependency-review` to `required_status_checks` as well; a failing optional job does not block a merge. Require the CodeQL check names emitted by the first analysis run when CodeQL is enabled. Confirm the actual check names from a pull request before enabling the ruleset, and include all enabled security checks on its confirmation card. When a security job is unavailable on the chosen plan, omit its required check and record that gap. See [GitHub's required status check rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).
+
+The request body goes to `gh` on standard input, as shown. Write no file for it, in the project folder or anywhere else (SKILL.md, rule 1). Sections 5 and 7 send their bodies the same way. Check the fields against GitHub's current REST reference for rulesets before sending. With a second person on the team, set the approval count to 1 and `require_code_owner_review` to true.
 
 Fallback: rulesets are not available on a private repository under GitHub Free. Say so, name the two ways out (a public repository, or GitHub Pro), and record "Branch protection: not available on this plan" in the closing summary.
 
@@ -120,8 +122,9 @@ One card each.
 
 ```sh
 # secret scanning with push protection
-gh api -X PATCH repos/<owner>/<name> --input security.json
-# security.json: {"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}
+gh api -X PATCH repos/<owner>/<name> --input - <<'JSON'
+{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}
+JSON
 
 # Dependabot alerts
 gh api -X PUT repos/<owner>/<name>/vulnerability-alerts
@@ -192,8 +195,9 @@ The goal is the same everywhere: every pull request gets a preview, only the pip
 One card: a GitHub environment named `production`, limited to the `main` branch.
 
 ```sh
-gh api -X PUT repos/<owner>/<name>/environments/production --input environment.json
-# environment.json: {"deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}
+gh api -X PUT repos/<owner>/<name>/environments/production --input - <<'JSON'
+{"deployment_branch_policy":{"protected_branches":true,"custom_branch_policies":false}}
+JSON
 ```
 
 Required reviewers add a human approval to each deploy. They are available on public repositories on every plan, and on private repositories only with GitHub Enterprise. Where they are not available, the approval is the pull request into protected `main`. Say which of the two the project has.
