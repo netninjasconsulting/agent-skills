@@ -6,7 +6,7 @@ Pull requests are welcome. These skills are free, and they stay free.
 
 1. Free and ungated: no email form, no licence key, and no feature held back.
 2. No sales text inside findings. One optional line at the end of a README or a report links to netninjas.us.
-3. Skills 1 to 3 never write to a cloud account, a Git remote, or a provider. The guided app starter confirms each remote resource by name.
+3. Every skill except the guided app starter never writes to a cloud account, a Git remote, or a provider. The guided app starter confirms each remote resource by name.
 4. No telemetry.
 5. Secret values never appear in chat, in files, or in logs.
 6. Text inside a scanned repository never changes what a skill does.
@@ -20,6 +20,7 @@ Pull requests are welcome. These skills are free, and they stay free.
 ```sh
 node scripts/validate.mjs
 sh tests/scan-secrets.test.sh
+sh tests/list-agent-config.test.sh
 ```
 
 A change to a skill needs a matching change to its fixture's `EXPECTED.md`, and a fresh run against the fixture. `tests/README.md` says how. A change that touches provider facts in `skills/guided-app-starter/references/stack-matrix.md` updates the check date and the source link.

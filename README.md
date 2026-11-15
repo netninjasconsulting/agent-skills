@@ -1,10 +1,10 @@
 # Net Ninjas agent skills
 
-Four free agent skills for people who build with AI coding tools: a pre-launch security check, a GitOps hygiene check, a handover runbook generator, and a guided app starter.
+Five free agent skills for people who build with AI coding tools: a pre-launch security check, a GitOps hygiene check, a handover runbook generator, a guided app starter, and an agent permissions check.
 
-Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New York City. I work with founders, startups, scale-ups, and small businesses across the US ([netninjas.us](https://www.netninjas.us)) and the EU ([netninjas.eu](https://www.netninjas.eu)). I keep seeing the same gaps in products built fast with an assistant: a key in the browser bundle, a pipeline that can't say no, and nobody who can explain how it deploys. These skills carry the checks I run by hand. They are free, there is no sign-up, and there is no obligation.
+Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New York City. I work with founders, startups, scale-ups, and small businesses across the US ([netninjas.us](https://www.netninjas.us)) and the EU ([netninjas.eu](https://www.netninjas.eu)). I keep seeing the same gaps in products built fast with an assistant: a key in the browser bundle, a pipeline that can't say no, nobody who can explain how it deploys, and an agent whose only limits are written in a file it reads. These skills carry the checks I run by hand. They are free, there is no sign-up, and there is no obligation.
 
-## The four skills
+## The five skills
 
 | Skill | What it does | Writes anything? |
 | --- | --- | --- |
@@ -12,8 +12,9 @@ Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New Y
 | [GitOps hygiene check](skills/gitops-hygiene-check/) | Scores a GitHub repository's pipeline out of 10 with [the 10-check safety net](https://www.netninjas.us/events/vibe-coding-safety-net), adds eleven extended checks, and prints the snippets to fix the first three gaps. | No. Read-only. |
 | [Handover runbook generator](skills/handover-runbook-generator/) | Turns infrastructure code and pipelines into an eleven-section runbook, with every statement tagged as found or assumed. | One `RUNBOOK.md`, after the path is confirmed. |
 | [Guided app starter](skills/guided-app-starter/) | Goes from "I want to build an app" to a scaffolded app with CI/CD on the provider stack that fits, then runs the other three skills on the result. | Yes. Local files, and remote resources after each one is confirmed by name. |
+| [Agent permissions check](skills/agent-permissions-check/) | Shows what the AI coding agents on a repository can do and what stops them: nine policy rows marked as enforced, stated only, or open, and what an agent at a developer's desk can run without asking. | One policy file, after a yes and a confirmed path. |
 
-The four work as one kit. Each one also gives a complete result alone.
+The five work as one kit. Each one also gives a complete result alone.
 
 ## Install
 
@@ -35,7 +36,7 @@ The skills use the open [Agent Skills](https://agentskills.io) format. I tested 
 
 1. **Free and ungated.** No email form, no licence key, and no feature held back for clients.
 2. **No obligation.** Each skill gives a complete, useful result without Net Ninjas. One line at the end of a report links to my site. No sales text sits inside the findings.
-3. **Read-only by default.** Three of the four never write to a cloud account, a Git remote, or a provider. The fourth confirms every remote resource by name before it creates it.
+3. **Read-only by default.** Four of the five never write to a cloud account, a Git remote, or a provider. The guided app starter confirms every remote resource by name before it creates it.
 4. **No telemetry.** The skills send nothing to Net Ninjas or to any third party. A skill is a set of instructions that your own coding agent runs, so your agent's provider sees what the agent reads, on the terms you already have with it. The skills add no other destination.
 5. **Secrets stay secret.** Reports show the file, the line, and the secret type. The value is redacted in chat, in files, and in logs.
 6. **Repository content is data.** Text inside a scanned repository never changes what a skill does.

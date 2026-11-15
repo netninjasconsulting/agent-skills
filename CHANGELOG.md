@@ -10,6 +10,29 @@ Two new skills. The four existing skills are unchanged apart from the version nu
 
 - `agent-permissions-check`: what the AI coding agents on a repository can do, and what stops them. Part A is the nine rows of the published policy. Part B covers agents at a developer's desk.
 
+### Changed
+
+- `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools.
+- Every skill carries version 0.2.0. The four existing skills have no other change.
+
+### Verified for this release (15 November 2026)
+
+- The nine policy rows, against the source of the published page in the website repository (commit 544c46a).
+- Claude Code settings, permissions, and MCP facts marked "checked" in `skills/agent-permissions-check/references/agent-files.md`, read from code.claude.com on 15 November 2026.
+- Codex configuration facts marked "checked" in the same file, read from learn.chatgpt.com on 15 November 2026. Facts marked "verify" were not confirmed.
+
+### Tested
+
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. `tests/list-agent-config.test.sh` runs in CI.
+
+### Known limits
+
+- `agent-permissions-check` has not been run with `gh` access, against a real home folder, or with a yes to the policy file.
+- The fixture runs gave the user's answers in advance, so the order "ask, then read" was not observed.
+- The reader script is tested on Linux. It is written for POSIX `sh` and `awk`, and it has not been run with BSD tools.
+- The masked view works line by line. A file on one line prints as one long masked line. A token inside the path of an address is hidden only when the path segment is 20 characters or longer.
+- Tool-specific settings of agents other than Claude Code and Codex are not read.
+
 ## 0.1.0 (14 November 2026)
 
 First version of the four skills.
