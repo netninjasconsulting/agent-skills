@@ -1,0 +1,22 @@
+service: quickship-import
+frameworkVersion: "4"
+
+provider:
+  name: aws
+  region: us-east-1
+
+functions:
+  ingest:
+    handler: handler.ingest
+    runtime: nodejs20.x
+    architecture: x86_64
+    memorySize: 1769
+    timeout: 900
+    url: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action: "*"
+        Resource: "*"
+    environment:
+      DB_PASSWORD: |
+        FIXTUREVALUE-serverless-block-01

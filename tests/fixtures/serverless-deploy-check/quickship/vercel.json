@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/track/route.ts": { "memory": 3009, "maxDuration": 800 },
+    "app/api/webhooks/carrier/route.ts": { "memory": 1024, "maxDuration": 800 }
+  },
+  "crons": [{ "path": "/api/cron/sync", "schedule": "0 * * * *" }],
+  "env": {
+    "CARRIER_API_TOKEN": "FIXTUREVALUE-vercel-json-env-01"
+  }
+}
