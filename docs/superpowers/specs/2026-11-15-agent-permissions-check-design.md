@@ -104,7 +104,7 @@ sh list-agent-config.sh --show FILE         print FILE with line numbers and val
 
 ### Part A: the nine rows
 
-The rows, their order, and their wording come from the published takeaway and stay as published: repository, identity, outside input, review, record, cloud accounts, secrets, runners, and data.
+The rows, their order, and their wording come from the published takeaway and stay as published: repository, identity, secrets, cloud, data, runners, outside input, review, and record. The wording is copied from the source of the page in the website repository (`lib/events.ts`, commit 544c46a).
 
 Each row gets one status.
 
