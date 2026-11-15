@@ -1,0 +1,5 @@
+{
+  "name": "parcel-desk",
+  "private": true,
+  "scripts": { "test": "node --test" }
+}

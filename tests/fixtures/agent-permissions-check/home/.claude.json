@@ -1,0 +1,15 @@
+{
+  "oauthAccount": {
+    "emailAddress": "dev@example.com",
+    "accessToken": "FIXTUREVALUE-claude-json-token"
+  },
+  "mcpServers": {
+    "notes": {
+      "command": "npx",
+      "args": ["-y", "@example/mcp-notes"],
+      "env": {
+        "NOTES_TOKEN": "FIXTUREVALUE-home-mcp-token"
+      }
+    }
+  }
+}
