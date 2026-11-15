@@ -1,4 +1,4 @@
-# Checks for every pull request: the validator, the scanner test, and shellcheck.
+# Checks for every pull request: the validator, the two script tests, and shellcheck.
 name: ci
 
 on:
@@ -30,5 +30,7 @@ jobs:
         run: node scripts/validate.mjs
       - name: Test the secret scanner
         run: sh tests/scan-secrets.test.sh
+      - name: Test the agent configuration reader
+        run: sh tests/list-agent-config.test.sh
       - name: Lint the shell scripts
         run: shellcheck -s sh skills/*/scripts/*.sh tests/*.sh tests/fixtures/*/make-repo.sh
