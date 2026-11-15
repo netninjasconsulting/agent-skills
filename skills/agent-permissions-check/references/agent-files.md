@@ -40,7 +40,7 @@ Keys that carry permissions:
 Three facts that change a status:
 
 1. `permissions.defaultMode` values `auto` and `bypassPermissions` take no effect from `.claude/settings.json` or `.claude/settings.local.json`. They take effect from the home folder file, from managed settings, or from a command-line flag. The settings page says that `bypassPermissions` took effect from any file before version 2.1.257. checked
-2. `permissions.allow` rules and `permissions.additionalDirectories` in the shared project file apply only after each person trusts the folder. `deny` and `ask` rules apply at once. checked
+2. `permissions.allow` rules and `permissions.additionalDirectories` in the shared project file apply only after each person trusts the folder. `deny` and `ask` rules apply at once. A local file that Git tracks waits in the same way, and one that Git does not track applies at once. checked
 3. Lists such as `permissions.allow` merge across files. A home-folder allow rule applies in every project. checked
 
 ## Codex

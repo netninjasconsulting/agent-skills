@@ -8,7 +8,7 @@ Each skill ships with a fixture and the result it has to produce. A skill is a s
 | `gitops-hygiene-check` | `fixtures/gitops-hygiene-check/loose-pipeline/`, a repository with a loose pipeline | `fixtures/gitops-hygiene-check/EXPECTED.md` |
 | `handover-runbook-generator` | `fixtures/handover-runbook-generator/parcel-api/`, a small AWS service | `fixtures/handover-runbook-generator/EXPECTED.md` |
 | `guided-app-starter` | Scenarios, because the skill writes and creates things | `fixtures/guided-app-starter/scenarios.md` |
-| `agent-permissions-check` | `fixtures/agent-permissions-check/loose-agents/`, a repository with loose agent settings, and `home/`, a stand-in home folder | `fixtures/agent-permissions-check/EXPECTED.md`, and `scenarios.md` for a repository with no agent files |
+| `agent-permissions-check` | `fixtures/agent-permissions-check/loose-agents/`, a repository with loose agent settings, and `home/`, a stand-in home folder | `fixtures/agent-permissions-check/EXPECTED.md`, and `scenarios.md` for a repository with no agent files and for the `open-rows` variant of the fixture |
 | `ai-feature-architecture-check` | `fixtures/ai-feature-architecture-check/support-copilot/`, a small support app with two AI features | `fixtures/ai-feature-architecture-check/EXPECTED.md`, and `scenarios.md` for a repository with no model call |
 
 The fixtures are unsafe on purpose. Every key in them is fake, and none of them is meant to run.

@@ -402,6 +402,93 @@ for name in sql.yml raiders.yml commented.yml; do
   printf '%s\n' "$wf" | grep -q "$name" && fail "list workflows: $name runs no agent and is listed"
 done
 
+# 7b. A server that carries the name of a hidden block (review minor 10).
+# The name of a server is not a block of credentials. Its settings are shown,
+# and the env block inside it is still hidden.
+n="$work/names"
+mkdir -p "$n/a" "$n/b" "$n/c" "$n/d" "$n/e" "$n/.vscode"
+cat > "$n/a/.mcp.json" <<'JSON'
+{
+  "mcpServers": {
+    "auth": {
+      "command": "npx",
+      "args": ["auth-server"],
+      "env": {
+        "API_KEY": "FIXTUREVALUE-m10-env"
+      }
+    },
+    "env": { "command": "envsrv", "env": { "command": "FIXTUREVALUE-m10-inner" } },
+    "headers":
+    {
+      "command": "hdrsrv"
+    }
+  },
+  "auth": { "command": "FIXTUREVALUE-m10-after" }
+}
+JSON
+out=$(sh "$reader" --show "$n/a/.mcp.json")
+no_marker "$out" "server names json"
+expect_text "$out" '"npx"' "server named auth: command"
+expect_text "$out" '"auth-server"' "server named auth: args"
+expect_text "$out" '"envsrv"' "server named env: command"
+expect_text "$out" '"hdrsrv"' "server named headers: command"
+
+printf '{"mcpServers":{"oauth":{"command":"oauthsrv","env":{"K":"FIXTUREVALUE-m10-oneline"}}},"env":{"command":"FIXTUREVALUE-m10-top"}}\n' > "$n/b/.mcp.json"
+out=$(sh "$reader" --show "$n/b/.mcp.json")
+no_marker "$out" "server names json one line"
+expect_text "$out" '"oauthsrv"' "server named oauth: command"
+
+# A hidden block outside a list of servers stays hidden.
+printf '{\n  "env": {\n    "command": "FIXTUREVALUE-m10-settings"\n  },\n  "x": [ { "mcpServers": {} }, { "auth": { "command": "FIXTUREVALUE-m10-array" } } ]\n}\n' > "$n/c/settings.json"
+out=$(sh "$reader" --show "$n/c/settings.json")
+no_marker "$out" "hidden block outside servers"
+
+printf '{\n  "servers": {\n    "auth": { "command": "vscodesrv", "env": { "T": "FIXTUREVALUE-m10-vscode" } }\n  }\n}\n' > "$n/.vscode/mcp.json"
+out=$(sh "$reader" --show "$n/.vscode/mcp.json")
+no_marker "$out" "server names vscode"
+expect_text "$out" '"vscodesrv"' "server named auth in servers: command"
+
+cat > "$n/d/config.toml" <<'TOML'
+[mcp_servers.auth]
+command = "tomlauthsrv"
+
+[mcp_servers.auth.env]
+API_KEY = "FIXTUREVALUE-m10-toml-env"
+
+[mcp_servers]
+env.command = "tomlenvsrv"
+env.env = { K = "FIXTUREVALUE-m10-toml-inline" }
+
+[auth]
+command = "FIXTUREVALUE-m10-toml-top"
+TOML
+out=$(sh "$reader" --show "$n/d/config.toml")
+no_marker "$out" "server names toml"
+expect_text "$out" '"tomlauthsrv"' "toml server named auth: command"
+expect_text "$out" '"tomlenvsrv"' "toml server named env: command"
+
+printf 'mcp_servers.oauth.command = "tomloauthsrv"\nmcp_servers.oauth.env.K = "FIXTUREVALUE-m10-toml-dotted"\noauth.command = "FIXTUREVALUE-m10-toml-dotted-top"\n' > "$n/e/config.toml"
+out=$(sh "$reader" --show "$n/e/config.toml")
+no_marker "$out" "server names toml dotted"
+expect_text "$out" '"tomloauthsrv"' "toml dotted server named oauth: command"
+
+# 7c. The open-rows variant of the fixture (review minor 5). It plants what
+# makes rows 3, 4, and 6 "open": production cloud keys in the agent job and a
+# self-hosted runner. The reader keeps that evidence readable.
+sh "$root/tests/fixtures/agent-permissions-check/make-repo.sh" "$work/open" open-rows >/dev/null
+out=$(sh "$reader" "$work/open/repo")
+expect_line "$out" ".github/workflows/agent.yml:shared:workflow:tracked" "open-rows list"
+out=$(sh "$reader" --show "$work/open/repo/.github/workflows/agent.yml")
+no_marker "$out" "open-rows workflow"
+expect_text "$out" 'runs-on: self-hosted' "open-rows: runner"
+expect_text "$out" 'secrets.PROD_AWS_SECRET_ACCESS_KEY' "open-rows: production key by name"
+expect_text "$out" 'secrets.PROD_AWS_ACCESS_KEY_ID' "open-rows: production key id by name"
+[ -z "$(git -C "$work/open/repo" status --porcelain)" ] || fail "open-rows: the fixture repository is not clean"
+code=0
+sh "$root/tests/fixtures/agent-permissions-check/make-repo.sh" "$work/bad" no-such-variant >/dev/null 2>&1 || code=$?
+[ "$code" -eq 2 ] || fail "make-repo: an unknown variant did not exit 2"
+[ ! -e "$work/bad" ] || fail "make-repo: an unknown variant left a folder behind"
+
 # 8. No agent files, and no Git (Review Focus 3 and 4).
 mkdir "$work/empty"
 code=0
