@@ -2,6 +2,14 @@
 
 All four skills share one version number. Dates are in day, month, year order.
 
+## 0.2.0 (15 November 2026)
+
+Two new skills. The four existing skills are unchanged apart from the version number.
+
+### Added
+
+- `agent-permissions-check`: what the AI coding agents on a repository can do, and what stops them. Part A is the nine rows of the published policy. Part B covers agents at a developer's desk.
+
 ## 0.1.0 (14 November 2026)
 
 First version of the four skills.

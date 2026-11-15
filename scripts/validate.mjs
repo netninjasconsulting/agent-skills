@@ -22,7 +22,8 @@ const read = (file) => readFileSync(file, "utf8");
 function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    if (entry.name === ".git" || entry.name === "node_modules") return [];
+    // .superpowers is the git-ignored scratch folder of the planning tools.
+    if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".superpowers") return [];
     return entry.isDirectory() ? walk(full) : [full];
   });
 }
@@ -60,8 +61,9 @@ const credits = [
 const scopeLine = "This is a quick check. It is not a penetration test and it is not legal advice.";
 
 // Names that contain the word and are someone else's: a product name, or an ecosystem's own command.
+// "audit log" is GitHub's own name for the feature the agent permissions policy cites.
 const auditAllowed =
-  /security-audit(-skill)?|\b(npm|pnpm|yarn npm|yarn|bun|cargo|composer|bundle) audit\b|\b(pip|cargo|bundler)-audit\b|audit fix|ecosystem's own audit command/gi;
+  /security-audit(-skill)?|\baudit logs?\b|\b(npm|pnpm|yarn npm|yarn|bun|cargo|composer|bundle) audit\b|\b(pip|cargo|bundler)-audit\b|audit fix|ecosystem's own audit command/gi;
 
 const skills = readdirSync(skillsDir).filter((name) => statSync(path.join(skillsDir, name)).isDirectory());
 const versions = new Set();

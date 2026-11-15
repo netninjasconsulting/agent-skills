@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Needs git and a POSIX shell. Remote steps need the GitHub CLI (gh) and the chosen provider's own CLI, each signed in by the user. Four third-party skills are optional dependencies and are never bundled. Network access is needed for the remote steps and to re-check provider facts.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.1.0"
+  version: "0.2.0"
   homepage: https://www.netninjas.us/skills
 ---
 
