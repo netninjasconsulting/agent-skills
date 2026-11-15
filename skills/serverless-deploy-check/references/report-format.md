@@ -7,6 +7,8 @@ Print the report in chat in this shape. Write no file.
 
 This is a quick check. It is not a penetration test and it is not legal advice. It reads the repository, and a file is not the running system: a memory size, a time limit, a region, or an access rule can be set in a provider's console and not in a file. Where the repository does not show a setting, the report asks the team.
 
+<"Vercel is assumed: no file names the host", when Vercel is present by assumption.>
+
 ## <Not ready to deploy, Ready after the first three, or Ready from what the repository shows>
 
 <One sentence: the rule that decided the verdict, naming the checks that decided it.>
@@ -79,6 +81,8 @@ Secret names only. No value, and no part of one.
 - <Each hidden setting: file, line, and key, with "not found in what the reader shows".>
 - <Each file the reader does not show (exit code 4), by path.>
 - <Each function whose code is built outside the repository.>
+- <Code whose platform file is not in the reader's list, such as a Worker entry file with no Wrangler file.>
+- <"The app's host is not one of the four platforms: <file>.", when another host's file was found and no Vercel signal.>
 - <Settings held in each provider's console, from "Not checked in version 1" in references/platforms.md, for the platforms found.>
 - The reader works by line and does not parse: some valid layouts show as "not found in what the reader shows", and anything in its output that looked like a credential is reported above by path, line, and type only.
 
@@ -86,6 +90,8 @@ Secret names only. No value, and no part of one.
 
 Checked with the serverless deploy check, a free skill from Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City: https://www.netninjas.us/skills
 ````
+
+In each headline, N counts the checks marked "pass", K counts the checks marked "ask the team", and M counts the checks that apply, so "does not apply" is never in M. A team's answer never changes a headline. Each Vercel evidence cell carries the word "assumption" when Vercel is present by assumption.
 
 Leave out "Also found" when there is nothing to put in it. Leave out "Questions for the team" in the same way, when no check is marked "ask the team". When fewer than three checks qualify for "The first three to change", list those only. When none qualify, write "This check identifies no change." under that heading.
 
@@ -100,7 +106,9 @@ This is a quick check. It is not a penetration test and it is not legal advice.
 
 None of AWS Lambda, Vercel, Cloudflare Workers, or Supabase was found in this repository, so there is nothing to score.
 
-Searched for: <the file names in "Files the reader lists" and the source code in "Read as source code" in references/platforms.md>.
+Searched for: <the file names in "Files the reader lists" and the source code in "Read as source code" in references/platforms.md, and the Vercel signals in SKILL.md, step 1>.
+
+<"The app's host is not one of the four platforms: <file>.", when a framework app was found with another host's file.>
 
 ---
 
@@ -125,7 +133,7 @@ With a yes, ask the question of each check marked "ask the team", one at a time,
 With the team's answers: <efficiency N plus the efficiency checks answered yes> out of <efficiency M> (efficiency).
 With the team's answers: <security N plus the security checks answered yes> out of <security M> (security).
 
-The first headlines and the verdict stand: Efficiency: N out of M confirmed in the repository. Security: N out of M confirmed in the repository. <Verdict>.
+The first headlines and the verdict stand: Efficiency: N out of M confirmed in the repository (K to ask the team). Security: N out of M confirmed in the repository (K to ask the team). <Verdict>.
 ````
 
 A check that carries several questions, one for each function or hidden setting, counts as answered yes only when every one of its answers is yes.

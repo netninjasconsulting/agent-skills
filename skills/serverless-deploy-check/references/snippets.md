@@ -54,7 +54,7 @@ resource "aws_lambda_function" "<name>" {
 }
 ```
 
-**Vercel.** No file setting. Memory and CPU are the dashboard setting "Function CPU". Remove a `memory` key from `vercel.json` `functions`: with Fluid compute Vercel does not take it.
+**Vercel.** No file setting. Memory and CPU are the dashboard setting "Function CPU". Remove a `memory` key from `vercel.json` `functions`: with Fluid compute Vercel does not take it. What it does with Fluid compute off is not confirmed (verify).
 
 **Cloudflare Workers and Supabase.** Memory is fixed, with no setting.
 
@@ -573,11 +573,13 @@ create policy "<table>: owner reads"
   to authenticated
   using ((select auth.uid()) = <owner column>);
 
-create policy "<table>: owner writes"
+create policy "<table>: owner adds rows"
   on public.<table> for insert
   to authenticated
   with check ((select auth.uid()) = <owner column>);
 ```
+
+These two policies cover select and insert only. Update and delete each need a policy of their own, limited to the caller's rows in the same way: with no policy, row-level security refuses them.
 
 A view in an exposed schema runs as the caller:
 
@@ -592,22 +594,48 @@ create or replace view public.<view> with (security_invoker = true) as <query>;
 ```ts
 // app/<cron route>/route.ts
 export async function GET(request: Request) {
-  if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response("Unauthorised", { status: 401 });
   }
   // work starts here
 }
 ```
 
-**Every platform, a webhook.** Check the provider's signature over the raw body before acting. Use the provider's own verification library where it has one. The header name and the signing scheme come from the provider.
+**Every platform, a webhook.** Check the provider's signature over the raw body before acting. Use the provider's own verification library where it has one. The header name and the signing scheme come from the provider. Refuse when the secret is unset.
+
+Node.js (Lambda and Vercel). On Cloudflare Workers, `node:crypto` and `Buffer` need the `nodejs_compat` compatibility flag (verify); the Web Crypto form below needs no flag.
 
 ```ts
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+const secret = process.env.<WEBHOOK_SECRET name>;
+if (!secret) return new Response("Unauthorised", { status: 401 });
 const raw = await request.text();
-const expected = createHmac("sha256", process.env.<WEBHOOK_SECRET name>).update(raw).digest("hex");
-const given = request.headers.get("<signature header>") ?? "";
-const ok = given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+const expected = Buffer.from(createHmac("sha256", secret).update(raw).digest("hex"));
+const given = Buffer.from(request.headers.get("<signature header>") ?? "");
+// compare byte lengths first: timingSafeEqual throws on buffers of different lengths
+const ok = given.length === expected.length && timingSafeEqual(given, expected);
+if (!ok) return new Response("Unauthorised", { status: 401 });
+// parse raw and act here
+```
+
+Web Crypto (Cloudflare Workers and Supabase; availability on each: verify):
+
+```ts
+function hexToBytes(hex: string): Uint8Array | null {
+  if (!/^(?:[0-9a-f]{2})+$/i.test(hex)) return null;
+  return Uint8Array.from(hex.match(/../g)!, (pair) => parseInt(pair, 16));
+}
+
+const secret = env.<WEBHOOK_SECRET name>; // Supabase: Deno.env.get("<WEBHOOK_SECRET name>")
+if (!secret) return new Response("Unauthorised", { status: 401 });
+const raw = await request.text();
+const key = await crypto.subtle.importKey(
+  "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
+);
+const signature = hexToBytes(request.headers.get("<signature header>") ?? "");
+const ok = signature !== null && (await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(raw)));
 if (!ok) return new Response("Unauthorised", { status: 401 });
 // parse raw and act here
 ```
@@ -738,22 +766,29 @@ if (origin && ALLOWED.has(origin)) {
 **AWS Lambda.** Sign in with OIDC and a role, and delete the stored access keys. The role's trust policy and the full job are in the [GitOps hygiene check's snippets](../../gitops-hygiene-check/references/snippets.md#oidc-deploy-without-stored-keys).
 
 ```yaml
-# .github/workflows/<deploy>.yml
-permissions:
-  contents: read
-  id-token: write
-steps:
-  - uses: aws-actions/configure-aws-credentials@<commit-sha> # <tag>
-    with:
-      role-to-assume: ${{ vars.<ROLE_ARN name> }}
-      aws-region: <region>
+# .github/workflows/<deploy>.yml: the deploy job only
+jobs:
+  <deploy job>:
+    runs-on: <runner>
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: aws-actions/configure-aws-credentials@<commit-sha> # <tag>
+        with:
+          role-to-assume: ${{ vars.<ROLE_ARN name> }}
+          aws-region: <region>
+      - run: <deploy command>
 ```
 
 **Vercel, Cloudflare Workers, and Supabase.** No short-lived option was confirmed (verify). Read the token from the repository's secrets, never from the workflow file, scope it to this project at the provider, and rotate it.
 
 ```yaml
-env:
-  <TOKEN_NAME>: ${{ secrets.<TOKEN_NAME> }}
+# one step of the deploy job
+- name: <deploy>
+  run: <deploy command>
+  env:
+    <TOKEN_NAME>: ${{ secrets.<TOKEN_NAME> }}
 ```
 
 ## S10. Logs

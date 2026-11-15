@@ -27,7 +27,7 @@ The status table, the verdict table, and the headlines are in [SKILL.md](../SKIL
 
 ### The questions for the team
 
-A check marked "ask the team" carries one yes or no question for the optional second pass. Each rule below gives its question. Name the function and the platform in it. When a check is "ask the team" because a setting is hidden, the question asks for that setting at its file and line.
+A check marked "ask the team" carries one yes or no question for the optional second pass. Each rule below gives its question. Name the function and the platform in it. When a check is "ask the team" because a setting is hidden, the question names that setting at its file and line and asks whether it meets the check: "Does the <key> at <file:line> meet <check>, as the check reads?" Every question can be answered yes or no.
 
 ## Efficiency
 
@@ -138,7 +138,7 @@ A check marked "ask the team" carries one yes or no question for the optional se
 - **Warn:** a statement names its actions and leaves `Resource` as `*`; one shared role serves functions that need different permissions (Serverless `mode: shared`, the default); a binding or a key is in scope and the code never uses it; or a function behind a caller check uses a Supabase secret or `service_role` key.
 - **Fail:** a statement allows `*` or `service:*` as its action; or a function with no caller check runs with a key that bypasses row-level security (a Supabase secret or `service_role` key, `ctx.supabaseAdmin`).
 - **Hidden or outside:** a policy that the reader hides, in whole or in part, follows the hidden-part rule: "ask the team" at best, with the setting under "Not checked". A role that the configuration names but that is defined outside the repository (an ARN, or a name with no matching resource) is "ask the team", because its statements sit outside the repository. A function with no role and no permissions found at all follows the status table.
-- **Question:** "What do the statements of <role> allow for <function>?"
+- **Question:** "Do the statements of <role> name only the actions and resources that <function> uses?"
 
 ### S3. Secrets live in the platform's secret store, not in configuration or code.
 
@@ -217,7 +217,7 @@ A check marked "ask the team" carries one yes or no question for the optional se
 - **No deploy workflow:** "ask the team", as the named exception to the general rule. A deploy often runs from the provider's own Git integration (Vercel, Cloudflare, and Supabase have one), which needs no workflow and no credential in the repository, so a missing workflow is not a missing control. A workflow that exists and deploys with a long-lived credential is still a fail.
 - **Fail:** a workflow passes `aws-access-key-id` and `aws-secret-access-key`, or a deploy credential is written in the workflow.
 - Point to the [GitOps hygiene check](../../gitops-hygiene-check/) for the full pass on the pipeline.
-- **Question:** "Is <token> scoped to this project, and is it rotated?" or "How do deploys reach <platform>?"
+- **Question:** "Is <token> scoped to this project, and is it rotated?" or "Do deploys to <platform> run without a long-lived token stored in the repository or in its secrets?"
 
 ### S10. Logs leave out secrets and request bodies, and have a retention period.
 
