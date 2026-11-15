@@ -28,7 +28,7 @@ Two new skills. The four skills from 0.1.0 keep their checks.
 
 ### Tested
 
-See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result. A review of that branch found nine important problems and no critical one. Seven are fixed and two are open decisions, and the fixture was run again.
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. The twelve minor findings of that review are fixed as well. Six were fixed with the review, and six after it: the reader shows a server that carries the name of a hidden block, the fixture has an `open-rows` variant with a scenario for the open rules of rows 3, 4, and 6, and the validator pins the nine rows. The first two runs of that scenario gave a wrong count in the headline, which is now fixed, and a third run passed. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result. A review of that branch found nine important problems and no critical one. Seven are fixed and two are open decisions, and the fixture was run again.
 
 ### Known limits
 
@@ -37,6 +37,7 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - The reader script is tested on Linux. It is written for POSIX `sh` and `awk`, and it has not been run with BSD tools.
 - The masked view works line by line. A file on one line prints as one long masked line.
 - The reader hides a credential that it can recognise by its key, its shape, its flag, or its place in an address. It cannot recognise a credential typed as a short plain word: a positional argument, a word in a command, a host name of fewer than 8 characters, or prose in an instruction file. The skill tells the agent not to repeat such a value.
+- A fresh agent sometimes cites a line number that is off by one. Two of the last five runs did so, each on one line.
 - The reader hides some harmless text: a word of 20 or more characters that mixes letters and digits, and comments in settings and env files.
 - Tool-specific settings of agents other than Claude Code and Codex are not read.
 - `ai-feature-architecture-check` has one fixture, in TypeScript, that fails most checks on purpose. It has not been run on a real product or on a feature that passes.

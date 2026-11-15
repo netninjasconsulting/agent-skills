@@ -23,7 +23,7 @@ Rules that hold for every row:
 - Before a row is `not found` or `not checked`, search every instruction file for a statement of that row's rule. A stated rule with no mechanism behind it makes the row `stated only`.
 - An agent job is a job that names an agent, in a workflow that `scripts/list-agent-config.sh` lists with the kind `workflow`. Other jobs in the same workflow are not agent jobs. The deploy job is the job that deploys to production.
 - No row is `enforced` because there is nothing to check. "Every agent job ..." needs at least one agent job.
-- A row that is `stated only` while its setting could not be read is also named in the "Confirm first" line and under "Not checked". It is not counted in the headline's "not checked".
+- A row that is `stated only` while its setting could not be read is also named in the "Confirm first" line and under "Not checked". It is not counted in the headline's "not checked". The same holds for a row that is `open`: the headline counts only the rows whose status is `not checked`.
 
 ## Part A: the policy
 
