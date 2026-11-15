@@ -28,9 +28,13 @@ jobs:
           node-version: 24
       - name: Validate the skills
         run: node scripts/validate.mjs
+      - name: Test the published wording guards
+        run: node tests/validate.test.mjs
       - name: Test the secret scanner
         run: sh tests/scan-secrets.test.sh
       - name: Test the agent configuration reader
         run: sh tests/list-agent-config.test.sh
+      - name: Test the names filter for env files
+        run: sh tests/names-filter.test.sh
       - name: Lint the shell scripts
         run: shellcheck -s sh skills/*/scripts/*.sh tests/*.sh tests/fixtures/*/make-repo.sh

@@ -4,16 +4,19 @@ Every skill carries the same version number. Dates are in day, month, year order
 
 ## 0.2.0 (15 November 2026)
 
-One new skill. The four skills from 0.1.0 keep their checks.
+Two new skills. The four skills from 0.1.0 keep their checks.
 
 ### Added
 
 - `agent-permissions-check`: what the AI coding agents on a repository can do, and what stops them. Part A is the nine rows of the published policy. Part B covers agents at a developer's desk.
+- `ai-feature-architecture-check`: a score out of 12 for an AI feature from what the code shows, the path personal data takes through it, and whether its cost per action can be measured.
 
 ### Changed
 
 - `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools, which `.gitignore` now lists.
+- `scripts/validate.mjs` pins the twelve checks, the three score bands with their ranges, the ten stops, the eight leak paths, the seven cost columns, and the cost query of the AI feature architecture check to their published wording. It matches whole lines, so a check with a wrong number fails.
 - `scripts/validate.mjs` pins the nine rows of the agent permissions check to their published wording.
+- `handover-runbook-generator` reads env files through a stricter filter. The old one printed comments and the later lines of a value that spans lines. `tests/names-filter.test.sh` runs the filter of both skills that use it, in CI.
 - Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same.
 
 ### Verified for this release (15 November 2026)
@@ -21,10 +24,21 @@ One new skill. The four skills from 0.1.0 keep their checks.
 - The nine policy rows, against the source of the published page in the website repository (commit 544c46a).
 - Claude Code settings, permissions, and MCP facts marked "checked" in `skills/agent-permissions-check/references/agent-files.md`, read from code.claude.com on 15 November 2026.
 - Codex configuration facts marked "checked" in the same file, read from learn.chatgpt.com on 15 November 2026. Facts marked "verify" were not confirmed.
+- The twelve checks, the score bands, the ten stops, the eight leak paths, and the cost query, against the source of the published pages in the website repository (commit 544c46a). The skill carries the wording of netninjas.us in UK spelling, so four words differ in spelling from that site: pseudonymises, pseudonymised, pseudonymisation, and anonymised.
+- The names in `skills/ai-feature-architecture-check/references/signals.md`, each read on 15 November 2026 from the vendor's package on npm or PyPI, from its source code, or from its documentation. The file names the source and the version in every row. The reads changed the list: Sentry's JavaScript SDK now uses `dataCollection` where it used `sendDefaultPii`, Together's default host is `api.together.ai`, two Google packages and one Langfuse package are deprecated, and pgvector has a fourth operator.
+- The rule that a local settings file tracked by Git waits for trust, read from code.claude.com on 15 November 2026.
 
 ### Tested
 
-See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. The twelve minor findings of that review are fixed as well. Six were fixed with the review, and six after it: the reader shows a server that carries the name of a hidden block, the fixture has an `open-rows` variant with a scenario for the open rules of rows 3, 4, and 6, and the validator pins the nine rows. The first two runs of that scenario gave a wrong count in the headline, which is now fixed, and a third run passed.
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. The twelve minor findings of that review are fixed as well. Six were fixed with the review, and six after it: the reader shows a server that carries the name of a hidden block, the fixture has an `open-rows` variant with a scenario for the open rules of rows 3, 4, and 6, and the validator pins the nine rows. The first two runs of that scenario gave a wrong count in the headline, which is now fixed, and a third run passed. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result. A review of that branch found nine important problems and no critical one. Seven were fixed with the review. The other two are settled: the skill keeps UK spelling, and the names in `signals.md` were read from the vendors. The nine minor findings are fixed as well: the status rules have no gap inside a check, the order of the first three follows the design, and the fixture's error tracker, components, and documents table are wired in.
+
+### Branch B independent review corrections (15 November 2026)
+
+- Make scoring and leak-path statuses disjoint, require code owner approval enforcement, and require useful fallback behaviour.
+- Correct OpenSearch import names and legacy OpenTelemetry capture guidance, and add vLLM signals.
+- Replace the env names filter with stateful quote tracking so assignment-shaped lines inside multiline values remain hidden.
+- Reject reordered and duplicate published structures, hidden wording decoys, and SQL appended to the pinned query. Fourteen mutation cases run in CI.
+- Correct the fixture explanations for the Anthropic SDK timeout and Sentry user data; aggregate statuses remain unchanged.
 
 ### Independent review corrections (15 November 2026)
 
@@ -42,6 +56,9 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - A fresh agent sometimes cites a line number that is off by one. Two of the last five runs did so, each on one line.
 - The reader hides some harmless text: a word of 20 or more characters that mixes letters and digits, and comments in settings and env files.
 - Tool-specific settings of agents other than Claude Code and Codex are not read.
+- `ai-feature-architecture-check` has one fixture, in TypeScript, that fails most checks on purpose. It has not been run on a real product or on a feature that passes.
+- The second pass of `ai-feature-architecture-check` was run with one question. The fixture has no second check that ends in "ask the team".
+- The published cost query prices in euros, and the skill prints it as published.
 
 ## 0.1.0 (14 November 2026)
 

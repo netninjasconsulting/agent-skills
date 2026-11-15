@@ -176,6 +176,181 @@ if (existsSync(gitops)) {
   });
 }
 
+// Modified from the Net Ninjas original during independent review.
+// The AI feature architecture check keeps the wording of three published takeaways:
+// the checklist, the data path map, and the cost worksheet.
+const twelveChecks = [
+  "The AI feature works inside the signed-in user's permissions.",
+  "The interface says it's AI and marks what it generated.",
+  "Every request passes authentication and validation before a prompt exists.",
+  "A policy step removes or pseudonymises the personal data a task doesn't need.",
+  "Retrieval reads only the sources we approved.",
+  "The retrieval service applies the tenant filter in code.",
+  "Every model call goes through one gateway.",
+  "The feature still works when the model is slow or down.",
+  "An evaluation set from real cases scores every change.",
+  "A named person approves the outputs that matter.",
+  "Every request leaves a trace we can query.",
+  "We know what one AI action costs, per customer.",
+];
+const scoreBands = [
+  "Ready for a customer's security review. The work now is keeping the evaluation set and the traces current.",
+  "Close. A layer with two noes is the one I'd expect to break first.",
+  "I'd start with layers 2 and 3. A leak of personal data, or of another customer's data, is the mistake that's hardest to undo.",
+];
+const tenStops = [
+  "Client and API",
+  "Policy gateway",
+  "Prompt builder",
+  "Retrieval and vector store",
+  "Model endpoint",
+  "Response handling",
+  "Application logs",
+  "Tracing and error tracking",
+  "Evaluation sets",
+  "Backups and snapshots",
+];
+const eightLeakPaths = [
+  "Prompts and responses stay out of our application logs.",
+  "Our tracing and error tools don't capture request bodies.",
+  "The model endpoint is pinned to one region.",
+  "We know what the model provider keeps, and for how long.",
+  "The pseudonymisation table sits apart from the prompts.",
+  "A deleted record also leaves the vector store.",
+  "Our evaluation sets hold synthetic or anonymised cases.",
+  "Backups and snapshots stay in the approved regions.",
+];
+const scoreRanges = ["11 to 12", "8 to 10", "0 to 7"];
+const costColumns = ["tenant_id", "action_id", "model", "input_tokens", "cached_input_tokens", "output_tokens", "created_at"];
+// The published query, with the site's domain written as on netninjas.us.
+const costQuery = [
+  "-- cost_per_action.sql (PostgreSQL)",
+  "-- From the talk \"Your AI feature is an architecture problem\" (netninjas.us/events).",
+  "-- Model cost per customer and per AI action over the last 30 days.",
+  "--",
+  "-- ai_requests:  one row per model call (tenant_id, action_id, model,",
+  "--               input_tokens, cached_input_tokens, output_tokens, created_at).",
+  "--               input_tokens counts the tokens billed at the full input price.",
+  "-- model_prices: one row per model, in euros per million tokens, copied from",
+  "--               the provider's current price list.",
+  "",
+  "WITH calls AS (",
+  "  SELECT",
+  "    r.tenant_id,",
+  "    r.action_id,",
+  "    ( r.input_tokens        * p.input_per_million",
+  "    + r.cached_input_tokens * p.cached_input_per_million",
+  "    + r.output_tokens       * p.output_per_million ) / 1000000.0 AS cost_eur",
+  "  FROM ai_requests r",
+  "  JOIN model_prices p ON p.model = r.model",
+  "  WHERE r.created_at >= now() - interval '30 days'",
+  ")",
+  "SELECT",
+  "  tenant_id,",
+  "  count(DISTINCT action_id)                                AS actions,",
+  "  count(*)                                                 AS model_calls,",
+  "  round(sum(cost_eur), 2)                                  AS model_cost_eur,",
+  "  round(sum(cost_eur) / count(DISTINCT action_id), 4)      AS cost_per_action_eur",
+  "FROM calls",
+  "GROUP BY tenant_id",
+  "ORDER BY model_cost_eur DESC;",
+];
+// Match the visible structures in their own sections. A spare copy in a code
+// example or a comment must not satisfy a changed live checklist.
+const visibleLines = (lines) => {
+  let fence = null;
+  return lines.join("\n").replace(/<!--[\s\S]*?-->/g, "").split("\n").filter((line) => {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (marker) {
+      if (fence === null) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+      return false;
+    }
+    return fence === null;
+  });
+};
+const sectionLines = (lines, heading) => {
+  const starts = lines.flatMap((line, i) => line === heading ? [i] : []);
+  if (starts.length !== 1) return [];
+  const end = lines.findIndex((line, i) => i > starts[0] && /^## /.test(line));
+  return lines.slice(starts[0] + 1, end === -1 ? undefined : end);
+};
+const sameLines = (file, actual, expected, label) => {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) fail(file, `${label} must match the published wording once, in order`);
+};
+const stopRows = [
+  "What the request carries, and which fields the feature really needs.",
+  "Which identifiers get removed or pseudonymised, and where the lookup table lives.",
+  "Whether the finished prompt still holds a name, a date of birth, or a record number.",
+  "Which sources the embeddings came from, and whether a deleted record leaves the index.",
+  "The region of the endpoint, and what the provider keeps and for how long.",
+  "Where re-identification happens, and who approves the draft.",
+  "Whether prompts or responses appear in a log line.",
+  "Whether request bodies travel to a tool outside our approved regions.",
+  "Whether test cases hold real records or synthetic ones.",
+  "Whether copies of the stores above stay in the same region.",
+];
+const aiSkill = path.join(skillsDir, "ai-feature-architecture-check");
+if (existsSync(aiSkill)) {
+  const linesOf = (file) => (existsSync(file) ? read(file).split("\n") : []);
+  const skillFile = path.join(aiSkill, "SKILL.md");
+  const skillLines = visibleLines(linesOf(skillFile));
+  const checksFile = path.join(aiSkill, "references", "checks.md");
+  const checksLines = visibleLines(linesOf(checksFile));
+  sameLines(skillFile, sectionLines(skillLines, "## The twelve checks").filter(line => /^\d+\. /.test(line)), twelveChecks.map((check, i) => `${i + 1}. ${check}`), "the twelve checks");
+  sameLines(checksFile, checksLines.filter(line => /^### \d+\. /.test(line)), twelveChecks.map((check, i) => `### ${i + 1}. ${check}`), "the twelve check headings");
+  sameLines(skillFile, skillLines.filter(line => /^\| \d+ to \d+ \|/.test(line)), scoreBands.map((band, i) => `| ${scoreRanges[i]} | ${band} |`), "the score bands");
+  // A whole line must match, so that "2. ..." is not found inside "12. ...".
+  twelveChecks.forEach((check, index) => {
+    if (!skillLines.includes(`${index + 1}. ${check}`)) fail(skillFile, `check ${index + 1} does not match the published wording: ${check}`);
+    if (!checksLines.includes(`### ${index + 1}. ${check}`)) fail(checksFile, `the heading of check ${index + 1} does not match the published wording: ${check}`);
+  });
+  scoreBands.forEach((band, index) => {
+    if (!skillLines.includes(`| ${scoreRanges[index]} | ${band} |`)) fail(skillFile, `the score band ${scoreRanges[index]} does not match the published wording: ${band}`);
+  });
+  const dataPathFile = path.join(aiSkill, "references", "data-path.md");
+  const dataPathLines = visibleLines(linesOf(dataPathFile));
+  sameLines(dataPathFile, sectionLines(dataPathLines, "## The ten stops").filter(line => /^\| /.test(line)).slice(2), tenStops.map((stop, i) => `| ${stop} | ${stopRows[i]} |`), "the ten stops");
+  sameLines(dataPathFile, sectionLines(dataPathLines, "## The eight leak paths").filter(line => /^\d+\. /.test(line)), eightLeakPaths.map((leak, i) => `${i + 1}. ${leak}`), "the eight leak paths");
+  tenStops.forEach((stop) => {
+    if (!dataPathLines.some((line) => line.startsWith(`| ${stop} | `))) fail(dataPathFile, `a stop does not match the published wording: ${stop}`);
+  });
+  eightLeakPaths.forEach((leak, index) => {
+    if (!dataPathLines.includes(`${index + 1}. ${leak}`)) fail(dataPathFile, `leak path ${index + 1} does not match the published wording: ${leak}`);
+  });
+  const costFile = path.join(aiSkill, "references", "cost.md");
+  const costLines = linesOf(costFile);
+  sameLines(costFile, sectionLines(visibleLines(costLines), "## The seven columns").filter(line => /^\| `/.test(line)).map(line => line.split("|")[1].trim()), costColumns.map(column => "`" + column + "`"), "the seven cost columns");
+  const querySection = sectionLines(costLines.join("\n").replace(/<!--[\s\S]*?-->/g, "").split("\n"), "## The published query");
+  const queryFences = querySection.flatMap((line, i) => /^```/.test(line) ? [i] : []);
+  if (queryFences.length !== 2 || querySection[queryFences[0]] !== "```sql" || querySection[queryFences[1]] !== "```") {
+    fail(costFile, "the published query needs exactly one SQL code block");
+  } else {
+    sameLines(costFile, querySection.slice(queryFences[0] + 1, queryFences[1]), costQuery, "the complete published query");
+  }
+  costColumns.forEach((column) => {
+    if (!costLines.some((line) => line.startsWith(`| \`${column}\` | `))) fail(costFile, `the cost column ${column} is missing from the table of seven columns`);
+  });
+  const queryStart = costLines.indexOf(costQuery[0]);
+  if (queryStart === -1) {
+    fail(costFile, "the published cost query is missing");
+  } else {
+    costQuery.forEach((line, index) => {
+      if (costLines[queryStart + index] !== line) fail(costFile, `line ${index + 1} of the cost query does not match the published query: ${line}`);
+    });
+  }
+  const expectedFile = path.join(root, "tests", "fixtures", "ai-feature-architecture-check", "EXPECTED.md");
+  const expectedLines = linesOf(expectedFile);
+  if (expectedLines.length > 0) {
+    twelveChecks.forEach((check, index) => {
+      if (!expectedLines.some((line) => line.startsWith(`| ${index + 1} | ${check} | `))) fail(expectedFile, `check ${index + 1} does not match the published wording: ${check}`);
+    });
+    eightLeakPaths.forEach((leak, index) => {
+      if (!expectedLines.some((line) => line.startsWith(`| ${index + 1} | ${leak} | `))) fail(expectedFile, `leak path ${index + 1} does not match the published wording: ${leak}`);
+    });
+  }
+}
+
 // The nine rows of the agent permissions check keep the wording of the published policy.
 const nineRows = [
   ["Repository", "Open branches and pull requests, and comment.", "Push to main, merge, approve its own work, or edit workflow files.", "A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/."],
