@@ -2,7 +2,7 @@
 
 Fixes to paste, by check and by platform. The setting names come from [platforms.md](platforms.md). Adapt names and paths to the repository, and say which lines were adapted.
 
-Every value is a placeholder in angle brackets. A snippet shows where a setting goes and leaves the value to the team: the skill never says what a memory size, a time limit, a concurrency ceiling, a rate, or a retention period should be. A name marked "verify" was not confirmed in the provider's documentation on 15 November 2026: read the current page before pasting it. A secret never goes into a snippet, as a value or as an example.
+Every value is a placeholder in angle brackets. A snippet shows where a setting goes and leaves the value to the team: the skill never says what a memory size, a time limit, a concurrency ceiling, a rate, or a retention period should be. Here, "verify" marks a name, a key, or a form that does not come from [platforms.md](platforms.md), or that it marks "verify": it was not read in the provider's documentation on 15 November 2026, so read the current page before pasting it. A secret never goes into a snippet, as a value or as an example.
 
 Where a platform has no setting for a check, its section says so, and the fix sits in code or in the provider's console.
 
@@ -121,7 +121,7 @@ functions:
     reservedConcurrency: <ceiling, above 0>
     events:
       - sqs:
-          arn: <queue ARN>
+          arn: <queue ARN> # key name: verify
           maximumConcurrency: <ceiling>
 ```
 
@@ -161,7 +161,7 @@ for (let i = 0; i < items.length; i += BATCH) {
 # serverless.yml
 provider:
   runtime: <a supported runtime, such as an identifier from platforms.md>
-  architecture: <x86_64 or arm64>
+  architecture: <x86_64 or arm64> # provider level: verify
 ```
 
 ```yaml
@@ -199,13 +199,13 @@ compatibility_date = "<YYYY-MM-DD, recent>"
 package:
   individually: true
   patterns:
-    - "!**"
+    - "!**" # pattern form: verify
     - "<path the function runs>/**"
 ```
 
 **AWS Lambda, SAM and Terraform.** Point `CodeUri` or `filename` at a folder or archive that holds the function's own code, and build that archive from what the handler imports.
 
-**Vercel.** Leave out what the function does not run.
+**Vercel.** Leave out what the function does not run. The form of the `excludeFiles` value: verify.
 
 ```json
 {
@@ -218,7 +218,7 @@ package:
 ```js
 // next.config.js
 module.exports = {
-  outputFileTracingExcludes: {
+  outputFileTracingExcludes: { // shape of the map: verify
     "<route>": ["<pattern of files the route does not run>"],
   },
 };
@@ -259,7 +259,7 @@ export async function handler(event) {
 **Supabase, from any function.** Reach PostgreSQL through the transaction pooler, on port 6543, with one connection for each function instance and prepared statements off. Keep the connection string in the secret store, under a name.
 
 ```ts
-import postgres from "postgres";
+import postgres from "postgres"; // client library and option names: verify
 
 const sql = postgres(process.env.<DATABASE_URL name>, { max: 1, prepare: false, ssl: "require" });
 ```
@@ -411,7 +411,7 @@ export async function POST(request: Request) {
 ```toml
 # wrangler.toml
 workers_dev = false
-routes = [{ pattern = "<host>/<path>*", zone_name = "<zone>" }]
+routes = [{ pattern = "<host>/<path>*", zone_name = "<zone>" }] # zone_name: verify
 ```
 
 ```ts
@@ -491,6 +491,7 @@ resource "aws_iam_role_policy" "<name>" {
 **Supabase.** Behind a caller check, act as the caller: use the publishable key with the caller's JWT, so that row-level security applies. Keep the secret key for the work that needs it, behind a caller check.
 
 ```ts
+// passing the caller's Authorization header this way: verify
 const supabase = createClient(<project URL>, <publishable key name>, {
   global: { headers: { Authorization: request.headers.get("Authorization") } },
 });
@@ -511,7 +512,7 @@ functions:
 **Vercel.** Move the value out of `vercel.json` `env` into a Secret variable, then delete the key from `vercel.json`. The CLI prompts for the value.
 
 ```sh
-vercel env add <SECRET_NAME> production --sensitive
+vercel env add <SECRET_NAME> production --sensitive # environment argument: verify
 ```
 
 **Cloudflare Workers.** Move the value out of `vars` into a secret. Wrangler prompts for the value. List the name under `secrets.required`.
@@ -643,7 +644,7 @@ provider:
       throttle:
         burstLimit: <burst>
         rateLimit: <requests per second>
-      quota:
+      quota: # limit and period keys: verify
         limit: <requests>
         period: <period>
 ```
