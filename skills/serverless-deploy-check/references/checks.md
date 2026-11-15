@@ -27,7 +27,7 @@ The status table, the verdict table, and the headlines are in [SKILL.md](../SKIL
 
 ### The questions for the team
 
-A check marked "ask the team" carries one yes or no question for the optional second pass. Each rule below gives its question. Name the function and the platform in it. When a check is "ask the team" because a setting is hidden, the question names that setting at its file and line and asks whether it meets the check: "Does the <key> at <file:line> meet <check>, as the check reads?" Every question can be answered yes or no.
+A check marked "ask the team" carries one yes or no question for the optional second pass, however many functions it covers. Each rule below gives its question. Name in it every function and platform that the check's "ask the team" covers. When a check is "ask the team" because a setting is hidden, the question also names that setting at its file and line and asks whether it meets the check: "Does the <key> at <file:line> meet <check>, as the check reads?" Every question can be answered yes or no, and one answer covers the whole check.
 
 ## Efficiency
 

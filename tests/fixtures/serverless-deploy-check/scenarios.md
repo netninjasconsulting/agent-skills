@@ -34,24 +34,25 @@ Must never:
 
 ## Scenario 2: Vercel and Supabase only
 
-Quickship with the Worker, both Lambda functions, and the Worker's local secrets file removed.
+Quickship with the Worker and both Lambda functions removed.
 
 ```sh
 sh tests/fixtures/serverless-deploy-check/make-repo.sh /tmp/quickship-web
 cd /tmp/quickship-web
 git rm -r -q worker lambda infra
-rm .dev.vars
 git commit -q -m "Keep Vercel and Supabase only"
 # then give the request
 ```
 
-`.dev.vars` is ignored by Git, so `git rm` leaves it, and it is removed by hand. The reader lists it with the platform `cloudflare-workers`, so leaving it would make Cloudflare Workers present with no Worker.
+`.dev.vars` is ignored by Git, so `git rm` leaves it. The reader lists it as `.dev.vars:cloudflare-workers:env:ignored`. A file of the kind `env` alone never makes a platform present, so Cloudflare Workers is not present.
 
-The reader lists `.env.local`, `.github/workflows/deploy.yml`, `supabase/config.toml`, and `vercel.json`. Five functions: track, carrier webhook, and cron sync on Vercel, and `notify` and `label` on Supabase.
+The reader lists `.dev.vars`, `.env.local`, `.github/workflows/deploy.yml`, `supabase/config.toml`, and `vercel.json`. Five functions: track, carrier webhook, and cron sync on Vercel, and `notify` and `label` on Supabase.
 
 Under the rules, Vercel has no memory setting in a file, so E1 does not apply. The planted `memory` keys at `vercel.json:5` and `:6` stay in the fixture, and the E1 evidence names them as a setting that Vercel may not apply, not counted. They never make E1 a warn and never put E1 in M.
 
 Must:
+
+- The platforms found are Vercel and Supabase only. `.dev.vars` is in the table of configuration files read, does not make Cloudflare Workers present, and is not an S3 finding, because Git ignores it.
 
 | # | Status | Why |
 | --- | --- | --- |
@@ -133,7 +134,10 @@ Must:
 - Its settings are read from the stack: memory explicit at line 15, a time limit at 16, reserved concurrency at 17, and `NODEJS_24_X` with `ARM_64` at 11 and 12.
 - S3 is a fail. Its evidence includes the credential written in code under `RATES_API_KEY` at `lib/quickship-stack.ts:19`.
 - "Also found" reports that credential by path, line, and type (a key written in code), with a pointer to the vibe-code pre-launch check. The reach map names `RATES_API_KEY` as written in code, by name only.
-- The headlines, the verdict, and the first three are as in `EXPECTED.md`. E1 stays "ask the team", and its question names `quickship-rates` too.
+- S10 is a warn: `quickship-rates` sets no log retention in the stack (the S10 warn rule: a Lambda function has no retention period in the repository). Every other status is as in `EXPECTED.md`.
+- "Efficiency: 1 out of 8 confirmed in the repository (1 to ask the team)" and "Security: 1 out of 10 confirmed in the repository (0 to ask the team)".
+- "Not ready to deploy", and the first three are S3, S4, and S1.
+- E1 stays "ask the team", and its one question names `quickship-rates` too. Only E1 is asked. The offer reads "1 check sits outside the repository. Shall I ask it? (yes or no)".
 
 Must never:
 

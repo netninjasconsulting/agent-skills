@@ -68,7 +68,7 @@ Secret names only. No value, and no part of one.
 
 ## Questions for the team
 
-- <Check>, <function> on <platform>: <the question from references/checks.md> (yes or no)
+- <Check>, <every function and platform it covers, and each hidden setting by file and line>: <the question from references/checks.md> (yes or no)
 
 ## Also found
 
@@ -119,16 +119,16 @@ Give no score, no verdict, and no offer.
 
 ## The second pass
 
-After the report, when any check is marked "ask the team", offer once. K is the number of those checks across both headlines. For several checks: "K checks sit outside the repository. Shall I ask them? (yes or no)". For one check: "1 check sits outside the repository. Shall I ask it? (yes or no)". With no answer, or a no, the report is the result.
+After the report, when any check is marked "ask the team", offer once. The offer is the last line of the reply: it comes after the closing link line, and nothing follows it. K is the number of those checks across both headlines. For several checks: "K checks sit outside the repository. Shall I ask them? (yes or no)". For one check: "1 check sits outside the repository. Shall I ask it? (yes or no)". With no answer, or a no, the report is the result.
 
-With a yes, ask the question of each check marked "ask the team", one at a time, as a yes or no question. Ask no other check. Then print this block, and nothing else changes:
+With a yes, ask the one question of each check marked "ask the team", one check at a time, as a yes or no question. Ask no other check. Then print this block, and nothing else changes:
 
 ````markdown
 ## With the team's answers
 
 | # | Question | Answer |
 | --- | --- | --- |
-| <E1 to S10> | <the question, with the function and the platform> | <yes or no>, stated by the team |
+| <E1 to S10> | <the question, with every function and platform it covers> | <yes or no>, stated by the team |
 
 With the team's answers: <efficiency N plus the efficiency checks answered yes> out of <efficiency M> (efficiency).
 With the team's answers: <security N plus the security checks answered yes> out of <security M> (security).
@@ -136,4 +136,4 @@ With the team's answers: <security N plus the security checks answered yes> out 
 The first headlines and the verdict stand: Efficiency: N out of M confirmed in the repository (K to ask the team). Security: N out of M confirmed in the repository (K to ask the team). <Verdict>.
 ````
 
-A check that carries several questions, one for each function or hidden setting, counts as answered yes only when every one of its answers is yes.
+Each check has one question and one answer, which covers every function and hidden setting the question names. A check counts as answered yes only when its answer is yes.
