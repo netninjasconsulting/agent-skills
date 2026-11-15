@@ -27,7 +27,7 @@ Two new skills. The four skills from 0.1.0 keep their checks.
 
 ### Tested
 
-See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result.
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result. A review of that branch found nine important problems and no critical one. Seven are fixed and two are open decisions, and the fixture was run again.
 
 ### Known limits
 
