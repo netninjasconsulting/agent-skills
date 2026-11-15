@@ -19,6 +19,7 @@ Pull requests are welcome. These skills are free, and they stay free.
 
 ```sh
 node scripts/validate.mjs
+node tests/validate.test.mjs
 sh tests/scan-secrets.test.sh
 sh tests/list-agent-config.test.sh
 sh tests/read-serverless-config.test.sh

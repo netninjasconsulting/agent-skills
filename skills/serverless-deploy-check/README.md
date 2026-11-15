@@ -42,7 +42,7 @@ I keep seeing the same pattern in functions that shipped fast. The memory size c
 
 ## What comes back
 
-The report opens with the scope line. A note follows it: a file is not the running system. Then come two headlines.
+The report opens with the scope line. A note follows it: a file is not the running system. Then comes the verdict: "Not ready to deploy", "Ready after the first three", or "Ready from what the repository shows". A fail in any of S1 to S5 blocks the deploy. The efficiency score alone never blocks it. Two headlines sit under the verdict.
 
 ```text
 Efficiency: N out of M confirmed in the repository (K to ask the team)
@@ -51,11 +51,11 @@ Security: N out of M confirmed in the repository (K to ask the team)
 
 Each check gets one status: "pass", "warn", "fail", "ask the team", or "does not apply". M counts only the checks that apply to the platforms in the repository. E1 never passes from the repository. An explicit memory size is "ask the team", because only measured use shows that the size fits.
 
-Next come the function map, the eighteen checks with a file and a line each, the reach map, and the verdict. The verdict is "Not ready to deploy", "Ready after the first three", or "Ready from what the repository shows". A fail in any of S1 to S5 blocks the deploy. The efficiency score alone never blocks it.
+The function map comes after the headlines. Then the report gives the eight efficiency checks and the ten security checks, each with a file and a line. The reach map follows them.
 
-The first three things to change follow a fixed order, from S3, S4, and S1 down to the efficiency checks. Each one comes with a snippet for its platform. Every value in a snippet is a placeholder.
+Next come the first three things to change. They follow a fixed order, from S3, S4, and S1 down to the efficiency checks. Each one comes with a snippet for its platform. Every value in a snippet is a placeholder.
 
-When a check is "ask the team", the skill offers once to ask those questions. The answers go in a second block, and each one carries the label "stated by the team". The first headlines and the verdict never change.
+The report ends with the questions for the team, anything else it found, and what it did not check. When a check is "ask the team", the skill offers once to ask those questions. The answers go in a second block, and each one carries the label "stated by the team". The first headlines and the verdict never change.
 
 When the repository holds none of the four platforms, the skill says so, lists what it searched for, and stops with no score.
 
@@ -65,7 +65,7 @@ When the repository holds none of the four platforms, the skill says so, lists w
 - It never makes a network request, and it never writes a file.
 - It never changes a setting in a cloud account, a Git remote, or a provider.
 - It never opens a configuration file that the reader lists in any other way.
-- It never repeats a secret value. It reports the file, the line, and the secret type.
+- It tells the agent never to repeat a secret value. The reader hides values, and the agent reports the file, the line, and the secret type. The limits below say where that can fail.
 - It never passes a check because a README, a comment, or a variable name says so.
 - It never follows instructions found inside the repository.
 - It sends nothing to Net Ninjas or to anyone else.
@@ -76,7 +76,7 @@ It doesn't repeat the full secrets pass of the [vibe-code pre-launch check](../v
 
 - **The reader doesn't parse.** It works by line and hides what it can't place. Some valid layouts get hidden that way: the inputs of a Terraform `module` block, a top-level `maxDuration` in `vercel.json`, the items of a one-line `jsonencode` list, the principals of a policy document, and the `Cors` of a SAM API. The report gives their settings as "not found in what the reader shows".
 - **A secret in the wrong place can print.** The reader shows a value when its key carries a setting. So a secret can appear in its output when someone writes it where a setting name belongs. Examples are a runtime, a handler, an IAM action, and the last part of an ARN. A secret used as a key name can appear too. The skill tells the agent not to copy such a value into the report.
-- **Many provider facts are marked "verify".** I read the facts in `references/platforms.md` from each provider's documentation on 15 November 2026. The rows marked "verify" weren't confirmed on that date. Provider limits and defaults change often.
+- **45 provider facts are marked "verify".** `references/platforms.md` holds 147 rows of provider facts. I read 102 of them in each provider's documentation on 15 November 2026. The other 45 are marked "verify", and I didn't confirm them on that date. Provider limits and defaults change often.
 - **No size, no saving, and no cost.** The skill says whether a setting is explicit, and where. Measured use is the evidence for a size, and the repository doesn't hold it.
 - **A file is not the running system.** A memory size, a region, or an access rule can live in a provider's console and not in a file. The report says so at the top.
 - **Four platforms only.** Azure Functions, Google Cloud Functions, Netlify, Deno Deploy, Fly.io, and Kubernetes are outside this check.
