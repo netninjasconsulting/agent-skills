@@ -4,6 +4,13 @@ frameworkVersion: "4"
 provider:
   name: aws
   region: us-east-1
+  logRetentionInDays: 30
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action: "*"
+          Resource: "*"
   apiGateway:
     apiKeys:
       - quickship-import
@@ -28,10 +35,6 @@ functions:
           path: ingest
           method: post
           private: true
-    iamRoleStatements:
-      - Effect: Allow
-        Action: "*"
-        Resource: "*"
     environment:
       DB_PASSWORD: |
         FIXTUREVALUE-serverless-block-01
