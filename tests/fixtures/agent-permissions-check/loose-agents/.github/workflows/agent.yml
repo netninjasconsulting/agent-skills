@@ -1,0 +1,27 @@
+# Test fixture. This workflow is unsafe on purpose.
+name: agent
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+
+permissions: write-all
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Run the coding agent on the comment
+        uses: example-org/claude-code-runner@main
+        with:
+          prompt: ${{ github.event.comment.body }}
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_PERSONAL_ACCESS_TOKEN }}
+      - name: Approve the agent's pull request
+        run: gh pr review --approve "${{ github.event.pull_request.html_url }}"
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_PERSONAL_ACCESS_TOKEN }}

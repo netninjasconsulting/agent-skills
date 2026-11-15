@@ -1,6 +1,47 @@
 # Changelog
 
-All four skills share one version number. Dates are in day, month, year order.
+Every skill carries the same version number. Dates are in day, month, year order.
+
+## 0.2.0 (15 November 2026)
+
+One new skill. The four skills from 0.1.0 keep their checks.
+
+### Added
+
+- `agent-permissions-check`: what the AI coding agents on a repository can do, and what stops them. Part A is the nine rows of the published policy. Part B covers agents at a developer's desk.
+
+### Changed
+
+- `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools, which `.gitignore` now lists.
+- `scripts/validate.mjs` pins the nine rows of the agent permissions check to their published wording.
+- Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same.
+
+### Verified for this release (15 November 2026)
+
+- The nine policy rows, against the source of the published page in the website repository (commit 544c46a).
+- Claude Code settings, permissions, and MCP facts marked "checked" in `skills/agent-permissions-check/references/agent-files.md`, read from code.claude.com on 15 November 2026.
+- Codex configuration facts marked "checked" in the same file, read from learn.chatgpt.com on 15 November 2026. Facts marked "verify" were not confirmed.
+
+### Tested
+
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. The twelve minor findings of that review are fixed as well. Six were fixed with the review, and six after it: the reader shows a server that carries the name of a hidden block, the fixture has an `open-rows` variant with a scenario for the open rules of rows 3, 4, and 6, and the validator pins the nine rows. The first two runs of that scenario gave a wrong count in the headline, which is now fixed, and a third run passed.
+
+### Independent review corrections (15 November 2026)
+
+- Correct hidden JSON arrays, escaped keys and values, and quoted or flow YAML credential handling. Escaped strings and the remainder of escaped text are now hidden conservatively.
+- Tighten evidence for enforced permissions, clarify status precedence, and update Claude Code and Codex facts from vendor documentation. A self-hosted label alone leaves the runner unconfirmed.
+- The plain fixture remains 1 of 9 enforced (1 not checked). The open-rows variant is now 0 of 9 enforced (1 not checked).
+
+### Known limits
+
+- `agent-permissions-check` has not been run with `gh` access, against a real home folder, or with a yes to the policy file.
+- The fixture runs gave the user's answers in advance, so the order "ask, then read" was not observed.
+- The reader script is tested on Linux and macOS with BSD awk and sed, under sh and dash. BusyBox remains untested.
+- The masked view works line by line. A file on one line prints as one long masked line.
+- The reader hides a credential that it can recognise by its key, its shape, its flag, or its place in an address. It cannot recognise a credential typed as an unlabelled plain word: a positional argument, a word in a command, a host name of fewer than 8 characters, or prose in an instruction file. This includes arbitrarily long alphabetic values, not only short words. This heuristic reader cannot guarantee that arbitrary input is free of credentials. The skill tells the agent not to repeat such a value.
+- A fresh agent sometimes cites a line number that is off by one. Two of the last five runs did so, each on one line.
+- The reader hides some harmless text: a word of 20 or more characters that mixes letters and digits, and comments in settings and env files.
+- Tool-specific settings of agents other than Claude Code and Codex are not read.
 
 ## 0.1.0 (14 November 2026)
 

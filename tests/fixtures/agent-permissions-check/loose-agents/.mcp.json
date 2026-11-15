@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@example/mcp-postgres"],
+      "env": {
+        "DATABASE_URL": "postgres://admin:FIXTUREVALUE-db-password@prod-db.example.com:5432/parcels"
+      }
+    },
+    "search": {
+      "command": "npx",
+      "args": ["-y", "@example/mcp-search", "--api-key=FIXTUREVALUE-search-key"]
+    },
+    "tickets": {
+      "type": "http",
+      "url": "https://mcp.example.com/v1?key=FIXTUREVALUE-url-key",
+      "headers": {
+        "Authorization": "Bearer FIXTUREVALUE-bearer"
+      }
+    }
+  }
+}

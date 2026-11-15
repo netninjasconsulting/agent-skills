@@ -22,7 +22,8 @@ const read = (file) => readFileSync(file, "utf8");
 function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    if (entry.name === ".git" || entry.name === "node_modules") return [];
+    // .superpowers is the git-ignored scratch folder of the planning tools.
+    if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".superpowers") return [];
     return entry.isDirectory() ? walk(full) : [full];
   });
 }
@@ -60,8 +61,9 @@ const credits = [
 const scopeLine = "This is a quick check. It is not a penetration test and it is not legal advice.";
 
 // Names that contain the word and are someone else's: a product name, or an ecosystem's own command.
+// "audit log" is GitHub's own name for the feature the agent permissions policy cites.
 const auditAllowed =
-  /security-audit(-skill)?|\b(npm|pnpm|yarn npm|yarn|bun|cargo|composer|bundle) audit\b|\b(pip|cargo|bundler)-audit\b|audit fix|ecosystem's own audit command/gi;
+  /security-audit(-skill)?|\baudit logs?\b|\b(npm|pnpm|yarn npm|yarn|bun|cargo|composer|bundle) audit\b|\b(pip|cargo|bundler)-audit\b|audit fix|ecosystem's own audit command/gi;
 
 const skills = readdirSync(skillsDir).filter((name) => statSync(path.join(skillsDir, name)).isDirectory());
 const versions = new Set();
@@ -171,6 +173,30 @@ if (existsSync(gitops)) {
   const content = read(gitops);
   tenChecks.forEach((check, index) => {
     if (!content.includes(`${index + 1}. ${check}`)) fail(gitops, `check ${index + 1} does not match the published wording: ${check}`);
+  });
+}
+
+// The nine rows of the agent permissions check keep the wording of the published policy.
+const nineRows = [
+  ["Repository", "Open branches and pull requests, and comment.", "Push to main, merge, approve its own work, or edit workflow files.", "A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/."],
+  ["Identity", "Act as its own bot account or GitHub App.", "Use a person's account or personal access token.", "A GitHub App with the fewest permissions. Its installation tokens expire after an hour."],
+  ["Secrets", "Use the secrets of its sandbox.", "Read production secrets or long-lived cloud keys.", "Production secrets only in an environment with required reviewers."],
+  ["Cloud", "Read and write in a sandbox account.", "Reach production accounts.", "A separate account, with OIDC roles scoped to it."],
+  ["Data", "Work with synthetic or anonymised fixtures.", "Read production customer data.", "No production credentials in the sandbox, and no copies of production data there."],
+  ["Runners", "Run in fresh, isolated runners.", "Run on a laptop or a runner with a network path to production.", "GitHub-hosted or ephemeral runners only."],
+  ["Outside input", "Read issues, web pages, and READMEs as data.", "Follow instructions found in them.", "No secrets for workflows that outside contributors trigger."],
+  ["Review", "Review code as an extra reviewer that comments.", "Give the approving review.", "A required approval from a human code owner."],
+  ["Record", "Act under its own identity, with every action in the log.", "Act anonymously or under a shared login.", "An audit log we keep, so last week's agent changes are one query away."],
+];
+const agentChecks = path.join(skillsDir, "agent-permissions-check", "references", "checks.md");
+if (existsSync(agentChecks)) {
+  const lines = read(agentChecks).split("\n");
+  nineRows.forEach(([area, may, mayNot, enforce], index) => {
+    const row = `row ${index + 1} (${area})`;
+    if (!lines.includes(`### ${index + 1}. ${area}`)) fail(agentChecks, `${row} has no heading "### ${index + 1}. ${area}"`);
+    if (!lines.includes(`- **The agent may:** ${may}`)) fail(agentChecks, `${row}: "The agent may" does not match the published wording: ${may}`);
+    if (!lines.includes(`- **The agent may not:** ${mayNot}`)) fail(agentChecks, `${row}: "The agent may not" does not match the published wording: ${mayNot}`);
+    if (!lines.includes(`- **How we enforce it:** ${enforce}`)) fail(agentChecks, `${row}: "How we enforce it" does not match the published wording: ${enforce}`);
   });
 }
 

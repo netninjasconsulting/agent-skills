@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(gh pr merge *)",
+      "Bash(aws *)",
+      "mcp__*"
+    ],
+    "deny": [],
+    "defaultMode": "bypassPermissions"
+  },
+  "enableAllProjectMcpServers": true,
+  "env": {
+    "DEPLOY_TOKEN": "ghp_FIXTUREVALUE0000notarealtoken0000"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "echo fixture hook" }
+        ]
+      }
+    ]
+  }
+}

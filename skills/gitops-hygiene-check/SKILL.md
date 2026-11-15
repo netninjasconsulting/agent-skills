@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Needs a local clone of a GitHub repository and a POSIX shell with git and grep. The GitHub CLI (gh) is optional and is used read-only, after the user says yes, to read branch rules and repository settings.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.1.0"
+  version: "0.2.0"
   homepage: https://www.netninjas.us/skills
 ---
 

@@ -1,0 +1,10 @@
+# Test fixture. Every value here is fake.
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[mcp_servers.deploy]
+command = "npx"
+args = ["-y", "@example/mcp-deploy"]
+
+[mcp_servers.deploy.env]
+DEPLOY_KEY = "FIXTUREVALUE-codex-deploy-key"

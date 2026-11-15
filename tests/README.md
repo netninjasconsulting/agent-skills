@@ -8,6 +8,7 @@ Each skill ships with a fixture and the result it has to produce. A skill is a s
 | `gitops-hygiene-check` | `fixtures/gitops-hygiene-check/loose-pipeline/`, a repository with a loose pipeline | `fixtures/gitops-hygiene-check/EXPECTED.md` |
 | `handover-runbook-generator` | `fixtures/handover-runbook-generator/parcel-api/`, a small AWS service | `fixtures/handover-runbook-generator/EXPECTED.md` |
 | `guided-app-starter` | Scenarios, because the skill writes and creates things | `fixtures/guided-app-starter/scenarios.md` |
+| `agent-permissions-check` | `fixtures/agent-permissions-check/loose-agents/`, a repository with loose agent settings, and `home/`, a stand-in home folder | `fixtures/agent-permissions-check/EXPECTED.md`, and `scenarios.md` for a repository with no agent files and for the `open-rows` variant of the fixture |
 
 The fixtures are unsafe on purpose. Every key in them is fake, and none of them is meant to run.
 
@@ -34,9 +35,10 @@ Use a fresh session each time. An agent that has read `EXPECTED.md` is not a tes
 ```sh
 node scripts/validate.mjs       # format and repository rules for every skill
 sh tests/scan-secrets.test.sh   # the secret scanner against the vibe-shop fixture
+sh tests/list-agent-config.test.sh   # the agent configuration reader against the loose-agents fixture
 ```
 
-Both run in CI on every pull request.
+All three run in CI on every pull request.
 
 ## Before a release
 
