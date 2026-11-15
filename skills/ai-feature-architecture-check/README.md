@@ -8,7 +8,7 @@ I'm starting to see the same gap in a lot of AI features. The demo works, and pr
 
 ## What it checks
 
-**The twelve checks of [the six-layer AI architecture checklist](https://www.netninjas.us/events/six-layer-ai-architecture-checklist),** two per layer, with the same wording and the same score bands as the published page.
+**The twelve checks of [the six-layer AI architecture checklist](https://www.netninjas.us/events/six-layer-ai-architecture-checklist),** two per layer, with the wording and the score bands of the published page, in UK spelling.
 
 1. The AI feature works inside the signed-in user's permissions.
 2. The interface says it's AI and marks what it generated.

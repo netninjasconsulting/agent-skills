@@ -94,7 +94,7 @@ Leave out "Also found" when there is nothing to put in it.
 
 ## The second pass
 
-After the report, when M is above 0, offer once: "M checks sit outside the code. Shall I ask them? (yes or no)". When M is 1, write "1 check sits outside the code. Shall I ask it? (yes or no)". With no answer, or a no, the report is the result.
+After the report, when M is above 0, offer once. For several checks: "M checks sit outside the code. Shall I ask them? (yes or no)". For one check: "1 check sits outside the code. Shall I ask it? (yes or no)". With no answer, or a no, the report is the result.
 
 With a yes, ask the question of each check marked "ask the team", one at a time, as a yes or no question. Ask no other check. Then print this block, and nothing else changes:
 

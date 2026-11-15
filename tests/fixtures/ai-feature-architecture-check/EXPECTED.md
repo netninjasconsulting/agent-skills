@@ -24,16 +24,16 @@ A run passes when every line under "Must" holds and no line under "Must never" i
 
 | # | Check | Status | Evidence the report points to |
 | --- | --- | --- | --- |
-| 1 | The AI feature works inside the signed-in user's permissions. | fail | `lib/ai/tools.ts`: the refund tool calls the payments API with a service key. `app/api/draft-reply/route.ts` reads the ticket and the customer by ID alone |
+| 1 | The AI feature works inside the signed-in user's permissions. | fail | Draft reply is named. `lib/ai/tools.ts`: the refund tool calls the payments API with a service key. `app/api/draft-reply/route.ts` reads the ticket and the customer by ID alone |
 | 2 | The interface says it's AI and marks what it generated. | pass | The labels in `components/`, the `data-ai-generated` attribute, and the `x-ai-generated` header on both routes |
-| 3 | Every request passes authentication and validation before a prompt exists. | warn | Draft reply is named: `app/api/draft-reply/route.ts` checks the session, builds the prompt, and validates after. No size limit. No rate limit found on either route |
+| 3 | Every request passes authentication and validation before a prompt exists. | warn | Draft reply is named, and summarise ticket meets the check: `app/api/draft-reply/route.ts` checks the session, builds the prompt, and validates after, with no size limit and no rate limit. `app/api/summarise/route.ts` runs all four before the prompt |
 | 4 | A policy step removes or pseudonymises the personal data a task doesn't need. | fail | `lib/ai/prompt.ts`: the whole customer record goes into the prompt. Fields named, no value quoted |
 | 5 | Retrieval reads only the sources we approved. | ask the team | `lib/ai/sources.ts`: a named list with owners. `lib/ai/retrieve.ts`: the query is limited to it. No review of the list is visible |
-| 6 | The retrieval service applies the tenant filter in code. | fail | `app/api/draft-reply/route.ts`: the tenant comes from the request body |
+| 6 | The retrieval service applies the tenant filter in code. | fail | Draft reply is named. `app/api/draft-reply/route.ts`: the tenant comes from the request body |
 | 7 | Every model call goes through one gateway. | fail | Two call sites, as in the map |
 | 8 | The feature still works when the model is slow or down. | fail | No timeout and no fallback at either call site |
 | 9 | An evaluation set from real cases scores every change. | warn | `evals/run.ts` and `evals/cases.json` exist. `.github/workflows/ci.yml` does not run them |
-| 10 | A named person approves the outputs that matter. | fail | `lib/ai/draft.ts`: the refund runs when the model asks for it |
+| 10 | A named person approves the outputs that matter. | fail | Draft reply is named. `lib/ai/draft.ts`: the refund runs when the model asks for it |
 | 11 | Every request leaves a trace we can query. | warn | `lib/ai/trace.ts`: both call sites write a trace with four of the five fields. The approver is written as empty on every call |
 | 12 | We know what one AI action costs, per customer. | fail | `db/schema.sql`: `usage_log` has no tenant |
 
@@ -49,7 +49,7 @@ A run passes when every line under "Must" holds and no line under "Must never" i
 | 4 | We know what the model provider keeps, and for how long. | ask the team | Not in the repository |
 | 5 | The pseudonymisation table sits apart from the prompts. | fail | No pseudonymisation step exists |
 | 6 | A deleted record also leaves the vector store. | fail | `app/api/customers/[id]/route.ts` leaves the `documents` rows |
-| 7 | Our evaluation sets hold synthetic or anonymised cases. | warn, as an assumption | `evals/cases.json`: cases with names, emails, and phone numbers. A pass is also accepted here, when the report gives the fixture marker in the name field as its reason |
+| 7 | Our evaluation sets hold synthetic or anonymised cases. | warn, as an assumption | `evals/cases.json`: the field names are personal data fields, and no script generates the set. The marker inside the records is a value and is not evidence |
 | 8 | Backups and snapshots stay in the approved regions. | ask the team | `infra/main.tf`: a copy from `us-east-1` to `eu-west-1`, with both regions named |
 
 **Cost per action.** `model` and `created_at` are recorded. `tenant_id`, `action_id`, `input_tokens`, `cached_input_tokens`, and `output_tokens` are not. The published query is printed under "Proposal". No figure is given.

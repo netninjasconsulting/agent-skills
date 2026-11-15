@@ -22,8 +22,8 @@ Two new skills. The four skills from 0.1.0 keep their checks.
 - The nine policy rows, against the source of the published page in the website repository (commit 544c46a).
 - Claude Code settings, permissions, and MCP facts marked "checked" in `skills/agent-permissions-check/references/agent-files.md`, read from code.claude.com on 15 November 2026.
 - Codex configuration facts marked "checked" in the same file, read from learn.chatgpt.com on 15 November 2026. Facts marked "verify" were not confirmed.
-- The twelve checks, the score bands, the ten stops, the eight leak paths, and the cost query, against the source of the published pages in the website repository (commit 544c46a), in the wording of netninjas.us.
-- Not verified: the names in `skills/ai-feature-architecture-check/references/signals.md`. Every row there is marked "verify".
+- The twelve checks, the score bands, the ten stops, the eight leak paths, and the cost query, against the source of the published pages in the website repository (commit 544c46a). The skill carries the wording of netninjas.us in UK spelling, so four words differ in spelling from that site: pseudonymises, pseudonymised, pseudonymisation, and anonymised.
+- Not verified: the names in `skills/ai-feature-architecture-check/references/signals.md`. None was read from a vendor's documentation, and the file says so.
 
 ### Tested
 

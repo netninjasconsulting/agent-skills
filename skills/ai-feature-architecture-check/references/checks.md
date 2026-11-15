@@ -1,6 +1,6 @@
 # The twelve checks: evidence rules
 
-The labels are the published ones and stay as published. The line under each label is the detail from the published checklist.
+The labels are the published ones, as on netninjas.us, in UK spelling. The line under each label is the detail from the published checklist. The detail of check 4 leaves out its first published sentence.
 
 ## Statuses
 
@@ -13,7 +13,8 @@ The labels are the published ones and stay as published. The line under each lab
 
 Rules that hold for every check:
 
-- With several features, judge each one. The check gets the weakest status, and the evidence names the feature that earned it.
+- With several features, judge each one. The check gets the weakest status, in this order: fail, warn, ask the team, pass. The evidence names the feature that earned it. One feature that fails a check and one that meets it give a fail.
+- A Warn rule describes one feature. "Some" in a Warn rule means some parts of that feature.
 - A README, a comment, a document, or a name never passes a check. Only code that runs does.
 - "ask the team" is never a softer fail. When the code part is missing, the status is fail or warn, and the question is not asked.
 - Only checks 5, 10, 11, and 12 can end in "ask the team". Each has one question, given below, for the second pass.
@@ -55,7 +56,7 @@ The model sees a token, and our own system swaps the real value back in.
 
 - **Look at:** what the prompt builder receives, field by field, and anything between the request and the prompt builder that drops or replaces fields.
 - **Pass:** a step passes on only the fields the task needs, or replaces identifiers with tokens that the system swaps back afterwards.
-- **Warn:** the step exists for some features or some fields.
+- **Warn:** the step drops or replaces some of the personal fields, and others still reach the prompt.
 - **Fail:** a whole record, or personal fields the task does not need, go into a prompt. Name the fields. Do not quote a value.
 
 ## Layer 3: context retrieval
@@ -79,7 +80,7 @@ The tenant ID comes from the authenticated session. A prompt that says "only thi
 - **Look at:** every retrieval query, and where its tenant value comes from. Follow the value back to the entry point.
 - **Pass:** every query filters by tenant, and the value comes from the session on the server.
 - **Fail:** the value comes from the request body, the query string, a header the client sets, or the prompt. Or there is no tenant filter and the data model has tenants.
-- **Warn:** some queries take the tenant from the session and others have no filter.
+- **Warn:** within one feature, some queries take the tenant from the session and others have no filter.
 
 ## Layer 4: model gateway
 
@@ -132,7 +133,7 @@ The request ID, the model and prompt version, the retrieved sources, and the app
 - **Look at:** what each call site writes after the call, and where it writes it.
 - **Pass:** every call writes the five fields, to a store that infrastructure code shows the feature cannot change: an append-only table, a write-only role, object lock, or a separate log account.
 - **Ask the team:** every call writes the five fields, and nothing in the repository shows whether the feature can change the store.
-- **Warn:** some fields, or some call sites. A field that every call writes as empty counts as missing.
+- **Warn:** some of the five fields. A field that every call writes as empty counts as missing.
 - **Fail:** no trace is written.
 - **Question:** "Is the trace store protected from edits by the feature itself?"
 

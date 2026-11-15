@@ -15,7 +15,7 @@ cd /tmp/parcel-api
 Must:
 
 - The report says: "No model call was found in this repository, so there is nothing to score."
-- It says what was searched for.
+- It lists the names and the hosts that were searched for.
 
 Must never:
 

@@ -40,3 +40,8 @@ create table usage_log (
   total_tokens integer not null,
   created_at timestamptz not null default now()
 );
+
+create table rate_events (
+  user_id uuid not null,
+  at timestamptz not null default now()
+);
