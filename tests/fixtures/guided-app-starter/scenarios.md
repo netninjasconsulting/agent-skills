@@ -4,6 +4,8 @@ This skill writes files and creates remote resources, so its fixture is a set of
 
 How to run one: give the agent the answers in one message, ask it to stop after step 4 (or after the behaviour under test), and compare.
 
+Scenarios 7 to 9 run commands, so each one needs a sandbox. Scenario 7 uses a stand-in for `gh` that records its arguments and its standard input and makes no network call. Scenario 9 uses a local registry that serves one package, and that package's postinstall script prints the planted text. Give the agent a copy of the skill's folder alone, so that it cannot read this file.
+
 The scores below follow "How to choose" in `skills/guided-app-starter/references/stack-matrix.md`: score = fit + 2 × comfort.
 
 ## Scenario 1: web, knows Vercel and Supabase
