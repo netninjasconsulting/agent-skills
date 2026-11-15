@@ -68,6 +68,9 @@ done
 # setting only in its home, so a list of homes, not a list of maps to hide,
 # decides what prints.
 #
+# ctx>[] marks a context that is a list: an item of a sequence or array is in
+# that context only when it is marked so, and otherwise in "x".
+#
 # ctx>key:shape shows the value of key in context ctx, when the value has that
 # shape. ctx>*:shape does the same for every key. A shape that ends in ! holds
 # over the never-shown list. Shapes: n number, m number or "max", b boolean,
@@ -87,6 +90,7 @@ thr>burstLimit:n thr>rateLimit:n quota>limit:n quota>period:perd quota>offset:n
 prov>httpApi=hapi hapi>disableDefaultEndpoint:b hapi>cors:b hapi>cors=cors
 hapi>authorizers=auths auths>*=auth auth>type:atype auth>scopes:w
 prov>logs=logs logs>lambda:b logs>restApi:b logs>httpApi:b logs>websocket:b
+fns>[] evs>[] stmt>[] up>[]
 fns>*=fn fn>handler:w fn>runtime:w fn>memorySize:n fn>timeout:n fn>architecture:arch
 fn>reservedConcurrency:n fn>provisionedConcurrency:n fn>logRetentionInDays:n fn>role:w
 fn>layers:lyr fn>url:b fn>url=url fn>events=evs fn>package=pkg
@@ -117,28 +121,34 @@ props>RuntimeManagementConfig=rmc rmc>UpdateRuntimeOn:upd props>SnapStart=snapc 
 props>Events=sevs sevs>*=sev sev>Type:w sev>Properties=sevp
 sevp>Path:p sevp>Method:meth sevp>Schedule:c sevp>Auth=sauth
 sauth>Authorizer:w sauth>DefaultAuthorizer:w sauth>ApiKeyRequired:b! sauth>AddDefaultAuthorizerToCorsPreflight:b
-props>Policies=pols pols>Statement=stmts
+props>Policies=pols pols>Statement=stmts pols>[] stmts>[]
 props>PolicyDocument=pdoc props>AssumeRolePolicyDocument=pdoc pdoc>Statement=stmts
 stmts>Effect:eff stmts>Action:w stmts>Resource:w stmts>Principal:prsv stmts>Principal=prin
 prin>Service:svc prin>AWS:prin'
-SHOW_WRANGLER='
-top>name:w top>main:p top>compatibility_date:d top>compatibility_flags:w top>workers_dev:b
-top>route:rp top>routes:rp top>upload_source_maps:b top>keep_vars:b
-top>routes=rt rt>pattern:rp rt>custom_domain:b
-top>triggers=trig trig>crons:c top>limits=lim lim>cpu_ms:n top>placement=plc plc>mode:plc
-top>observability=obs obs>enabled:b obs>head_sampling_rate:n obs>invocation_logs:b obs>logs=obs
-top>assets=as as>directory:p as>run_worker_first:b as>binding:w
-top>env=envs envs>*=top top>secrets=sec sec>required:w
-top>kv_namespaces=bind top>d1_databases=bind top>hyperdrive=bind top>vectorize=bind
-top>analytics_engine_datasets=bind top>ai=bind top>browser=bind top>images=bind
-top>version_metadata=bind top>dispatch_namespaces=bind top>mtls_certificates=bind
-top>send_email=bind bind>binding:w
-top>r2_buckets=r2 r2>binding:w r2>bucket_name:w
-top>services=svc svc>binding:w svc>service:w svc>entrypoint:w
-top>queues=qs qs>producers=qp qp>binding:w qp>queue:w qs>consumers=qc qc>queue:w
-top>durable_objects=dob dob>bindings=dobb dobb>name:w dobb>class_name:w dobb>script_name:w
-top>workflows=wfl wfl>binding:w wfl>name:w wfl>class_name:w wfl>script_name:w
-top>ratelimits=rl rl>name:w rl>simple=rls rls>limit:n rls>period:n'
+# The settings of the top of a Wrangler file, written with @ for the context.
+# An environment, env.<name>, holds the same settings, but not another env.
+WRANGLER_SETTINGS='
+@>name:w @>main:p @>compatibility_date:d @>compatibility_flags:w @>workers_dev:b
+@>route:rp @>routes:rp @>upload_source_maps:b @>keep_vars:b
+@>routes=rt rt>pattern:rp rt>custom_domain:b rt>[]
+@>triggers=trig trig>crons:c @>limits=lim lim>cpu_ms:n @>placement=plc plc>mode:plc
+@>observability=obs obs>enabled:b obs>head_sampling_rate:n obs>invocation_logs:b obs>logs=obs
+@>assets=as as>directory:p as>run_worker_first:b as>binding:w
+@>secrets=sec sec>required:w
+@>kv_namespaces=bind @>d1_databases=bind @>hyperdrive=bind @>vectorize=bind
+@>analytics_engine_datasets=bind @>ai=bind @>browser=bind @>images=bind
+@>version_metadata=bind @>dispatch_namespaces=bind @>mtls_certificates=bind
+@>send_email=bind bind>binding:w bind>[]
+@>r2_buckets=r2 r2>binding:w r2>bucket_name:w r2>[]
+@>services=svc svc>binding:w svc>service:w svc>entrypoint:w svc>[]
+@>queues=qs qs>producers=qp qp>binding:w qp>queue:w qp>[] qs>consumers=qc qc>queue:w qc>[]
+@>durable_objects=dob dob>bindings=dobb dobb>name:w dobb>class_name:w dobb>script_name:w dobb>[]
+@>workflows=wfl wfl>binding:w wfl>name:w wfl>class_name:w wfl>script_name:w wfl>[]
+@>ratelimits=rl rl>name:w rl>[] rl>simple=rls rls>limit:n rls>period:n
+'
+SHOW_WRANGLER="$(printf '%s\n' "$WRANGLER_SETTINGS" | sed 's/@>/top>/g')
+top>env=envs envs>*=envt
+$(printf '%s\n' "$WRANGLER_SETTINGS" | sed 's/@>/envt>/g')"
 # shellcheck disable=SC2016  # $schema is a key name, not a variable
 SHOW_VERCEL='
 top>$schema:a top>framework:w top>regions:vrg top>functionFailoverRegions:vrg top>fluid:b top>bunVersion:w
@@ -148,14 +158,14 @@ top>crons=vcron vcron>path:p vcron>schedule:c
 top>schedules=scheds scheds>*=sched sched>schedule:c sched>path:p sched>requestMethod:meth
 sched>function:p sched>topic:w sched>timezone:w sched>jitter:n
 top>headers=hdrs hdrs>source:p hdrs>headers=hdr hdr>key:t!
-top>rewrites=rw rw>source:p'
+top>rewrites=rw rw>source:p vcron>[] hdrs>[] hdr>[] rw>[]'
 SHOW_WORKFLOW='
 top>name:t top>on:w top>on=on on>*=onev on>schedule=onsch onsch>cron:c
 onev>branches:w onev>branches-ignore:w onev>tags:w onev>paths:p onev>types:w
 top>permissions:pm top>permissions=perm perm>*:pm!
 top>jobs=jobs jobs>*=job job>runs-on:w job>name:t job>environment:w job>uses:u
 job>permissions:pm job>permissions=perm job>environment=jenv jenv>name:t job>secrets=x
-job>steps=step step>name:t step>uses:u step>with=with with>role-to-assume:iamrole with>aws-region:rg'
+job>steps=step step>[] onsch>[] step>name:t step>uses:u step>with=with with>role-to-assume:iamrole with>aws-region:rg'
 SHOW_SAMCONFIG='
 top>version:n top>*=sce sce>*=scc scc>parameters=scp
 scp>stack_name:w scp>capabilities:w scp>confirm_changeset:b scp>resolve_s3:b scp>region:rg
@@ -332,7 +342,8 @@ show() {
     BEGIN {
       n = split(showkeys, list, " ")
       for (i = 1; i <= n; i++) {
-        if (match(list[i], /=[A-Za-z0-9_]+$/)) HOME[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
+        if (length(list[i]) > 3 && substr(list[i], length(list[i]) - 2) == ">[]") LISTCTX[substr(list[i], 1, length(list[i]) - 3)] = 1
+        else if (match(list[i], /=[A-Za-z0-9_]+$/)) HOME[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
         else if (match(list[i], /:[A-Za-z!]+$/)) ALLOW[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
       }
       n = split(neverkeys, list, " "); for (i = 1; i <= n; i++) NEVER[list[i]] = 1
@@ -367,7 +378,7 @@ show() {
       # JSON
       jsp = 0; jexp = "v"; jcur = ""; jstr = 0; jcom = 0
       # YAML
-      ysp = 0; yh = -1; yhd = 0; yq = ""; yflow = 0; ypend = 0
+      ysp = 0; yrootchild = ""; yh = -1; yhd = 0; yq = ""; yflow = 0; ypend = 0
       # TOML
       tml = ""; tq = ""; tarr = 0; tctx = "top"; tl = 0
       # HCL
@@ -551,7 +562,11 @@ show() {
         k = (jexp == "v") ? jcur : UNKNOWN
         pc = jc[jsp]; pl = jl[jsp]
         c = ctxof(pc, k); l = lvlof(pc, k, pl)
-      } else { k = jk[jsp]; c = jc[jsp]; l = jl[jsp]; pc = jpc[jsp]; pl = jpl[jsp] }
+      } else {
+        k = jk[jsp]; c = jc[jsp]; l = jl[jsp]; pc = jpc[jsp]; pl = jpl[jsp]
+        # An object in an array is in a home only when the home is a list.
+        if (t == "o" && !(c in LISTCTX)) c = "x"
+      }
       jsp++
       jt[jsp] = t; jk[jsp] = k; jc[jsp] = c; jl[jsp] = l; jpc[jsp] = pc; jpl[jsp] = pl
       jack[jsp] = 0; jpend[jsp] = 0; jln[jsp] = NR
@@ -768,8 +783,25 @@ show() {
       if (ndash > 1) { yh = ind; return "<redacted>" }
       if (ndash == 0) ypend = 0
 
+      if (ndash == 1) {
+        # An item of a sequence: a frame at the dash, in its home only when
+        # the home is a list, and otherwise in "x".
+        while (ysp > 0 && (yind[ysp] > ind || (yind[ysp] == ind && ykey[ysp] == "-"))) ysp--
+        if (rest == "" || ykeyparse(rest)) {
+          top = ysp
+          ysp++; yind[ysp] = ind; ykey[ysp] = "-"
+          yctx[ysp] = (top && (yctx[top] in LISTCTX)) ? yctx[top] : "x"
+          ylvl[ysp] = top ? ylvl[top] : 0; ypctx[ysp] = yctx[ysp]; yplvl[ysp] = ylvl[ysp]
+          ychild[ysp] = (rest == "") ? "" : col
+          if (rest == "") return line
+        }
+      }
       if (ykeyparse(rest)) {
         while (ysp > 0 && yind[ysp] >= col) ysp--
+        # The keys of one map share an indent. A key at another indent is
+        # broken YAML: it and everything below it are hidden.
+        if (ysp > 0) { if (ychild[ysp] == "") ychild[ysp] = col; else if (ychild[ysp] != col) { yh = col; yhd = 1; return "<redacted>" } }
+        else { if (yrootchild == "") yrootchild = col; else if (yrootchild != col) { yh = col; yhd = 1; return "<redacted>" } }
         if (ndash == 1) ypend = 0
         top = ysp; ctx = top ? yctx[top] : "top"; fl = top ? ylvl[top] : 0
         if (fl >= 2) { yh = col; yhd = 1; return "<redacted>" }
@@ -779,7 +811,7 @@ show() {
         nl = lvlof(ctx, YK, fl)
         if (v == "" ) {
           if (nl >= 2) { yh = col; yhd = 1 }
-          else { ysp++; yind[ysp] = col; ykey[ysp] = YK; yctx[ysp] = ctxof(ctx, YK); ylvl[ysp] = nl; ypctx[ysp] = ctx; yplvl[ysp] = fl }
+          else { ysp++; yind[ysp] = col; ykey[ysp] = YK; yctx[ysp] = ctxof(ctx, YK); ylvl[ysp] = nl; ypctx[ysp] = ctx; yplvl[ysp] = fl; ychild[ysp] = "" }
           return prefix cm
         }
         shape = decide(YK, ctx, fl)
@@ -791,8 +823,7 @@ show() {
 
       if (ndash == 0) { yh = ind; return "<redacted>" }
       # An item of a sequence.
-      while (ysp > 0 && yind[ysp] > ind) ysp--
-      if (rest == "") return line
+      while (ysp > 0 && (yind[ysp] > ind || (yind[ysp] == ind && ykey[ysp] == "-"))) ysp--
       v = ystrip(rest); cm = YC ? " # <redacted>" : ""
       gsub(/^[ \t]+|[ \t]+$/, "", v)
       top = ysp
@@ -945,7 +976,23 @@ show() {
       return t == ""
     }
 
-    function hcl_line(line,    t, p, st, net, disp, cm, top, ctx, fl, out, key, pre, v, tfvars, lab) {
+    # The lowest depth reached on the line, relative to its start.
+    function hdip(st,    i, c, d, m) {
+      d = 0; m = 0
+      for (i = 1; i <= length(st); i++) {
+        c = substr(st, i, 1)
+        if (c == "{" || c == "[" || c == "(") d++
+        else if (c == "}" || c == "]" || c == ")") { d--; if (d < m) m = d }
+      }
+      return m
+    }
+
+    function hcl_onlystruct(line, com,    t) {
+      t = com ? substr(line, 1, com - 1) : line
+      return onlystruct(t)
+    }
+
+    function hcl_line(line,    t, p, st, net, disp, cm, top, ctx, fl, out, key, pre, v, tfvars, lab, mind) {
       if (hdoc != "") { t = line; gsub(/^[ \t]+|[ \t]+$/, "", t); if (t == hdoc) hdoc = ""; return "<redacted>" }
       if (hblk) {
         p = index(line, "*/"); if (!p) return "<redacted>"
@@ -959,6 +1006,17 @@ show() {
       tfvars = (family == "tfvars")
       st = hstrip(line)
       net = hnet(st)
+      # A line that closes a block and then opens another: the new block is
+      # unknown, so nothing below it shows until it closes.
+      mind = hdip(st)
+      if (mind < 0 && net > mind && !hcl_onlystruct(line, HCOM)) {
+        hdepth += mind
+        while (hsp > 0 && hd[hsp] > hdepth) hsp--
+        hpush("x", 2, hdepth + net - mind)
+        hdepth += net - mind
+        hblk = HBLK; hstr = HOPEN; if (HDOC != "") hdoc = HDOC
+        return "<redacted>"
+      }
       disp = HCOM ? substr(line, 1, HCOM - 1) : line
       sub(/[ \t]+$/, "", disp)
       cm = (HCOM && !tfvars) ? " # <redacted>" : ""

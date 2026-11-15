@@ -926,6 +926,84 @@ YAML
 put fixedform2/wrangler.json <<'JSON'
 { "route": "FIXTUREVALUE", "routes": ["api.example.com/*"] }
 JSON
+# 5s. Review round 3.
+# A Wrangler environment holds the top-level settings, but not another environment.
+put envnest/wrangler.json <<'JSON'
+{
+  "name": "w",
+  "env": { "staging": { "name": "w-s", "env": { "x": { "name": "FIXTUREVALUE" } } } }
+}
+JSON
+put envnest/wrangler.toml <<'TOML'
+name = "w"
+[env.x]
+name = "w-x"
+[env.x.env.y]
+name = "FIXTUREVALUE"
+TOML
+# A line that closes a block and opens another puts the reader in an unknown block.
+put sameline/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+} resource "aws_s3_bucket" "b" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "g" {
+  runtime = "nodejs22.x" }  resource "aws_s3_bucket" "c" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "h" {
+  ephemeral_storage {
+  } tags {
+    runtime = "FIXTUREVALUE"
+  }
+}
+resource "aws_lambda_function" "i" {
+  timeout = 9
+}
+HCL
+# A sequence item is in a home only where that home is a list.
+put seqitem/serverless.yml <<'YAML'
+provider:
+  w: ~
+  - runtime: FIXTUREVALUE
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+functions:
+  g:
+    - handler: FIXTUREVALUE
+  f:
+    handler: ok.handler
+    events:
+      - http:
+          path: ok
+YAML
+put seqarray/serverless.yml <<'YAML'
+functions:
+  - h:
+      handler: arr.handler
+YAML
+put seqitem/vercel.json <<'JSON'
+{ "images": [ { "runtime": "FIXTUREVALUE" } ], "crons": [ { "path": "/ok", "schedule": "0 * * * *" } ] }
+JSON
+# Long lowercase path segments, which the capitals rule does not catch.
+put longseg2/wrangler.toml <<'TOML'
+routes = [ "api.example.com/hooks/lowercasesharedsecretvalue" ]
+TOML
+put longseg2/vercel.json <<'JSON'
+{ "crons": [{ "path": "/api/lowercasesharedsecretvalue", "schedule": "0 * * * *" }] }
+JSON
+# A key that dedents to an indent no sibling uses is broken YAML, so it is hidden.
+put dedent/serverless.yml <<'YAML'
+provider:
+    runtime: nodejs22.x
+    stackTags:
+      runtime: FIXTUREVALUE
+  runtime: FIXTUREVALUE
+service: kept
+YAML
 
 attack_count=0
 for file in $(cd "$a" && find . -type f | sort); do
@@ -1008,6 +1086,20 @@ expect_text "$(sh "$reader" --show "$a/home/.github/workflows/h.yml")" 'runs-on:
 expect_text "$(sh "$reader" --show "$a/home/supabase/config.toml")" 'schemas = ["public"]' "home supabase"
 expect_text "$(sh "$reader" --show "$a/fixedform2/serverless.yml")" 'schedule: rate(5 minutes)' "fixed forms rate"
 expect_text "$(sh "$reader" --show "$a/fixedform2/wrangler.json")" '"api.example.com/*"' "fixed forms route"
+expect_text "$(sh "$reader" --show "$a/envnest/wrangler.json")" '"name": "w-s"' "env nest json"
+expect_text "$(sh "$reader" --show "$a/envnest/wrangler.toml")" 'name = "w-x"' "env nest toml"
+expect_re "$(sh "$reader" --show "$a/sameline/main.tf")" '^ +2	  runtime = "nodejs22\.x"$' "same line"
+expect_re "$(sh "$reader" --show "$a/sameline/main.tf")" 'timeout = 9$' "same line"
+expect_text "$(sh "$reader" --show "$a/seqitem/serverless.yml")" '- Effect: Allow' "sequence item"
+expect_text "$(sh "$reader" --show "$a/seqitem/serverless.yml")" 'handler: ok.handler' "sequence item"
+expect_text "$(sh "$reader" --show "$a/seqitem/serverless.yml")" 'path: ok' "sequence item"
+expect_text "$(sh "$reader" --show "$a/seqarray/serverless.yml")" 'handler: arr.handler' "sequence item, array form of functions"
+expect_text "$(sh "$reader" --show "$a/seqitem/vercel.json")" '"schedule": "0 * * * *"' "sequence item json"
+expect_re "$(sh "$reader" --show "$a/dedent/serverless.yml")" 'runtime: nodejs22\.x$' "broken dedent"
+expect_text "$(sh "$reader" --show "$a/dedent/serverless.yml")" 'service: kept' "broken dedent"
+for file in longseg2/wrangler.toml longseg2/vercel.json; do
+  sh "$reader" --show "$a/$file" | grep -q lowercasesharedsecretvalue && fail "long segment: $file shows a lowercase segment over 15 characters"
+done
 sh "$reader" --show "$a/longseg/wrangler.toml" | grep -q abcdefghijklmnopq && fail "long segment: a route segment over 15 characters is shown"
 
 # The other CloudFormation template is listed with the platform files.
