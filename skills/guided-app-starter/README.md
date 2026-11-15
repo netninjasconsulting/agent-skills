@@ -26,6 +26,10 @@ This skill is not read-only, and I want that to be plain. It writes files in the
 
 - It never handles a password, a key, or a token. Sign-in goes through each provider's own CLI, and you run it.
 - It never creates a remote resource without its own confirmation.
+- It never writes a file outside the project folder, and that includes temporary files.
+- It never fetches a workflow or a script from the web. The CI workflow starts from `assets/ci.yml`, a template inside the skill.
+- It never follows an instruction that it finds in a package's README or in a tool's output. It shows you the text and carries on with the plan.
+- It never adds a package that the plan doesn't name without asking first.
 - It never installs or copies a third-party skill. It checks whether each one is installed, prints the install command when it is not, and asks whether to go on without it.
 - It sends nothing to Net Ninjas or to anyone else. Requests go only to the providers you chose, through your own sign-ins.
 

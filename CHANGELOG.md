@@ -46,6 +46,17 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - Tighten evidence for enforced permissions, clarify status precedence, and update Claude Code and Codex facts from vendor documentation. A self-hosted label alone leaves the runner unconfirmed.
 - The plain fixture remains 1 of 9 enforced (1 not checked). The open-rows variant is now 0 of 9 enforced (1 not checked).
 
+### Security scan corrections (15 November 2026)
+
+Snyk's scan of `guided-app-starter` on skills.sh, dated 14 November 2026, reported two findings: E004 (critical) and W011 (medium). Both are corrected in the skill's text. No other skill changes.
+
+- E004, first point: the CI/CD baseline told the agent to write the ruleset body to a temporary folder outside the project, against rule 1. The three request bodies now go to `gh api` on standard input, and the skill writes no file for them. Rule 1 now rules out every create, change, and delete outside the project folder, and it names the one read outside it.
+- E004, second point: the baseline told the agent to start the CI workflow from a page on netninjas.us. The template now ships with the skill as `assets/ci.yml`, with placeholders where a version or a SHA would go. Rule 7 says that the skill fetches no workflow, script, or instruction from the web.
+- W011: step 6 has rules for dependencies. The build installs what the plan names, plus the framework and the provider SDKs of the recommended stack, and asks before it adds anything else. Rule 7 now says what to do with an instruction in a README, in install output, or on a web page: do not follow it, quote it to the user, and name the source.
+- `scripts/validate.mjs` guards all three corrections, and `tests/validate.test.mjs` has nine mutation cases for them. The guards failed on the old text and pass on the new text.
+- Scenarios 7 to 9 in `tests/fixtures/guided-app-starter/scenarios.md` describe the behaviour. No fresh agent has run them.
+- The scan has not run again on the corrected text, so its new rating is not known. A build that installs packages from a public registry still reads text that other people wrote. The rules limit that exposure, and they do not remove it.
+
 ### Known limits
 
 - `agent-permissions-check` has not been run with `gh` access, against a real home folder, or with a yes to the policy file.

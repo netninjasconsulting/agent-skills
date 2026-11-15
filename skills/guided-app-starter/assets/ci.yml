@@ -1,0 +1,81 @@
+# .github/workflows/ci.yml
+#
+# Template of the Guided app starter, a free skill from Net Ninjas Consulting.
+# Copyright 2026 Net Ninjas Consulting
+# SPDX-License-Identifier: Apache-2.0
+#
+# It has the shape of the starter pipeline from the talk "Ship fast, break nothing"
+# (https://www.netninjas.us/events/starter-github-actions-workflow), without the deploy job.
+# Deploys go through the provider's own Git integration (references/ci-cd-baseline.md, section 6).
+# The skill copies this file. It does not fetch the published page.
+#
+# Before this file goes into a project:
+#   1. Replace every <40-character-sha> and <tag> with the commit and the tag of the
+#      action's newest release (references/ci-cd-baseline.md, "Pin every action").
+#   2. Swap the install command and the four check commands for the stack's own.
+#      As written, the file assumes a Node.js project with lint, typecheck, test, and build scripts.
+#   3. Set the CodeQL language to the project's language.
+#   4. Remove the dependency-review and codeql jobs when the repository is private and
+#      the account has no GitHub Code Security.
+#   5. Delete this comment block.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege by default. A job that needs more asks for it.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels its older run. Runs on main always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Branch protection requires this job by name. Keep the name.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@<40-character-sha> # <tag>
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@<40-character-sha> # <tag>
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@<40-character-sha> # <tag>
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@<40-character-sha> # <tag>
+        with:
+          fail-on-severity: high
+
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@<40-character-sha> # <tag>
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@<40-character-sha> # <tag>
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@<40-character-sha> # <tag>
