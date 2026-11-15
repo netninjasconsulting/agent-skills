@@ -28,7 +28,7 @@ It calls the same APIs as the rest of the product, so it can't read or change mo
 - **Look at:** every tool the model can call, and every read the feature makes on the way to the prompt.
 - **Pass:** each one goes through the product's own API or data layer with the signed-in user's identity, and each query carries the user's or the tenant's condition.
 - **Fail:** a tool or a query uses a service key, an admin client, or a database role that ignores the user, or reads a record by ID with no owner or tenant condition.
-- **Warn:** every write carries the user's identity, and a read on the way to the prompt is wider than the user's own.
+- **Warn:** every tool and every write carries the user's identity, every read carries the tenant's condition, and a read on the way to the prompt returns more of that tenant's records than this user may see.
 
 ### 2. The interface says it's AI and marks what it generated.
 
@@ -47,8 +47,8 @@ Size limits, schema checks, and rate limits run in ordinary code, ahead of the m
 
 - **Look at:** every entry point, in the order its code runs, up to the line that builds the prompt.
 - **Pass:** sign-in, a schema check, a size limit, and a rate limit all run before the prompt is built.
-- **Warn:** sign-in runs first on every entry point, and a schema check, a size limit, or a rate limit is missing or runs after the prompt is built. For a missing rate limit, add: "A platform rule may exist outside the repository."
-- **Fail:** an entry point reaches the prompt builder with no sign-in check.
+- **Warn:** sign-in runs first on every entry point, and a schema check, a size limit, or a rate limit is missing or runs after the prompt is built. For a missing rate limit, add: "A platform rule may exist outside the repository." The status stays warn, because this check has no question for the team.
+- **Fail:** an entry point reaches the prompt builder with no sign-in check, or with a sign-in check that runs after the prompt is built.
 
 ### 4. A policy step removes or pseudonymises the personal data a task doesn't need.
 
@@ -68,8 +68,8 @@ A named list of data sources, each with an owner. A new source goes through revi
 - **Look at:** where the list of sources lives, and whether the retrieval query is limited to it.
 - **Pass:** a named list with an owner for each source, a query limited to that list, and a CODEOWNERS entry or another required review that covers the file that holds the list.
 - **Ask the team:** the list, the owners, and the limit are in code, and nothing in the repository shows that a change to the list is reviewed.
-- **Warn:** a list with no owners, or a query that is not limited to the list.
-- **Fail:** retrieval reads whatever the store holds.
+- **Warn:** a list exists, and it has no owners or the query is not limited to it.
+- **Fail:** no list of sources is found, and retrieval reads whatever the store holds.
 - **Question:** "Does a new retrieval source go through review before it is added?"
 - A feature with no retrieval passes this check and check 6, with the evidence "no retrieval found in the repository".
 
@@ -110,7 +110,7 @@ It runs in CI on each prompt or model change, and a lower score blocks the merge
 
 - **Look at:** the evaluation set, the command that scores it, and the workflows.
 - **Pass:** a set, a command, a workflow that runs the command on pull requests, and a threshold that fails the run.
-- **Warn:** a set and a command exist, and no workflow runs them, or the run cannot fail.
+- **Warn:** a set exists, and one of the other three is missing: the command, the workflow that runs it on pull requests, or the threshold that fails the run.
 - **Fail:** no evaluation set is found.
 - Whether the cases look real belongs to leak path 7.
 
@@ -121,6 +121,7 @@ Anything that moves money, changes a record, or reaches a customer waits for a h
 - **Look at:** every action that follows model output: tools that move money, write a record, or send something to a customer.
 - **Pass:** each such action waits in a pending state for an approval that code records, with a role check on who may approve, or it passes a deterministic rule in code, such as a limit or an allow-list. A feature whose only output is a draft that a signed-in person reads and sends passes, with that as the evidence.
 - **Ask the team:** the approval step is in code and records the approver, and who may approve is decided outside the code.
+- **Warn:** an approval step in code holds the action, and it does not record who approved.
 - **Fail:** an action runs on the model's output alone.
 - **Question:** "Is there a named person, by role, who approves these outputs?"
 
@@ -134,6 +135,7 @@ The request ID, the model and prompt version, the retrieved sources, and the app
 - **Pass:** every call writes the five fields, to a store that infrastructure code shows the feature cannot change: an append-only table, a write-only role, object lock, or a separate log account.
 - **Ask the team:** every call writes the five fields, and nothing in the repository shows whether the feature can change the store.
 - **Warn:** some of the five fields. A field that every call writes as empty counts as missing.
+- **The approver:** where check 10 passes because a person reads and sends a draft, the approver is that person, written when the draft is sent or accepted. A feature whose output starts no action and reaches no customer has no approver, and the other four fields are enough for it.
 - **Fail:** no trace is written.
 - **Question:** "Is the trace store protected from edits by the feature itself?"
 
@@ -142,6 +144,7 @@ The request ID, the model and prompt version, the retrieved sources, and the app
 Tokens, model, and cache hits per request, joined to the tenant. Pricing and plan limits rest on that number.
 
 - **Look at:** what is recorded after each call. [cost.md](cost.md) has the seven columns.
+- **Pass:** never in the first pass. Code cannot show that anyone reads the number. So the best status here is "ask the team", and the first headline is 11 out of 12 at most.
 - **Ask the team:** all seven columns are recorded for every call. Code can show that the number can be computed, and it cannot show that anyone reads it.
 - **Warn:** usage is recorded per tenant, and the action or the split into input, cached input, and output tokens is missing.
 - **Fail:** usage is not recorded per tenant, or not recorded at all.
@@ -154,6 +157,6 @@ Take the first three whose status is fail or warn, in this order:
 1. Check 6, check 4, check 3.
 2. Leak path 1, leak path 2.
 3. Check 10.
-4. Checks 7, 8, 9, 11, 12, 5, 1, and 2.
+4. Checks 7, 8, 9, 11, 12, 1, 2, and 5. These are the remaining checks in layer order, starting from layer 4.
 
 This follows the published advice for the lowest band: layers 2 and 3 first. For each of the three, give one sentence on why it comes first and a short code sketch of the fix in the repository's own language, with placeholders where a name is not known.

@@ -37,6 +37,7 @@ Use a fresh session each time. An agent that has read `EXPECTED.md` is not a tes
 node scripts/validate.mjs       # format and repository rules for every skill
 sh tests/scan-secrets.test.sh   # the secret scanner against the vibe-shop fixture
 sh tests/list-agent-config.test.sh   # the agent configuration reader against the loose-agents fixture
+sh tests/names-filter.test.sh   # the names-only filter that two skills use on env files
 ```
 
 All three run in CI on every pull request.

@@ -21,6 +21,7 @@ Pull requests are welcome. These skills are free, and they stay free.
 node scripts/validate.mjs
 sh tests/scan-secrets.test.sh
 sh tests/list-agent-config.test.sh
+sh tests/names-filter.test.sh
 ```
 
 A change to a skill needs a matching change to its fixture's `EXPECTED.md`, and a fresh run against the fixture. `tests/README.md` says how. A change that touches provider facts in `skills/guided-app-starter/references/stack-matrix.md` updates the check date and the source link.

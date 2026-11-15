@@ -18,9 +18,14 @@ create table tickets (
   body text not null
 );
 
+-- One row per chunk of a ticket or a help article. A row built from a ticket
+-- names the ticket and its customer. There is no foreign key, so the row stays
+-- when the ticket or the customer is deleted.
 create table documents (
   id uuid primary key,
   tenant_id uuid not null,
+  ticket_id uuid,
+  customer_id uuid,
   source text not null,
   body text not null,
   embedding vector(1024)

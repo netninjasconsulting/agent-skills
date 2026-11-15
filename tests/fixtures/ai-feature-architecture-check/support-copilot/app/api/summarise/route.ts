@@ -1,6 +1,7 @@
 // Test fixture.
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import "../../../lib/sentry";
 import { getSession } from "../../../lib/auth";
 import { db } from "../../../lib/db";
 import { summariseTicket } from "../../../lib/ai/summarise";

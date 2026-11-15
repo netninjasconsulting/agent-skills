@@ -5,7 +5,7 @@ Print the report in chat in this shape. Write no file.
 ````markdown
 # AI feature architecture check: <repository>
 
-This is a quick check. It is not a penetration test and it is not legal advice. It reads the code. A region, a retention period, or a capture setting can be set in a provider's console and not in a file, and those are listed as questions.
+This is a quick check. It is not a penetration test and it is not legal advice. It reads the code. A region, a retention period, or a capture setting can be set in a provider's console and not in a file. Where the repository does not show one, the report asks the team.
 
 ## N out of 12 confirmed in code (M to ask the team)
 
@@ -90,7 +90,7 @@ Proposal:
 Checked with the AI feature architecture check, a free skill from Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City: https://www.netninjas.us/skills
 ````
 
-Leave out "Also found" when there is nothing to put in it.
+Leave out "Also found" when there is nothing to put in it. Leave out "Questions for the team" in the same way, when no check and no leak path is marked "ask the team".
 
 ## The second pass
 

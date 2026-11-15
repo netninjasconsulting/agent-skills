@@ -22,7 +22,8 @@ The query needs one row per model call, with these columns.
 2. For each of the seven columns, write "recorded" with the path and the line, or "not recorded". A total of tokens with no split counts as "not recorded" for the three token columns.
 3. When several call sites exist, a column is "recorded" only when every call site records it.
 4. Print the query below under the heading "Proposal". Change only the table name and the column names it reads from, to the ones the repository uses. For a column that is not recorded, keep the published name and mark it with a comment: `-- not recorded yet`.
-5. Add one line: the retrieval and platform cost per action comes from the cloud bill, so it is "not checked".
+5. The query joins a second table, `model_prices`. When the repository has no price table, add one line under the query: "`model_prices` is not in this repository. It needs one row per model, copied from the provider's price list."
+6. Add one line: the retrieval and platform cost per action comes from the cloud bill, so it is "not checked".
 
 Do not estimate a cost, a price, or a volume. Model prices change often, and the worksheet takes them from the provider's price list on the day.
 
@@ -30,7 +31,7 @@ Do not estimate a cost, a price, or a volume. Model prices change often, and the
 
 ```sql
 -- cost_per_action.sql (PostgreSQL)
--- From the talk "Your AI feature is an architecture problem" (www.netninjas.us/events).
+-- From the talk "Your AI feature is an architecture problem" (netninjas.us/events).
 -- Model cost per customer and per AI action over the last 30 days.
 --
 -- ai_requests:  one row per model call (tenant_id, action_id, model,
@@ -61,4 +62,4 @@ GROUP BY tenant_id
 ORDER BY model_cost_eur DESC;
 ```
 
-The published query prices in euros. The currency is the one the team's price table uses, and the aliases can follow it.
+The published query prices in euros, and its aliases say so. Print the aliases as published. When the repository has a price table in another currency, say so in one line under the query.

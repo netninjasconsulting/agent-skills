@@ -176,7 +176,8 @@ if (existsSync(gitops)) {
   });
 }
 
-// The AI feature architecture check keeps the wording of three published takeaways.
+// The AI feature architecture check keeps the wording of three published takeaways:
+// the checklist, the data path map, and the cost worksheet.
 const twelveChecks = [
   "The AI feature works inside the signed-in user's permissions.",
   "The interface says it's AI and marks what it generated.",
@@ -218,24 +219,87 @@ const eightLeakPaths = [
   "Our evaluation sets hold synthetic or anonymised cases.",
   "Backups and snapshots stay in the approved regions.",
 ];
+const scoreRanges = ["11 to 12", "8 to 10", "0 to 7"];
+const costColumns = ["tenant_id", "action_id", "model", "input_tokens", "cached_input_tokens", "output_tokens", "created_at"];
+// The published query, with the site's domain written as on netninjas.us.
+const costQuery = [
+  "-- cost_per_action.sql (PostgreSQL)",
+  "-- From the talk \"Your AI feature is an architecture problem\" (netninjas.us/events).",
+  "-- Model cost per customer and per AI action over the last 30 days.",
+  "--",
+  "-- ai_requests:  one row per model call (tenant_id, action_id, model,",
+  "--               input_tokens, cached_input_tokens, output_tokens, created_at).",
+  "--               input_tokens counts the tokens billed at the full input price.",
+  "-- model_prices: one row per model, in euros per million tokens, copied from",
+  "--               the provider's current price list.",
+  "",
+  "WITH calls AS (",
+  "  SELECT",
+  "    r.tenant_id,",
+  "    r.action_id,",
+  "    ( r.input_tokens        * p.input_per_million",
+  "    + r.cached_input_tokens * p.cached_input_per_million",
+  "    + r.output_tokens       * p.output_per_million ) / 1000000.0 AS cost_eur",
+  "  FROM ai_requests r",
+  "  JOIN model_prices p ON p.model = r.model",
+  "  WHERE r.created_at >= now() - interval '30 days'",
+  ")",
+  "SELECT",
+  "  tenant_id,",
+  "  count(DISTINCT action_id)                                AS actions,",
+  "  count(*)                                                 AS model_calls,",
+  "  round(sum(cost_eur), 2)                                  AS model_cost_eur,",
+  "  round(sum(cost_eur) / count(DISTINCT action_id), 4)      AS cost_per_action_eur",
+  "FROM calls",
+  "GROUP BY tenant_id",
+  "ORDER BY model_cost_eur DESC;",
+];
 const aiSkill = path.join(skillsDir, "ai-feature-architecture-check");
 if (existsSync(aiSkill)) {
+  const linesOf = (file) => (existsSync(file) ? read(file).split("\n") : []);
   const skillFile = path.join(aiSkill, "SKILL.md");
-  const skillText = existsSync(skillFile) ? read(skillFile) : "";
+  const skillLines = linesOf(skillFile);
+  const checksFile = path.join(aiSkill, "references", "checks.md");
+  const checksLines = linesOf(checksFile);
+  // A whole line must match, so that "2. ..." is not found inside "12. ...".
   twelveChecks.forEach((check, index) => {
-    if (!skillText.includes(`${index + 1}. ${check}`)) fail(skillFile, `check ${index + 1} does not match the published wording: ${check}`);
+    if (!skillLines.includes(`${index + 1}. ${check}`)) fail(skillFile, `check ${index + 1} does not match the published wording: ${check}`);
+    if (!checksLines.includes(`### ${index + 1}. ${check}`)) fail(checksFile, `the heading of check ${index + 1} does not match the published wording: ${check}`);
   });
-  scoreBands.forEach((band) => {
-    if (!skillText.includes(band)) fail(skillFile, `a score band does not match the published wording: ${band}`);
+  scoreBands.forEach((band, index) => {
+    if (!skillLines.includes(`| ${scoreRanges[index]} | ${band} |`)) fail(skillFile, `the score band ${scoreRanges[index]} does not match the published wording: ${band}`);
   });
   const dataPathFile = path.join(aiSkill, "references", "data-path.md");
-  const dataPathText = existsSync(dataPathFile) ? read(dataPathFile) : "";
+  const dataPathLines = linesOf(dataPathFile);
   tenStops.forEach((stop) => {
-    if (!dataPathText.includes(`| ${stop} |`)) fail(dataPathFile, `a stop does not match the published wording: ${stop}`);
+    if (!dataPathLines.some((line) => line.startsWith(`| ${stop} | `))) fail(dataPathFile, `a stop does not match the published wording: ${stop}`);
   });
   eightLeakPaths.forEach((leak, index) => {
-    if (!dataPathText.includes(`${index + 1}. ${leak}`)) fail(dataPathFile, `leak path ${index + 1} does not match the published wording: ${leak}`);
+    if (!dataPathLines.includes(`${index + 1}. ${leak}`)) fail(dataPathFile, `leak path ${index + 1} does not match the published wording: ${leak}`);
   });
+  const costFile = path.join(aiSkill, "references", "cost.md");
+  const costLines = linesOf(costFile);
+  costColumns.forEach((column) => {
+    if (!costLines.some((line) => line.startsWith(`| \`${column}\` | `))) fail(costFile, `the cost column ${column} is missing from the table of seven columns`);
+  });
+  const queryStart = costLines.indexOf(costQuery[0]);
+  if (queryStart === -1) {
+    fail(costFile, "the published cost query is missing");
+  } else {
+    costQuery.forEach((line, index) => {
+      if (costLines[queryStart + index] !== line) fail(costFile, `line ${index + 1} of the cost query does not match the published query: ${line}`);
+    });
+  }
+  const expectedFile = path.join(root, "tests", "fixtures", "ai-feature-architecture-check", "EXPECTED.md");
+  const expectedLines = linesOf(expectedFile);
+  if (expectedLines.length > 0) {
+    twelveChecks.forEach((check, index) => {
+      if (!expectedLines.some((line) => line.startsWith(`| ${index + 1} | ${check} | `))) fail(expectedFile, `check ${index + 1} does not match the published wording: ${check}`);
+    });
+    eightLeakPaths.forEach((leak, index) => {
+      if (!expectedLines.some((line) => line.startsWith(`| ${index + 1} | ${leak} | `))) fail(expectedFile, `leak path ${index + 1} does not match the published wording: ${leak}`);
+    });
+  }
 }
 
 // The nine rows of the agent permissions check keep the wording of the published policy.

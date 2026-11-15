@@ -165,7 +165,7 @@ The seven request-log columns: `tenant_id`, `action_id`, `model`, `input_tokens`
 - Modify: `skills/ai-feature-architecture-check/SKILL.md`
 
 - [ ] **Step 1: Write the workflow.** Six steps, as the spec numbers them: the feature map, the twelve checks, the data path, cost per action, the first three to change, and the report with the one offer of a second pass. Env files are read with `sed -E 's/=.*$/=/' <file>` and no other way. When the map finds no model call, the skill prints "No model call was found in this repository, so there is nothing to score." and stops.
-- [ ] **Step 2: Fix the order for "the first three to change".** Checks 6, 4, and 3, then leak paths 1 and 2, then check 10, and then checks 7, 8, 9, 11, 12, 5, 1, and 2. The first three whose status is `fail` or `warn` are the result.
+- [ ] **Step 2: Fix the order for "the first three to change".** Checks 6, 4, and 3, then leak paths 1 and 2, then check 10, and then checks 7, 8, 9, 11, 12, 5, 1, and 2. Corrected on 15 November 2026 to match the design: the last group is checks 7, 8, 9, 11, 12, 1, 2, and 5, which is layer order starting from layer 4. The first three whose status is `fail` or `warn` are the result.
 - [ ] **Step 3: Write "Before sending" and "Common mistakes".** Include: a pass taken from a README or a comment, a record copied from an evaluation set, a team answer counted in the first headline, a failed check asked in the second pass, and a statement about whether a law is met.
 - [ ] **Step 4: Run the validator and commit.** Expected: no problems, and SKILL.md under 500 lines. Message: "Write the AI feature architecture check workflow".
 
