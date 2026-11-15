@@ -41,7 +41,7 @@ sh tests/list-agent-config.test.sh   # the agent configuration reader against th
 sh tests/names-filter.test.sh   # the names-only filter that two skills use on env files
 ```
 
-All three run in CI on every pull request.
+All five commands run in CI on every pull request. The validator mutation suite includes the starter's default permissions, redacted quotation, and package approval rules. Scenarios 10 to 12 cover the corresponding agent behaviour and security check requirements; these scenarios have not been run yet.
 
 ## Before a release
 

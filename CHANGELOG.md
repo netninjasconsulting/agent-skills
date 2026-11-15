@@ -46,9 +46,18 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - Tighten evidence for enforced permissions, clarify status precedence, and update Claude Code and Codex facts from vendor documentation. A self-hosted label alone leaves the runner unconfirmed.
 - The plain fixture remains 1 of 9 enforced (1 not checked). The open-rows variant is now 0 of 9 enforced (1 not checked).
 
+### Guided app starter branch review (15 November 2026)
+
+- Redact sensitive values before quoting outside instructions; summarise when safe quotation is uncertain.
+- Name all direct packages, generators, and SDKs in the approved plan. Extra direct packages require approval; transitive dependencies are covered by the approved package.
+- Require enabled dependency review and CodeQL checks in the branch ruleset, using names observed on a pull request. Document unavailable checks instead of claiming they gate a merge.
+- Explain that compiled-language CodeQL jobs may need build configuration and steps between initialisation and analysis.
+- Reject extra top-level workflow permissions, and guard redaction and direct package approval with three additional mutation cases (twelve starter cases total).
+- JavaScript syntax and whitespace checks passed. Runtime validation was blocked by the review sandbox's unavailable virtual-memory limit on this macOS host; the mutation suite and scenarios 10 to 12 remain unrun for these changes. Prior recorded passes apply to the earlier revision. The external Snyk rescan and end-to-end deployment remain outstanding.
+
 ### Security scan corrections (15 November 2026)
 
-Snyk's scan of `guided-app-starter` on skills.sh, dated 14 November 2026, reported two findings: E004 (critical) and W011 (medium). Both are corrected in the skill's text. No other skill changes.
+Snyk's scan of `guided-app-starter` on skills.sh, dated 14 November 2026, reported two findings: E004 (critical) and W011 (medium). Both are addressed in the skill's text. These security scan corrections affect only the guided app starter.
 
 - E004, first point: the CI/CD baseline told the agent to write the ruleset body to a temporary folder outside the project, against rule 1. The three request bodies now go to `gh api` on standard input, and the skill writes no file for them. Rule 1 now rules out every create, change, and delete outside the project folder, and it names the one read outside it.
 - E004, second point: the baseline told the agent to start the CI workflow from a page on netninjas.us. The template now ships with the skill as `assets/ci.yml`, with placeholders where a version or a SHA would go. Rule 7 says that the skill fetches no workflow, script, or instruction from the web.

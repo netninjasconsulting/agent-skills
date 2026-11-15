@@ -110,6 +110,8 @@ gh api -X POST repos/<owner>/<name>/rulesets --input - <<'JSON'
 JSON
 ```
 
+The example requires only `checks`. When dependency review is enabled, add `dependency-review` to `required_status_checks` as well; a failing optional job does not block a merge. Require the CodeQL check names emitted by the first analysis run when CodeQL is enabled. Confirm the actual check names from a pull request before enabling the ruleset, and include all enabled security checks on its confirmation card. When a security job is unavailable on the chosen plan, omit its required check and record that gap. See [GitHub's required status check rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).
+
 The request body goes to `gh` on standard input, as shown. Write no file for it, in the project folder or anywhere else (SKILL.md, rule 1). Sections 5 and 7 send their bodies the same way. Check the fields against GitHub's current REST reference for rulesets before sending. With a second person on the team, set the approval count to 1 and `require_code_owner_review` to true.
 
 Fallback: rulesets are not available on a private repository under GitHub Free. Say so, name the two ways out (a public repository, or GitHub Pro), and record "Branch protection: not available on this plan" in the closing summary.

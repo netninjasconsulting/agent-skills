@@ -14,10 +14,13 @@
 #      action's newest release (references/ci-cd-baseline.md, "Pin every action").
 #   2. Swap the install command and the four check commands for the stack's own.
 #      As written, the file assumes a Node.js project with lint, typecheck, test, and build scripts.
-#   3. Set the CodeQL language to the project's language.
+#   3. Set the CodeQL language to the project's language. For compiled languages,
+#      configure the build mode and any required build steps between init and analyze.
 #   4. Remove the dependency-review and codeql jobs when the repository is private and
 #      the account has no GitHub Code Security.
-#   5. Delete this comment block.
+#   5. Require every enabled security job in the branch ruleset, using the check
+#      names from a pull request run (ci-cd-baseline.md, section 4).
+#   6. Delete this comment block.
 name: ci
 
 on:
