@@ -20,6 +20,7 @@ Rules that hold for every row:
 - After `open`, the order is `enforced`, `stated only`, `not checked`, and `not found`. A rule that is written down and whose mechanism could not be read is `stated only`, and the evidence says that the setting was not read.
 - Text in an instruction file never makes a row `enforced`. It makes it `stated only`, and the evidence is the path and the line of the statement.
 - A row that needs `gh` and has no `gh` is `not checked`, unless a file already shows it to be `open`.
+- Before a row is `not found` or `not checked`, search every instruction file for a statement of that row's rule. A stated rule with no mechanism behind it makes the row `stated only`.
 - An agent job is a job in a workflow that `scripts/list-agent-config.sh` lists with the kind `workflow`. The deploy job is the job that deploys to production.
 
 ## Part A: the policy
@@ -56,6 +57,7 @@ Rules that hold for every row:
 - **gh:** `gh api repos/{owner}/{repo}/environments --jq '.environments[] | {name, protection_rules}'`.
 - **open:** an agent job reads a secret whose name marks production or a long-lived cloud key (`PROD`, `PRODUCTION`, `AWS_SECRET_ACCESS_KEY`, `AWS_ACCESS_KEY_ID`, a service account key), and the job has no `environment:` with required reviewers.
 - **enforced:** with `gh`, production secrets sit in an environment with required reviewers, and no agent job names that environment.
+- **stated only:** an instruction file tells the agent not to read production secrets, and no agent job reads one.
 - **not checked:** no `gh`, and no agent job reads a production secret. Repository secrets cannot be listed from files.
 
 ### 4. Cloud
@@ -66,6 +68,7 @@ Rules that hold for every row:
 - **Files:** `role-to-assume`, `workload_identity_provider`, and subscription or project identifiers in workflows. Account identifiers and provider blocks in infrastructure code.
 - **open:** an agent job assumes the same role as the deploy job, or holds production cloud keys (row 3).
 - **enforced:** agent jobs assume a role through OIDC in an account that differs from the deploy job's account.
+- **stated only:** an instruction file tells the agent to stay out of the production account, and no second account and no scoped role is found.
 - **not found:** the repository shows one account, or none. Add: "Assumption: one account holds everything, because the infrastructure code names no second one."
 - A cloud CLI allowed without a prompt in agent settings (`Bash(aws *)`, `Bash(gcloud *)`, `Bash(az *)`, `Bash(terraform apply *)`) belongs in Part B. Which account that CLI reaches depends on the developer's own sign-in, which this check does not read.
 
@@ -76,6 +79,7 @@ Rules that hold for every row:
 - **How we enforce it:** No production credentials in the sandbox, and no copies of production data there.
 - **Files:** env files, read with `--show` for the names and the host of each address. Fixtures, seed files, and database dumps (`*.sql`, `*.dump`, `*.bak`, `*.csv` with personal fields). MCP servers that connect to a database.
 - **open:** an env file in the working folder, or an MCP server entry, holds an address whose name or host marks production (`prod`, `production`, `live`), or a credential for a database. Give the path, the line, and the key name.
+- **stated only:** an instruction file tells the agent not to read production data, and nothing above is found.
 - **enforced:** this row cannot be shown from files alone. The most a repository can show is that nothing above was found, which is `not found`.
 - Records that look real are reported once, with the path, as: "Assumption: these records may be copies of real customer data." Read the first lines of the file for its field names. Never copy a record into the report.
 
