@@ -54,7 +54,7 @@ The stores the function reaches: a Supabase table through the client or a REST c
 | Mark | When |
 | --- | --- |
 | scoped | Every permission names its actions and its resources, every binding and key is one the code uses, the caller check is in place or the function is public on purpose, and no key bypasses row-level security. |
-| broad | Any permission allows more than the code uses: `*` as an action or a resource, a shared role, an unused binding, or a key that bypasses row-level security. Name the part that makes it broad. |
+| broad | Any permission allows more than the code uses (`*` as an action or a resource, a shared role, an unused binding, or a key that bypasses row-level security), or anyone can call the function and it is not public on purpose. Name the part that makes it broad. |
 | not found in the repository | The permissions are not in the repository or not shown by the reader, such as a role defined elsewhere or a policy the reader hides whole. Name what is missing. |
 
-A row with one broad part is broad. A row whose permissions are partly hidden and otherwise scoped is "not found in the repository", because what is hidden can be broad.
+A row is broad when its permissions are broad or when anyone can call it and it is not public on purpose, even when its permissions are narrow. A row with one broad part is broad. A row whose permissions are partly hidden and otherwise scoped is "not found in the repository", because what is hidden can be broad. Under S2, a "not found in the repository" row is "ask the team" when its permissions are hidden or defined outside the repository, and follows the status table when no permissions are found at all.
