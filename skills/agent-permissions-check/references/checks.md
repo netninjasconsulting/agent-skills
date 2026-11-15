@@ -146,7 +146,8 @@ Part B reads what an agent on a developer's machine can do without asking. Each 
 ### B2. What runs without a prompt
 
 - Allow rules that push, merge, deploy, or reach a cloud account: `Bash(git push *)`, `Bash(gh pr merge *)`, `Bash(aws *)`, `Bash(gcloud *)`, `Bash(az *)`, `Bash(kubectl *)`, `Bash(terraform apply *)`, `Bash(npm publish *)`, a bare `Bash`, and `mcp__*`.
-- A rule in the shared project file waits for each person to trust the folder. A rule in the local file or in the home folder applies at once.
+- A rule in the shared project file waits for each person to trust the folder. So does a rule in a local file that Git tracks, because Claude Code treats a tracked local file as the repository's own. The list gives the state of the local file: `tracked`, `untracked`, or `ignored`.
+- A rule in a local file that Git does not track, or in the home folder, applies at once.
 - Lists merge across files. A bare `Bash` in the home folder allows every command in every project.
 
 ### B3. What is kept out of reach

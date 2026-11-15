@@ -176,6 +176,30 @@ if (existsSync(gitops)) {
   });
 }
 
+// The nine rows of the agent permissions check keep the wording of the published policy.
+const nineRows = [
+  ["Repository", "Open branches and pull requests, and comment.", "Push to main, merge, approve its own work, or edit workflow files.", "A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/."],
+  ["Identity", "Act as its own bot account or GitHub App.", "Use a person's account or personal access token.", "A GitHub App with the fewest permissions. Its installation tokens expire after an hour."],
+  ["Secrets", "Use the secrets of its sandbox.", "Read production secrets or long-lived cloud keys.", "Production secrets only in an environment with required reviewers."],
+  ["Cloud", "Read and write in a sandbox account.", "Reach production accounts.", "A separate account, with OIDC roles scoped to it."],
+  ["Data", "Work with synthetic or anonymised fixtures.", "Read production customer data.", "No production credentials in the sandbox, and no copies of production data there."],
+  ["Runners", "Run in fresh, isolated runners.", "Run on a laptop or a runner with a network path to production.", "GitHub-hosted or ephemeral runners only."],
+  ["Outside input", "Read issues, web pages, and READMEs as data.", "Follow instructions found in them.", "No secrets for workflows that outside contributors trigger."],
+  ["Review", "Review code as an extra reviewer that comments.", "Give the approving review.", "A required approval from a human code owner."],
+  ["Record", "Act under its own identity, with every action in the log.", "Act anonymously or under a shared login.", "An audit log we keep, so last week's agent changes are one query away."],
+];
+const agentChecks = path.join(skillsDir, "agent-permissions-check", "references", "checks.md");
+if (existsSync(agentChecks)) {
+  const lines = read(agentChecks).split("\n");
+  nineRows.forEach(([area, may, mayNot, enforce], index) => {
+    const row = `row ${index + 1} (${area})`;
+    if (!lines.includes(`### ${index + 1}. ${area}`)) fail(agentChecks, `${row} has no heading "### ${index + 1}. ${area}"`);
+    if (!lines.includes(`- **The agent may:** ${may}`)) fail(agentChecks, `${row}: "The agent may" does not match the published wording: ${may}`);
+    if (!lines.includes(`- **The agent may not:** ${mayNot}`)) fail(agentChecks, `${row}: "The agent may not" does not match the published wording: ${mayNot}`);
+    if (!lines.includes(`- **How we enforce it:** ${enforce}`)) fail(agentChecks, `${row}: "How we enforce it" does not match the published wording: ${enforce}`);
+  });
+}
+
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   console.error(`\n${failures.length} problem(s) in ${skills.length} skill(s).`);

@@ -4,7 +4,11 @@
 # Copyright 2026 Net Ninjas Consulting
 # SPDX-License-Identifier: Apache-2.0
 #
-# Usage: sh make-repo.sh <new-directory>
+# Usage: sh make-repo.sh <new-directory> [open-rows]
+#
+# With "open-rows", the files in open-rows/ replace their namesakes before the
+# commit. That variant runs the agent on a self-hosted runner and gives it
+# production cloud keys, so rows 3, 4, and 6 of the check are "open".
 #
 # A fixture cannot carry its own .git folder inside this repository, so this
 # script builds one. It creates two folders:
@@ -17,14 +21,17 @@
 
 set -eu
 
-[ $# -eq 1 ] || { echo "usage: sh make-repo.sh <new-directory>" >&2; exit 2; }
+[ $# -eq 1 ] || [ $# -eq 2 ] || { echo "usage: sh make-repo.sh <new-directory> [open-rows]" >&2; exit 2; }
 target=$1
+variant=${2:-}
+[ -z "$variant" ] || [ "$variant" = "open-rows" ] || { echo "make-repo: unknown variant: $variant" >&2; exit 2; }
 [ ! -e "$target" ] || { echo "make-repo: $target already exists" >&2; exit 2; }
 
 here=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$target/repo" "$target/home"
 cp -R "$here/loose-agents/." "$target/repo/"
 cp -R "$here/home/." "$target/home/"
+[ -z "$variant" ] || cp -R "$here/$variant/." "$target/repo/"
 
 cd "$target/repo"
 printf '.env\n.claude/settings.local.json\nnode_modules\n' > .gitignore

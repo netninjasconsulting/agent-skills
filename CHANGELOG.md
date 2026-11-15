@@ -1,6 +1,6 @@
 # Changelog
 
-All four skills share one version number. Dates are in day, month, year order.
+Every skill carries the same version number. Dates are in day, month, year order.
 
 ## 0.2.0 (15 November 2026)
 
@@ -12,7 +12,8 @@ One new skill. The four skills from 0.1.0 keep their checks.
 
 ### Changed
 
-- `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools.
+- `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools, which `.gitignore` now lists.
+- `scripts/validate.mjs` pins the nine rows of the agent permissions check to their published wording.
 - Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same.
 
 ### Verified for this release (15 November 2026)

@@ -218,6 +218,7 @@ show() {
       n = split(hidekeys, list, " "); for (i = 1; i <= n; i++) HIDE[list[i]] = 1
       n = split(valueflags, list, " "); for (i = 1; i <= n; i++) VFLAG[list[i]] = 1
       arraykey = ""; hide = 0; hidedepth = 0; mcpprint = 0; mcpdepth = 0
+      jdepth = 0; srvat = 0; pendname = 0; ttable = ""
       instr = 0; incomment = 0; pendkey = ""; pend = 0
       arr = ""; arrdepth = 0; arrshow = 0; thide = 0; inml = 0; mlq = ""; tbl = 0
       envq = ""; yhide = -1; yscalar = 0; pem = 0
@@ -256,11 +257,24 @@ show() {
       return (a < b) ? a : b
     }
 
+    # How deep the braces are at this point of the line.
+    function jnow() { return jdepth + cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}") }
+
+    # A key that sits directly in a list of servers is the name of a server.
+    # A server can carry the name of a hidden block, and it is not one.
+    function servername(key,    d, name) {
+      d = jnow()
+      name = (srvat && d == srvat)
+      if (!srvat && (key == "mcpServers" || (key == "servers" && d == 1))) srvat = d + 1
+      return name
+    }
+
     # Text between two strings: structure, and bare values after a colon.
     function seg(text,    gov, ok, tmp, keep) {
       gov = (Jkey != "") ? Jkey : arraykey
       ok = (!hide && !Jhide && (gov in SHOW))
       LSTRUCT = LSTRUCT text; Jafter = Jafter text
+      if (srvat && jnow() < srvat) srvat = 0
       if (Jhide) Jhideafter = Jhideafter text
       if (LMCP) LMCPAFTER = LMCPAFTER text
       if (!ok) {
@@ -287,7 +301,7 @@ show() {
     # string is a value, governed by the last key before it or by the key of
     # the array it sits in. A value is shown only when that key is shown.
     function json_line(line,    rest, pre, str, post, c, q, d, gov, ok) {
-      Jout = ""; Jafter = ""; Jkey = ""; Jhide = 0; Jhideafter = ""
+      Jout = ""; Jafter = ""; Jkey = ""; Jhide = 0; Jhideafter = ""; Jname = 0
       LSTRUCT = ""; LMCP = 0; LMCPAFTER = ""
       if (incomment) { if (index(line, "*/")) incomment = 0; return "<redacted>" }
       rest = line
@@ -297,7 +311,7 @@ show() {
       }
       if (pendkey != "") {
         Jkey = pendkey
-        if (Jkey in HIDE) Jhide = 1
+        if ((Jkey in HIDE) && !pendname) Jhide = 1
         if (Jkey == "mcpServers") LMCP = 1
         pendkey = ""
       }
@@ -312,7 +326,8 @@ show() {
           Jkey = substr(str, 2, length(str) - 2)
           Jout = Jout str
           Jafter = ""; pend = 0
-          if (Jkey in HIDE) { if (!Jhide) Jhideafter = ""; Jhide = 1 }
+          Jname = servername(Jkey)
+          if ((Jkey in HIDE) && !Jname) { if (!Jhide) Jhideafter = ""; Jhide = 1 }
           if (Jkey == "mcpServers") { LMCP = 1; LMCPAFTER = "" }
         } else {
           gov = (Jkey != "") ? Jkey : arraykey
@@ -344,7 +359,8 @@ show() {
       if (Jkey != "" && cnt(Jafter, "[") > cnt(Jafter, "]")) arraykey = Jkey
       else if (cnt(LSTRUCT, "]") > cnt(LSTRUCT, "[")) { arraykey = ""; pend = 0 }
       # The key ended the line: its value starts on the next one.
-      if (Jkey != "" && !instr && Jafter ~ /^[ \t]*:[ \t]*$/) pendkey = Jkey
+      if (Jkey != "" && !instr && Jafter ~ /^[ \t]*:[ \t]*$/) { pendkey = Jkey; pendname = Jname }
+      jdepth += cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}")
       return Jout
     }
 
@@ -416,14 +432,20 @@ show() {
         thide = 0
         t = line; sub(/#.*/, "", t); gsub(/[][ \t"\047]/, "", t)
         n = split(t, parts, ".")
-        for (i = 1; i <= n; i++) if (parts[i] in HIDE) thide = 1
+        ttable = t
+        for (i = 1; i <= n; i++) if ((parts[i] in HIDE) && !(i == 2 && parts[1] == "mcp_servers")) thide = 1
         return tshow(line)
       }
       if (iskv) {
         k = substr(key, 1, length(key) - 1); gsub(/[ \t"\047]/, "", k)
         n = split(k, parts, ".")
         ok = (!thide && (parts[n] in SHOW))
-        for (i = 1; i <= n; i++) if (parts[i] in HIDE) ok = 0
+        for (i = 1; i <= n; i++) {
+          if (!(parts[i] in HIDE)) continue
+          if (i == 1 && ttable == "mcp_servers") continue
+          if (i == 2 && ttable == "" && parts[1] == "mcp_servers") continue
+          ok = 0
+        }
         if (val ~ /"""/ && val !~ /""".*"""/) { inml = 1; mlq = "\"\"\""; return key " <redacted>" }
         if (val ~ /\047\047\047/ && val !~ /\047\047\047.*\047\047\047/) { inml = 1; mlq = "\047\047\047"; return key " <redacted>" }
         sv = tstrip(val)
