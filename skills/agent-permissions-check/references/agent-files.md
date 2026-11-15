@@ -9,6 +9,13 @@ Sources:
 - Claude Code settings: https://code.claude.com/docs/en/settings
 - Claude Code permissions: https://code.claude.com/docs/en/permissions
 - Claude Code MCP: https://code.claude.com/docs/en/mcp
+- Claude Code memory: https://code.claude.com/docs/en/memory
+- Claude Code authentication: https://code.claude.com/docs/en/authentication
+- Claude Code sandboxing: https://code.claude.com/docs/en/sandboxing
+- Codex hooks: https://learn.chatgpt.com/docs/hooks
+- Codex instructions: https://learn.chatgpt.com/docs/agent-configuration/agents-md
+- Codex authentication: https://learn.chatgpt.com/docs/auth
+- Codex profiles: https://learn.chatgpt.com/docs/config-file/config-advanced#profiles
 - Codex configuration reference: https://learn.chatgpt.com/docs/config-file/config-reference.md
 
 ## Claude Code
@@ -19,11 +26,11 @@ Sources:
 | `.claude/settings.local.json` | Repository, kept out of Git | settings | One person's overrides, and the "don't ask again" approvals Claude Code saves | checked |
 | `.mcp.json` | Repository | mcp | Project-scoped MCP servers | checked |
 | `CLAUDE.md` | Repository | instructions | Standing instructions | checked |
-| `CLAUDE.local.md`, `.claude/CLAUDE.md`, `.claude/rules/` | Repository | instructions | More instruction files | verify |
+| `CLAUDE.local.md`, `.claude/CLAUDE.md`, `.claude/rules/` | Repository | instructions | More instruction files | checked |
 | `.claude/settings.json` | Home | settings | One person's settings for every project | checked |
 | `.claude.json` | Home | mcp | Account details, user-scoped and local-scoped MCP servers, and trust decisions | checked |
-| `.claude/CLAUDE.md` | Home | instructions | One person's standing instructions | verify |
-| `.claude/.credentials.json` | Home | credential-store | Sign-in tokens. Never shown | verify |
+| `.claude/CLAUDE.md` | Home | instructions | One person's standing instructions | checked |
+| `.claude/.credentials.json` | Home | credential-store | Sign-in tokens on Linux and Windows, and the macOS Keychain fallback. Never shown | checked |
 
 Keys that carry permissions:
 
@@ -35,7 +42,7 @@ Keys that carry permissions:
 - `hooks` runs commands on events. checked
 - `env` and `apiKeyHelper` can hold or produce credentials. They are never shown. checked
 - An MCP server entry has `command`, `args`, and `env` for a local server, or `type`, `url`, `headers`, and `headersHelper` for a remote one. `${VAR}` is expanded in `command`, `args`, `env`, `url`, and `headers`, so a server can name a variable where it would hold a token. checked
-- `sandbox` settings. verify
+- `sandbox.enabled` enables the shell sandbox; filesystem and network rules set its boundary. It does not sandbox every tool or MCP server. checked
 
 Three facts that change a status:
 
@@ -49,21 +56,21 @@ Three facts that change a status:
 | --- | --- | --- | --- | --- |
 | `.codex/config.toml` | Repository | settings | Project settings. Codex loads them only for a trusted project | checked |
 | `AGENTS.md` | Repository | instructions | Standing instructions | checked |
-| `.codex/hooks.json` | Repository | hooks | Commands that run on events | verify |
+| `.codex/hooks.json` | Repository | hooks | Commands that run on events; project hooks require project trust and non-managed hooks have their own trust review | checked |
 | `.codex/config.toml` | Home | settings | One person's settings, including MCP servers | checked |
-| `.codex/AGENTS.md` | Home | instructions | One person's standing instructions | verify |
-| `.codex/hooks.json` | Home | hooks | Commands that run on events | verify |
-| `.codex/auth.json` | Home | credential-store | Sign-in tokens. Never shown | checked |
+| `.codex/AGENTS.md` | Home | instructions | One person's standing instructions | checked |
+| `.codex/hooks.json` | Home | hooks | Commands that run on events; project hooks require project trust and non-managed hooks have their own trust review | checked |
+| `.codex/auth.json` | Home | credential-store | Sign-in tokens when file-based credential storage is used. Never shown | checked |
 
 Keys that carry permissions:
 
-- `approval_policy`: `on-request`, `never`, or a `granular` table. `never` removes every prompt. Older values such as `untrusted` and `on-failure` still appear in some files. checked for the first three, verify for the older two
+- `approval_policy`: `on-request`, `never`, or a `granular` table. `never` rejects requests that would need approval; sandbox restrictions still apply. `untrusted` is unsupported as an explicit approval policy, and `on-failure` is deprecated. checked
 - `sandbox_mode`: `read-only`, `workspace-write`, or `danger-full-access`. checked
 - `sandbox_workspace_write.network_access` and `sandbox_workspace_write.writable_roots`. checked
 - `default_permissions` and the `permissions.<name>` profiles. checked
 - `[mcp_servers.<id>]`: `command`, `args`, `env`, and `env_vars` for a local server, or `url`, `bearer_token_env_var`, `http_headers`, and `env_http_headers` for a remote one. `bearer_token_env_var` and `env_http_headers` name a variable and hold no token. `env`, `http_headers`, and `oauth.client_secret` can hold one, and they are never shown. checked
 - `enabled_tools`, `disabled_tools`, `default_tools_approval_mode`, and `tools.<tool>.approval_mode` on a server. checked
-- `profiles` can set any of the keys above under another name. checked
+- In Codex 0.134.0 and later, config profiles live in separate `$CODEX_HOME/<name>.config.toml` files selected with `--profile <name>`. Inline `[profiles.<name>]` and the top-level `profile` selector no longer apply. Project-scoped files cannot select or define config profiles. These separate files are not inventoried by this version of the script. checked
 
 ## Shared layer
 
@@ -93,6 +100,8 @@ Name each of these under "Not checked" in the report.
 
 - Managed settings that an employer installs: a `managed-settings.json` file in a system folder, a device management policy, or server-managed settings. They rank above every file this check reads.
 - Codex `requirements.toml` and other managed configuration.
+- Codex separate `<name>.config.toml` config profiles, `AGENTS.override.md`, and configured fallback instruction filenames. Overrides can replace an inventoried `AGENTS.md`; do not assume that file is the active instruction source.
+- OS credential stores, including the macOS Keychain and Codex keyring mode. A missing credential file does not mean no credentials are available.
 - A home folder moved with `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
 - Flags on the command line, such as `--permission-mode`, `--settings`, `--dangerously-skip-permissions`, and Codex `--sandbox`. Scripts and workflows in the repository that pass them are read. A person's shell history is not.
 - Tool-specific settings of agents other than Claude Code and Codex.
@@ -100,3 +109,5 @@ Name each of these under "Not checked" in the report.
 - `.claude/agents/`, `.claude/commands/`, and subfolders of `.claude/rules/`.
 - Env files below the top folder.
 - Cloud sessions, which read only some of these files.
+
+<!-- Changed from the Net Ninjas original during independent review, 15 November 2026. -->

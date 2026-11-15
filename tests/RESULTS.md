@@ -29,15 +29,15 @@ One row per run. Failures and gaps stay in the table.
 
 ## Not tested yet
 
-- Any agent other than Claude Code, and any operating system other than Linux.
+- Complete conversational fixture runs with agents other than Claude Code. The independent manual pass and macOS script checks are recorded below.
 - An install with `npx skills add` on a machine that has never had the skills.
 - `gitops-hygiene-check` with `gh` access against a real GitHub repository.
 - `guided-app-starter`: every scenario, the build, and every remote step.
 - A second run of the first three skills after the fixes listed above.
 - `agent-permissions-check` with `gh` access against a real GitHub repository, with a real home folder, and with a yes to the policy file.
 - `agent-permissions-check` on a repository that uses Codex, Cursor, or another agent as its main tool. The fixture's Codex file is small.
-- `list-agent-config.sh` on macOS with BSD tools. Its test runs on Linux in CI, under `sh` and `dash`.
-- The reader against a second review. One review found fifteen problems, so a second one is likely to find more.
+- BusyBox execution of `list-agent-config.sh`. The independent review below adds macOS BSD and dash coverage.
+- Exhaustive reader safety. A second review below found further credential leaks; the heuristic limitations remain.
 - Line numbers in the evidence. Two of the last five runs gave one line number that was off by one. The statuses were right in every run.
 - `ai-feature-architecture-check` on a real product, on a repository in a language other than TypeScript, and on a feature that passes most checks. The fixture fails most of them on purpose.
 - `ai-feature-architecture-check` where two or more checks end in "ask the team". The fixture has one.
@@ -47,3 +47,9 @@ One row per run. Failures and gaps stay in the table.
 Codex reviewed B at 32b65a1 against A at 2c244d9. Original validator, scanner, reader, and names-filter tests passed with macOS BSD tools. A multiline env value containing an assignment-shaped line defeated both documented names filters; the new regression fails against the original filter and passes with quote tracking. Fourteen validator mutations were tried: the original accepted ten and rejected four; the corrected validator rejects all fourteen. The new mutation suite is wired into CI.
 
 The twelve published checks, three bands, ten stops, eight leak-path labels, and cost SQL were checked against the live pages. Twenty-one signal rows were checked against primary package or vendor sources. Independent fixture derivation before EXPECTED.md confirms the aggregate statuses, but corrects two unsupported explanations. See the branch review report for status boundary inputs, exact sources, and untested scope. This was a manual instruction and evidence pass; no model or fixture application was executed.
+
+## Independent review, 15 November 2026
+
+Codex reviewed A at 2c244d9 against main 346a8a7. Original validator, scanner tests, and reader tests pass with macOS BSD awk and sed. ShellCheck 0.11.0 passes. New attacks failed before their fixes: hidden JSON arrays, escaped JSON keys, escaped approval strings, quoted and multiline YAML, expression suffixes, flow mappings, and escaped Markdown headers. Removing the hidden-key list in a scratch copy makes the existing reader suite fail. The corrected reader suite also passes with dash as the reader shell. BusyBox was unavailable.
+
+The nine published rows and Claude Code and Codex documentation were checked independently. Both fixture variants were built with a stand-in home; their reports were derived before opening EXPECTED.md. This is a manual instruction and evidence pass, with no GitHub access and no policy file written. It is not a new automated end-to-end conversational run. The open-rows runner status was overstated: corrected headline 0 of 9 enforced (1 not checked). Historical run records above are retained as records, not independent evidence that all current rules are correct.

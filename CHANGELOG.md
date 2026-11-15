@@ -40,13 +40,19 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - Reject reordered and duplicate published structures, hidden wording decoys, and SQL appended to the pinned query. Fourteen mutation cases run in CI.
 - Correct the fixture explanations for the Anthropic SDK timeout and Sentry user data; aggregate statuses remain unchanged.
 
+### Independent review corrections (15 November 2026)
+
+- Correct hidden JSON arrays, escaped keys and values, and quoted or flow YAML credential handling. Escaped strings and the remainder of escaped text are now hidden conservatively.
+- Tighten evidence for enforced permissions, clarify status precedence, and update Claude Code and Codex facts from vendor documentation. A self-hosted label alone leaves the runner unconfirmed.
+- The plain fixture remains 1 of 9 enforced (1 not checked). The open-rows variant is now 0 of 9 enforced (1 not checked).
+
 ### Known limits
 
 - `agent-permissions-check` has not been run with `gh` access, against a real home folder, or with a yes to the policy file.
 - The fixture runs gave the user's answers in advance, so the order "ask, then read" was not observed.
-- The reader script is tested on Linux. It is written for POSIX `sh` and `awk`, and it has not been run with BSD tools.
+- The reader script is tested on Linux and macOS with BSD awk and sed, under sh and dash. BusyBox remains untested.
 - The masked view works line by line. A file on one line prints as one long masked line.
-- The reader hides a credential that it can recognise by its key, its shape, its flag, or its place in an address. It cannot recognise a credential typed as a short plain word: a positional argument, a word in a command, a host name of fewer than 8 characters, or prose in an instruction file. The skill tells the agent not to repeat such a value.
+- The reader hides a credential that it can recognise by its key, its shape, its flag, or its place in an address. It cannot recognise a credential typed as an unlabelled plain word: a positional argument, a word in a command, a host name of fewer than 8 characters, or prose in an instruction file. This includes arbitrarily long alphabetic values, not only short words. This heuristic reader cannot guarantee that arbitrary input is free of credentials. The skill tells the agent not to repeat such a value.
 - A fresh agent sometimes cites a line number that is off by one. Two of the last five runs did so, each on one line.
 - The reader hides some harmless text: a word of 20 or more characters that mixes letters and digits, and comments in settings and env files.
 - Tool-specific settings of agents other than Claude Code and Codex are not read.

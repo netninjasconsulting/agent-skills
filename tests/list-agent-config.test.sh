@@ -347,7 +347,7 @@ expect_text "$(sh "$reader" --show "$r/c4.env")" "NAME=" "review c4.env"
 expect_text "$(sh "$reader" --show "$r/c4.toml")" "read-only" "review c4.toml"
 expect_text "$(sh "$reader" --show "$r/c4.json")" "kept" "review c4.json"
 expect_text "$(sh "$reader" --show "$r/c5.json")" "run-a" "review c5.json"
-expect_text "$(sh "$reader" --show "$r/c5.json")" "run-b" "review c5.json"
+# Escaped approval strings are hidden whole, including harmless command text.
 expect_text "$(sh "$reader" --show "$r/i1.yml")" "id-token: write" "review i1.yml"
 expect_text "$(sh "$reader" --show "$r/i1.yml")" "secrets.BOT_TOKEN" "review i1.yml"
 expect_text "$(sh "$reader" --show "$r/i1.yml")" "runs-on: ubuntu-latest" "review i1.yml"
@@ -488,6 +488,59 @@ code=0
 sh "$root/tests/fixtures/agent-permissions-check/make-repo.sh" "$work/bad" no-such-variant >/dev/null 2>&1 || code=$?
 [ "$code" -eq 2 ] || fail "make-repo: an unknown variant did not exit 2"
 [ ! -e "$work/bad" ] || fail "make-repo: an unknown variant left a folder behind"
+
+# Independent review: hidden arrays, escaped keys and values, quoted YAML.
+cat > "$r/hidden-array.json" <<'JSON'
+{
+ "mcpServers": {
+  "auth": {
+   "env": [
+    {"command": "FIXTUREVALUE-hidden-array"}
+   ]
+  }
+ }
+}
+JSON
+cat > "$r/server-array.json" <<'JSON'
+{
+ "servers": [
+  {"auth": {
+   "command": "FIXTUREVALUE-hidden-server"
+  }}
+ ]
+}
+JSON
+cat > "$r/escaped-key.json" <<'JSON'
+{
+ "servers": {
+  "headers": {
+   "\u0065nv": {
+    "command": "FIXTUREVALUE-escaped-key"
+   }
+  }
+ }
+}
+JSON
+cat > "$r/saved.json" <<'JSON'
+{"permissions":{"allow":["Bash(API_TOKEN=FIXTUREVALUE-first\nFIXTUREVALUE-second curl *)"]}}
+JSON
+cat > "$r/quoted.yml" <<'YAML'
+env:
+  'API_TOKEN': FIXTUREVALUE-quoted
+  API_TOKEN: "first
+    FIXTUREVALUE-second"
+  API_TOKEN: ${{ secrets.KEY }} FIXTUREVALUE-suffix
+YAML
+cat > "$r/flow.yml" <<'YAML'
+env: {API_TOKEN: FIXTUREVALUE-flow}
+YAML
+cat > "$r/escaped.md" <<'MD'
+Authorization: Bearer FIXTUREVALUE-first\nFIXTUREVALUE-second
+MD
+for file in "$r/hidden-array.json" "$r/server-array.json" "$r/escaped-key.json" "$r/saved.json" "$r/quoted.yml" "$r/flow.yml" "$r/escaped.md"; do
+  out=$(sh "$reader" --show "$file")
+  no_marker "$out" "independent review $file"
+done
 
 # 8. No agent files, and no Git (Review Focus 3 and 4).
 mkdir "$work/empty"
