@@ -79,3 +79,10 @@ Codex reviewed A at 2c244d9 against main 346a8a7. Original validator, scanner te
 The nine published rows and Claude Code and Codex documentation were checked independently. Both fixture variants were built with a stand-in home; their reports were derived before opening EXPECTED.md. This is a manual instruction and evidence pass, with no GitHub access and no policy file written. It is not a new automated end-to-end conversational run. The open-rows runner status was overstated: corrected headline 0 of 9 enforced (1 not checked). Historical run records above are retained as records, not independent evidence that all current rules are correct.
 
 | 15 November 2026 | `guided-app-starter` branch review | 0.2.0 | Codex, static review | Validator and scenarios 10 to 12 | Partial validation | JavaScript syntax (`node --check`) and `git diff --check` pass. Added three validator mutation cases and three behavioural scenarios. Runtime validator launch was blocked: macOS rejected the virtual-memory limit required by the security-audit skill sandbox. No mutation suite or fresh-agent run was performed for this revision. Prior passes above describe earlier revisions. |
+
+
+## Serverless branch code review, 15 November 2026
+
+Codex reviewed the serverless branch against origin/main and fixed two reader defects: mixed Terraform/OpenTofu infrastructure now lists every supported platform, and direct `--show` requests refuse symbolic links with exit code 4. Regression cases cover both behaviours. The root README describes the 0.2.0 additions and reader limits.
+
+All six CI commands in tests/README.md passed locally on macOS, including the validator mutation suite and the serverless reader attack suite. ShellCheck on the reader and `git diff --check` passed. This was a code and instruction review with automated helper tests; no fresh-agent fixture run, deployment, or provider-fact re-verification was performed. Earlier conversational runs retain their recorded scope and limitations.

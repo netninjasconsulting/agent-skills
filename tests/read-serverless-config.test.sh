@@ -2627,6 +2627,31 @@ code=0
 sh "$reader" --nope >/dev/null 2>&1 || code=$?
 [ "$code" -eq 2 ] || fail "usage: an unknown option did not exit 2"
 
+# A single infrastructure file may define several supported platforms.
+mkdir "$work/multi"
+cat > "$work/multi/main.tf" <<'EOF'
+resource "aws_lambda_function" "api" {
+}
+resource "cloudflare_workers_script" "edge" {
+}
+resource "supabase_project" "db" {
+}
+EOF
+multi=$(sh "$reader" "$work/multi")
+for platform in aws-lambda cloudflare-workers supabase; do
+  expect_line "$multi" "main.tf:$platform:infrastructure:no-git" "mixed Terraform"
+done
+
+# A direct --show must honour the same symbolic-link exclusion as list mode.
+mkdir "$work/links"
+printf 'PRIVATE=FIXTUREVALUE\n' > "$work/links/target"
+ln -s target "$work/links/.env"
+code=0
+linked=$(sh "$reader" --show "$work/links/.env" 2>/dev/null) || code=$?
+[ "$code" -eq 4 ] || fail "show: symbolic link did not exit 4"
+[ -z "$linked" ] || fail "show: symbolic link printed content"
+[ -z "$(sh "$reader" "$work/links")" ] || fail "list: symbolic link was listed"
+
 # 9. The reader writes nothing.
 [ -z "$(git -C "$repo" status --porcelain)" ] || fail "the reader changed the repository"
 

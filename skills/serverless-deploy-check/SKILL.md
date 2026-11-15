@@ -132,7 +132,7 @@ Before judging anything, list what exists. The map is printed in the report as t
    sh <skill-dir>/scripts/read-serverless-config.sh .
    ```
 
-   Each line is `<path>:<platform>:<kind>:<state>`. The state (`tracked`, `untracked`, `ignored`, or `no-git`) says whether Git carries the file to everyone who clones it.
+   Each line is `<path>:<platform>:<kind>:<state>`. A Terraform or OpenTofu file with several supported platforms has one line per platform; read that path once. The state (`tracked`, `untracked`, `ignored`, or `no-git`) says whether Git carries the file to everyone who clones it.
 3. Read every listed file through the reader, one file per command, so that every line number is the line in that file:
 
    ```sh

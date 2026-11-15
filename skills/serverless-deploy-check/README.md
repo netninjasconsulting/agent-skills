@@ -82,7 +82,7 @@ It doesn't repeat the full secrets pass of the [vibe-code pre-launch check](../v
 - **A secret in the wrong place can print.** The reader shows a value when its key carries a setting. So a secret can appear in its output when someone writes it where a setting name belongs. Examples are a runtime, a handler, an IAM action, and the last part of an ARN. A secret used as a key name can appear too. The skill tells the agent not to copy such a value into the report.
 - **The reader doesn't check the resource type of a SAM property.** A property with a setting's name, such as `Handler` or `Role`, shows its word under any resource in a template.
 - **A credential word in a name hides nothing.** A function, a resource, a job, or an environment whose name holds `token`, `password`, or `secret` shows its settings like any other. The reader still hides the value of a key with such a name.
-- **The reader lists known file names only.** It doesn't list a platform file that is a symbolic link. It doesn't list `serverless.json`, `samconfig.yaml`, `*.tf.json`, or `terraform.tfstate`. The skill names such a file under "Not checked" and doesn't open it.
+- **The reader lists known file names only.** It doesn't list a platform file that is a symbolic link, and `--show` refuses such a link with exit code 4. It doesn't list `serverless.json`, `samconfig.yaml`, `*.tf.json`, or `terraform.tfstate`. The skill names such a file under "Not checked" and doesn't open it.
 - **45 provider facts are marked "verify".** `references/platforms.md` holds 147 rows of provider facts. I read 102 of them in each provider's documentation on 15 November 2026. The other 45 are marked "verify", and I didn't confirm them on that date. Provider limits and defaults change often.
 - **No size, no saving, and no cost.** The skill says if a setting is explicit, and where. Measured use is the evidence for a size, and the repository doesn't hold it.
 - **A file is not the running system.** A memory size, a region, or an access rule can live in a provider's console and not in a file. The report says so at the top.
@@ -111,6 +111,8 @@ Is this ready to deploy? Check the CPU and memory settings and the security.
 ## Test fixture
 
 `tests/fixtures/serverless-deploy-check/quickship/` in this repository holds a delivery tracking app on all four platforms. It also holds the result the skill has to produce on it. `scenarios.md` adds four cases: none of the four platforms, Vercel and Supabase only, E1 as a warn, and a Lambda function defined in AWS CDK.
+
+A Terraform or OpenTofu file defining several supported platforms appears once per platform in the reader’s list.
 
 `tests/read-serverless-config.test.sh` runs the reader against the fixture and its own attack files in CI. It fails when a planted value appears in any output. `tests/RESULTS.md` records every run, and the rules that the first runs and the reviews changed.
 

@@ -238,14 +238,15 @@ git_state() {
   fi
 }
 
-# The platform of a Terraform or OpenTofu file, by the first resource type that matches.
+# Every supported platform in a Terraform or OpenTofu file.
 tf_platform() {
-  if grep -Eq 'resource[[:space:]]+"aws_lambda_' "$1" 2>/dev/null; then
-    echo aws-lambda
-  elif grep -Eq 'resource[[:space:]]+"cloudflare_worker' "$1" 2>/dev/null; then
-    echo cloudflare-workers
-  elif grep -Eq 'resource[[:space:]]+"supabase_' "$1" 2>/dev/null; then
-    echo supabase
+  platforms=$(
+    grep -Eq 'resource[[:space:]]+"aws_lambda_' "$1" 2>/dev/null && echo aws-lambda
+    grep -Eq 'resource[[:space:]]+"cloudflare_worker' "$1" 2>/dev/null && echo cloudflare-workers
+    grep -Eq 'resource[[:space:]]+"supabase_' "$1" 2>/dev/null && echo supabase
+  )
+  if [ -n "$platforms" ]; then
+    printf '%s\n' "$platforms"
   else
     echo shared
   fi
@@ -263,7 +264,9 @@ classify() {
     vercel.json) echo "vercel functions" ;;
     serverless.yml | serverless.yaml) echo "aws-lambda functions" ;;
     template.yaml | template.yml | template.json | samconfig.toml) echo "aws-lambda infrastructure" ;;
-    *.tf | *.tofu) echo "$(tf_platform "$ROOT/$1") infrastructure" ;;
+    *.tf | *.tofu) tf_platform "$ROOT/$1" | while IFS= read -r platform; do
+      echo "$platform infrastructure"
+    done ;;
     *.tfvars | *.tfvars.json) echo "shared env" ;;
     package.json | package-lock.json) ;;
     config.toml)
@@ -290,11 +293,18 @@ list() {
   ) | sed 's#^\./##' | while IFS= read -r path; do
     found=$(classify "$path")
     [ -n "$found" ] || continue
-    printf '%s:%s:%s:%s\n' "$path" "${found% *}" "${found#* }" "$(git_state "$path")"
+    state=$(git_state "$path")
+    printf '%s\n' "$found" | while IFS= read -r entry; do
+      printf '%s:%s:%s:%s\n' "$path" "${entry% *}" "${entry#* }" "$state"
+    done
   done | sort
 }
 
 show() {
+  if [ -L "$SHOW_FILE" ]; then
+    echo "read-serverless-config: symbolic link not checked: $SHOW_FILE" >&2
+    exit 4
+  fi
   [ -f "$SHOW_FILE" ] || { echo "read-serverless-config: not a file: $SHOW_FILE" >&2; exit 2; }
   base=$(basename "$SHOW_FILE")
   dir=$(cd "$(dirname "$SHOW_FILE")" && pwd)
