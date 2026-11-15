@@ -4,7 +4,7 @@ All four skills share one version number. Dates are in day, month, year order.
 
 ## 0.2.0 (15 November 2026)
 
-One new skill. The four skills from 0.1.0 keep their checks.
+Two new skills. The four skills from 0.1.0 keep their checks.
 
 ### Added
 
@@ -14,6 +14,7 @@ One new skill. The four skills from 0.1.0 keep their checks.
 ### Changed
 
 - `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools.
+- `scripts/validate.mjs` pins the twelve checks, the three score bands, the ten stops, and the eight leak paths of the AI feature architecture check to their published wording.
 - Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same.
 
 ### Verified for this release (15 November 2026)
@@ -21,10 +22,12 @@ One new skill. The four skills from 0.1.0 keep their checks.
 - The nine policy rows, against the source of the published page in the website repository (commit 544c46a).
 - Claude Code settings, permissions, and MCP facts marked "checked" in `skills/agent-permissions-check/references/agent-files.md`, read from code.claude.com on 15 November 2026.
 - Codex configuration facts marked "checked" in the same file, read from learn.chatgpt.com on 15 November 2026. Facts marked "verify" were not confirmed.
+- The twelve checks, the score bands, the ten stops, the eight leak paths, and the cost query, against the source of the published pages in the website repository (commit 544c46a), in the wording of netninjas.us.
+- Not verified: the names in `skills/ai-feature-architecture-check/references/signals.md`. Every row there is marked "verify".
 
 ### Tested
 
-See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI.
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result.
 
 ### Known limits
 
@@ -35,6 +38,9 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - The reader hides a credential that it can recognise by its key, its shape, its flag, or its place in an address. It cannot recognise a credential typed as a short plain word: a positional argument, a word in a command, a host name of fewer than 8 characters, or prose in an instruction file. The skill tells the agent not to repeat such a value.
 - The reader hides some harmless text: a word of 20 or more characters that mixes letters and digits, and comments in settings and env files.
 - Tool-specific settings of agents other than Claude Code and Codex are not read.
+- `ai-feature-architecture-check` has one fixture, in TypeScript, that fails most checks on purpose. It has not been run on a real product or on a feature that passes.
+- The second pass of `ai-feature-architecture-check` was run with one question. The fixture has no second check that ends in "ask the team".
+- The published cost query prices in euros, and the skill prints it as published.
 
 ## 0.1.0 (14 November 2026)
 
