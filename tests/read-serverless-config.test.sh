@@ -1690,6 +1690,230 @@ TOML
 printf '\357\273\277{ "name": "bomok" }\n' > "$a/r4b-bom.json"
 mkdir -p "$a/r4b/bom" && mv "$a/r4b-bom.json" "$a/r4b/bom/wrangler.json"
 
+# 5v. Review round 5.
+# A document marker inside an open quoted value or an open bracket breaks the file.
+put r5/yaml-markquote/serverless.yml <<'YAML'
+provider:
+  name: aws
+  x: "abc
+---
+provider:
+  runtime: FIXTUREVALUE
+  y: z"
+YAML
+put r5/yaml-markflow/serverless.yml <<'YAML'
+provider:
+  name: aws
+  x: [ a,
+---
+provider:
+  runtime: FIXTUREVALUE
+  ]
+YAML
+put r5/yaml-markflow2/serverless.yml <<'YAML'
+service: kept
+provider:
+  x: { a: 'b
+...
+provider:
+  stage: FIXTUREVALUE
+  c' }
+YAML
+# send_email is a list, and its items show their name.
+put r5/send-email/wrangler.json <<'JSON'
+{ "send_email": [ { "name": "MAILER", "destination_address": "FIXTUREVALUE" } ] }
+JSON
+put r5/send-email/wrangler.toml <<'TOML'
+[[send_email]]
+name = "MAILER"
+binding = "FIXTUREVALUE"
+TOML
+# A home that must be a list is unknown when it is written as one object.
+put r5/mustlist/serverless.yml <<'YAML'
+provider:
+  name: aws
+  iam:
+    role:
+      statements:
+        Effect: Allow
+        Resource: FIXTUREVALUE
+functions:
+  - f:
+      handler: ok.h
+      events:
+        http:
+          path: /leakpath
+        httpApi: GET /leakpath
+  - g:
+      events:
+        - http:
+            path: /okpath
+YAML
+put r5/mustlist/vercel.json <<'JSON'
+{
+  "crons": { "path": "/leakpath", "schedule": "0 0 * * *" },
+  "headers": [ { "source": "/a", "headers": { "key": "FIXTUREVALUE", "value": "x" } } ],
+  "rewrites": { "source": "/leakpath" }
+}
+JSON
+put r5/mustlist/wrangler.json <<'JSON'
+{
+  "kv_namespaces": { "binding": "FIXTUREVALUE" },
+  "durable_objects": { "bindings": { "name": "FIXTUREVALUE", "class_name": "FIXTUREVALUE" } },
+  "queues": { "producers": { "queue": "FIXTUREVALUE" } },
+  "send_email": { "name": "FIXTUREVALUE" },
+  "ratelimits": { "name": "FIXTUREVALUE" },
+  "r2_buckets": [ { "binding": "OKBUCKET" } ]
+}
+JSON
+put r5/mustlist/wrangler.toml <<'TOML'
+kv_namespaces.binding = "FIXTUREVALUE"
+[r2_buckets]
+bucket_name = "FIXTUREVALUE"
+[durable_objects.bindings]
+name = "FIXTUREVALUE"
+[send_email]
+name = "FIXTUREVALUE"
+[services]
+service = "FIXTUREVALUE"
+[[ratelimits]]
+name = "OKLIMIT"
+[ratelimits.simple]
+limit = 10
+TOML
+put r5/mustlist/.github/workflows/w.yml <<'YAML'
+on:
+  schedule:
+    cron: 0 0 * * 1
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      name: FIXTUREVALUE
+YAML
+# An IAM Statement may be one object, so it stays a home.
+put r5/statement/main.tf <<'HCL'
+resource "aws_iam_policy" "p" {
+  policy = jsonencode({
+    Statement = {
+      Resource = "okone"
+    }
+  })
+}
+HCL
+put r5/statement/template.json <<'JSON'
+{ "AWSTemplateFormatVersion": "2010-09-09", "Resources": { "R": { "Type": "AWS::IAM::Role", "Properties": {
+  "AssumeRolePolicyDocument": { "Statement": { "Effect": "Allow", "Resource": "okone" } } } } } }
+JSON
+# A block header is a home only with the labels its type takes, and a value
+# in single quotes is not an HCL string.
+put r5/hcl-labels/main.tf <<'HCL'
+resource "aws_lambda_function" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "a" "b" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" a {
+  handler = "FIXTUREVALUE"
+}
+data "aws_iam_policy_document" {
+  statement {
+    resources = ["FIXTUREVALUE"]
+  }
+}
+data "aws_iam_policy_document" "d" {
+  statement "x" {
+    actions = ["FIXTUREVALUE"]
+  }
+}
+resource "aws_lambda_function_url" "u" {
+  cors "x" {
+    allow_headers = ["FIXTUREVALUE"]
+  }
+}
+resource "aws_lambda_function" "ok" {
+  timeout = 14
+}
+HCL
+put r5/hcl-squote/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  handler = 'FIXTUREVALUE'
+  role = 'FIXTUREVALUE
+  layers = ['FIXTUREVALUE']
+  timeout = 15
+}
+HCL
+# A policy document shows a list of actions or resources that spans lines,
+# item by item, and only an item with the form of an action or a resource.
+put r5/hcl-doclist/main.tf <<'HCL'
+data "aws_iam_policy_document" "d" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:*",
+      "FIXTUREVALUE",
+      "s3:Get Object FIXTUREVALUE",
+      token = "FIXTUREVALUE"
+    ]
+    resources = [
+      "arn:aws:s3:::okbucket/*",
+      "${aws_s3_bucket.data.arn}/*",
+      aws_s3_bucket.data.arn,
+      "*",
+      "FIXTUREVALUE",
+      "${var.x}/FIXTUREVALUE",
+      "https://FIXTUREVALUE.example.com",
+      { arn = "FIXTUREVALUE" },
+    ]
+    not_resources = [
+      "FIXTUREVALUE",
+    ]
+  }
+  statement {
+    actions   = ["dynamodb:Query", "FIXTUREVALUE"]
+    resources = ["${aws_dynamodb_table.t.arn}/*", "FIXTUREVALUE"]
+  }
+}
+resource "aws_lambda_function_url" "u" {
+  cors {
+    allow_headers = [
+      "FIXTUREVALUE",
+    ]
+  }
+}
+resource "aws_lambda_function" "f" {
+  layers = [
+    "FIXTUREVALUE",
+  ]
+  environment {
+    variables = {
+      actions = [
+        "s3:FIXTUREVALUE",
+      ]
+    }
+  }
+}
+HCL
+# The Auth of a SAM API shows its authorizer settings and nothing else.
+put r5/sam-auth/template.yaml <<'YAML'
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Auth:
+        DefaultAuthorizer: MyAuth
+        ApiKeyRequired: true
+        UsagePlan:
+          Description: FIXTUREVALUE
+        Authorizers:
+          MyAuth:
+            UserPoolArn: FIXTUREVALUE
+            DefaultAuthorizer: FIXTUREVALUE
+YAML
+
 attack_count=0
 for file in $(cd "$a" && find . -type f | sort); do
   attack_count=$((attack_count + 1))
@@ -1700,7 +1924,7 @@ for file in $(cd "$a" && find . -type f | sort); do
   # A second marker, in lower case, for a path: the capitals of the first one hide a path by themselves.
   case "$out" in *leakpath*) fail "attack $file: a planted path leaked" ;; esac
 done
-[ "$attack_count" -ge 135 ] || fail "attack: only $attack_count files were written"
+[ "$attack_count" -ge 165 ] || fail "attack: only $attack_count files were written"
 
 # The attack files still show what the checks need.
 expect_text "$(sh "$reader" --show "$a/span/vercel.json")" '"framework": "kept"' "attack span/vercel.json"
@@ -1846,6 +2070,37 @@ expect_re "$(sh "$reader" --show "$a/r4b/yaml-flowcomment/serverless.yml")" 'tim
 expect_text "$(sh "$reader" --show "$a/r4b/yaml-ownline/serverless.yml")" 'service: kept' "round 4 yaml value on its own line"
 expect_text "$(sh "$reader" --show "$a/r4b/toml-mlescape/wrangler.toml")" 'workers_dev = true' "round 4 toml escaped quote"
 expect_text "$(sh "$reader" --show "$a/r4b/toml-quoteddot/wrangler.toml")" 'name = "w-t"' "round 4 toml quoted name"
+expect_text "$(sh "$reader" --show "$a/r5/yaml-markquote/serverless.yml")" 'name: aws' "round 5 marker in a quote"
+expect_text "$(sh "$reader" --show "$a/r5/yaml-markflow/serverless.yml")" 'name: aws' "round 5 marker in brackets"
+expect_text "$(sh "$reader" --show "$a/r5/yaml-markflow2/serverless.yml")" 'service: kept' "round 5 marker in brackets"
+expect_text "$(sh "$reader" --show "$a/r5/send-email/wrangler.json")" '"name": "MAILER"' "round 5 send_email json"
+expect_text "$(sh "$reader" --show "$a/r5/send-email/wrangler.toml")" 'name = "MAILER"' "round 5 send_email toml"
+r5=$(sh "$reader" --show "$a/r5/mustlist/serverless.yml")
+expect_text "$r5" 'handler: ok.h' "round 5 must be a list, yaml"
+expect_text "$r5" 'path: /okpath' "round 5 must be a list, yaml"
+expect_text "$(sh "$reader" --show "$a/r5/mustlist/wrangler.json")" '"binding": "OKBUCKET"' "round 5 must be a list, json"
+r5=$(sh "$reader" --show "$a/r5/mustlist/wrangler.toml")
+expect_text "$r5" 'name = "OKLIMIT"' "round 5 must be a list, toml"
+expect_re "$r5" 'limit = 10$' "round 5 must be a list, toml"
+expect_text "$(sh "$reader" --show "$a/r5/mustlist/.github/workflows/w.yml")" 'runs-on: ubuntu-latest' "round 5 must be a list, workflow"
+expect_text "$(sh "$reader" --show "$a/r5/statement/main.tf")" 'Resource = "okone"' "round 5 one statement, hcl"
+expect_text "$(sh "$reader" --show "$a/r5/statement/template.json")" '"Resource": "okone"' "round 5 one statement, json"
+expect_re "$(sh "$reader" --show "$a/r5/hcl-labels/main.tf")" 'timeout = 14$' "round 5 hcl labels"
+expect_re "$(sh "$reader" --show "$a/r5/hcl-squote/main.tf")" 'timeout = 15$' "round 5 hcl single quotes"
+r5=$(sh "$reader" --show "$a/r5/hcl-doclist/main.tf")
+expect_text "$r5" '"s3:GetObject",' "round 5 policy document list"
+expect_text "$r5" '"s3:*",' "round 5 policy document list"
+expect_text "$r5" '"arn:aws:s3:::okbucket/*",' "round 5 policy document list"
+# shellcheck disable=SC2016  # the reference is literal text in the Terraform file
+expect_text "$r5" '"${aws_s3_bucket.data.arn}/*",' "round 5 policy document list"
+expect_text "$r5" 'aws_s3_bucket.data.arn,' "round 5 policy document list"
+expect_text "$r5" '"*",' "round 5 policy document list"
+expect_text "$r5" 'actions   = ["dynamodb:Query", <redacted>]' "round 5 policy document list"
+# shellcheck disable=SC2016  # the reference is literal text in the Terraform file
+expect_text "$r5" 'resources = ["${aws_dynamodb_table.t.arn}/*", <redacted>]' "round 5 policy document list"
+r5=$(sh "$reader" --show "$a/r5/sam-auth/template.yaml")
+expect_text "$r5" 'DefaultAuthorizer: MyAuth' "round 5 sam api auth"
+expect_text "$r5" 'ApiKeyRequired: true' "round 5 sam api auth"
 for file in longseg2/wrangler.toml longseg2/vercel.json; do
   sh "$reader" --show "$a/$file" | grep -q lowercasesharedsecretvalue && fail "long segment: $file shows a lowercase segment over 15 characters"
 done

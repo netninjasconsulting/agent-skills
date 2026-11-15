@@ -72,14 +72,17 @@ done
 # that context only when it is marked so and the list is the value of its
 # key, and otherwise in "x". An item of an item is always in "x". A context
 # without the mark is one object, so bind1 (a single Wrangler binding) is not
-# a home when it is written as a list.
+# a home when it is written as a list. A context with the mark must be a
+# list: written as one object, it is "x". ctx>[?] marks a context that the
+# platform takes as a list or as one object, such as an IAM Statement.
 #
 # ctx>key:shape shows the value of key in context ctx, when the value has that
 # shape. ctx>*:shape does the same for every key. A shape that ends in ! holds
 # over the never-shown list. Shapes: n number, m number or "max", b boolean,
 # d date, w word, t short text, c schedule, p path or route, r method and path,
 # o origin, a address, u action reference, pm workflow permission, rp a
-# Worker route pattern (a path with a slash). The other
+# Worker route pattern (a path with a slash), act an IAM action, res an IAM
+# resource (an ARN, *, or a reference to the arn of a resource). The other
 # shapes are closed sets or fixed forms, in the ENUM table of the awk program.
 SHOW_SERVERLESS='
 top>service:w top>provider=prov top>functions=fns top>package=pkg
@@ -93,7 +96,7 @@ thr>burstLimit:n thr>rateLimit:n quota>limit:n quota>period:perd quota>offset:n
 prov>httpApi=hapi hapi>disableDefaultEndpoint:b hapi>cors:b hapi>cors=cors
 hapi>authorizers=auths auths>*=auth auth>type:atype auth>scopes:w
 prov>logs=logs logs>lambda:b logs>restApi:b logs>httpApi:b logs>websocket:b
-fns>[] evs>[] stmt>[] up>[]
+fns>[?] evs>[] stmt>[] up>[?]
 fns>*=fn fn>handler:w fn>runtime:w fn>memorySize:n fn>timeout:n fn>architecture:arch
 fn>reservedConcurrency:n fn>provisionedConcurrency:n fn>logRetentionInDays:n fn>role:w
 fn>layers:lyr fn>url:b fn>url=url fn>events=evs fn>package=pkg
@@ -124,7 +127,8 @@ props>RuntimeManagementConfig=rmc rmc>UpdateRuntimeOn:upd props>SnapStart=snapc 
 props>Events=sevs sevs>*=sev sev>Type:w sev>Properties=sevp
 sevp>Path:p sevp>Method:meth sevp>Schedule:c sevp>Auth=sauth
 sauth>Authorizer:w sauth>DefaultAuthorizer:w sauth>ApiKeyRequired:b! sauth>AddDefaultAuthorizerToCorsPreflight:b
-props>Policies=pols pols>Statement=stmts pols>[] stmts>[]
+props>Policies=pols pols>Statement=stmts pols>[?] stmts>[?]
+props>Auth=sauth
 props>PolicyDocument=pdoc props>AssumeRolePolicyDocument=pdoc pdoc>Statement=stmts
 stmts>Effect:eff stmts>Action:w stmts>Resource:w stmts>Principal:prsv stmts>Principal=prin
 prin>Service:svc prin>AWS:prin'
@@ -141,8 +145,9 @@ WRANGLER_SETTINGS='
 @>kv_namespaces=bind @>d1_databases=bind @>hyperdrive=bind @>vectorize=bind
 @>analytics_engine_datasets=bind @>dispatch_namespaces=bind @>mtls_certificates=bind
 bind>binding:w bind>[]
-@>ai=bind1 @>browser=bind1 @>images=bind1 @>version_metadata=bind1 @>send_email=bind1
+@>ai=bind1 @>browser=bind1 @>images=bind1 @>version_metadata=bind1
 bind1>binding:w
+@>send_email=sem sem>name:w sem>[]
 @>r2_buckets=r2 r2>binding:w r2>bucket_name:w r2>[]
 @>services=svc svc>binding:w svc>service:w svc>entrypoint:w svc>[]
 @>queues=qs qs>producers=qp qp>binding:w qp>queue:w qp>[] qs>consumers=qc qc>queue:w qc>[]
@@ -204,9 +209,9 @@ hperm>function_url_auth_type:auth hperm>invoked_via_function_url:b hperm>functio
 top>resource.aws_cloudwatch_log_group=hlg hlg>retention_in_days:n
 top>resource.aws_iam_role_policy=hpol top>resource.aws_iam_policy=hpol top>resource.aws_iam_role=hpol
 hpol>role:w hpol>policy=jpol hpol>assume_role_policy=jpol
-jpol>Statement=jst jst>[] jst>Effect:eff jst>Action:w jst>Resource:w
-top>data.aws_iam_policy_document=hpd hpd>statement=hpst hpst>effect:eff hpst>actions:w
-hpst>resources:w hpst>condition=hcond hcond>test:w hcond>variable:w'
+jpol>Statement=jst jst>[?] jst>Effect:eff jst>Action:w jst>Resource:w
+top>data.aws_iam_policy_document=hpd hpd>statement=hpst hpst>effect:eff hpst>actions:act
+hpst>resources:res hpst>condition=hcond hcond>test:w hcond>variable:w'
 
 # Never shown, matched by name in any file. A key whose name holds secret,
 # token, password, credential, private key, API key, access key, connection
@@ -346,7 +351,8 @@ show() {
     BEGIN {
       n = split(showkeys, list, " ")
       for (i = 1; i <= n; i++) {
-        if (length(list[i]) > 3 && substr(list[i], length(list[i]) - 2) == ">[]") LISTCTX[substr(list[i], 1, length(list[i]) - 3)] = 1
+        if (length(list[i]) > 3 && substr(list[i], length(list[i]) - 2) == ">[]") { LISTCTX[substr(list[i], 1, length(list[i]) - 3)] = 1; MUST[substr(list[i], 1, length(list[i]) - 3)] = 1 }
+        else if (length(list[i]) > 4 && substr(list[i], length(list[i]) - 3) == ">[?]") LISTCTX[substr(list[i], 1, length(list[i]) - 4)] = 1
         else if (match(list[i], /=[A-Za-z0-9_]+$/)) HOME[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
         else if (match(list[i], /:[A-Za-z!]+$/)) ALLOW[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
       }
@@ -378,11 +384,14 @@ show() {
       ENUM["prsv"] = ENUM["prin"] "|" ENUM["svc"]
       ENUM["lyr"] = "arn:aws[a-z-]*:lambda:[a-z0-9-]+:[0-9]+:layer:[A-Za-z0-9_-]+:[0-9]+"
       ENUM["arn"] = "arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:[0-9]*:[A-Za-z0-9_+=,.@/:*-]+"
+      ENUM["act"] = "[a-z0-9-]+:[A-Za-z0-9*]+|[*]"
+      HREF = "[a-z][a-z0-9_]*[.][A-Za-z0-9_-]+[.]arn"
+      ENUM["res"] = "[*]|" ENUM["arn"] "|" HREF "|[$][{]" HREF "[}](/[*])?"
       ENUM["hl"] = "[A-Za-z0-9*-]+(, *[A-Za-z0-9*-]+)*"
       # JSON
       jsp = 0; jexp = "v"; jcur = ""; jstr = 0; jcom = 0; jdone = 0; jbroken = 0
       # YAML
-      ysp = 0; yrootchild = ""; yrootkind = ""; yh = -1; yhd = 0; yq = ""; yflow = 0; yfon = 0; yfq = ""; ypend = 0; ydoc = 0
+      ysp = 0; yrootchild = ""; yrootkind = ""; yh = -1; yhd = 0; yq = ""; yflow = 0; yfon = 0; yfq = ""; ypend = 0; ydoc = 0; ybroken = 0
       # TOML
       tml = ""; tq = ""; tarr = 0; tctx = "top"; tl = 0; tbroken = 0
       # A part of a TOML key: bare, or quoted with the letters of a bare one.
@@ -520,10 +529,12 @@ show() {
 
     # A list on one line, element by element. "" when it cannot be shown so.
     # An element that starts with a dash is a flag: it hides, and so does the next.
-    function listval(v, shape,    inner, n, parts, i, e, out, pend) {
+    function listval(v, shape,    inner, n, parts, i, e, out, pend, t) {
       if (substr(v, 1, 1) != "[" || substr(v, length(v)) != "]") return ""
       inner = substr(v, 2, length(v) - 2)
-      if (index(inner, "[") || index(inner, "]") || index(inner, "{") || index(inner, "}")) return ""
+      # A reference such as ${aws_s3_bucket.data.arn} is one word of an element.
+      t = inner; gsub(/[$][{][A-Za-z0-9_.-]*[}]/, "", t)
+      if (index(t, "[") || index(t, "]") || index(t, "{") || index(t, "}")) return ""
       n = split(inner, parts, ",")
       out = ""; pend = 0
       for (i = 1; i <= n; i++) {
@@ -575,6 +586,8 @@ show() {
         k = (jexp == "v") ? jcur : UNKNOWN
         pc = jc[jsp]; pl = jl[jsp]
         c = ctxof(pc, k); l = lvlof(pc, k, pl)
+        # A home that must be a list is unknown as one object.
+        if (t == "o" && (c in MUST)) c = "x"
       } else {
         k = jk[jsp]; c = jc[jsp]; l = jl[jsp]; pc = jpc[jsp]; pl = jpl[jsp]
         # An object in an array is in a home only when the home is a list.
@@ -804,9 +817,12 @@ show() {
     }
 
     function yaml_line(line,    ind, rest, col, ndash, top, ctx, fl, nl, shape, v, prefix, out, cm, first) {
-      # A document marker ends everything that is open. A marker with text
+      # A document marker starts again with nothing open. A marker with text
       # after it starts a document that is one value: it is hidden whole.
+      if (ybroken) return "<redacted>"
       if (line ~ /^(---|[.][.][.])([ \t]|$)/) {
+        # Inside an open quoted value or an open bracket it breaks the file.
+        if (yq != "" || yfon) { ybroken = 1; return "<redacted>" }
         ysp = 0; yrootchild = ""; yrootkind = ""; ypend = 0; yq = ""; yflow = 0; yfon = 0; yfq = ""; yh = -1; yhd = 0
         if (line ~ /^(---|[.][.][.])[ \t]*$/) { ydoc = 0; return line }
         ydoc = (line !~ /^(---|[.][.][.])[ \t]+#/)
@@ -855,6 +871,8 @@ show() {
         if (!ychildok(ysp, "m", col)) { yh = col; yhd = 1; return "<redacted>" }
         if (ndash == 1) ypend = 0
         top = ysp; ctx = top ? yctx[top] : "top"; fl = top ? ylvl[top] : 0
+        # A key directly under a home that must be a list is in no home.
+        if (top && ykey[top] != "-" && (ctx in MUST)) ctx = "x"
         if (fl >= 2) { yh = col; yhd = 1; return "<redacted>" }
         prefix = substr(line, 1, col + YKL)
         v = ystrip(YV); cm = YC ? " # <redacted>" : ""
@@ -973,7 +991,8 @@ show() {
         n = split(inner, parts, ".")
         tl = 0; tctx = "top"
         for (i = 1; i <= n; i++) { tl = lvlof(tctx, parts[i], tl); tctx = ctxof(tctx, parts[i]) }
-        if (plain ~ /^[ \t]*\[\[/ && !(tctx in LISTCTX)) tctx = "x"
+        if (plain ~ /^[ \t]*\[\[/) { if (!(tctx in LISTCTX)) tctx = "x" }
+        else if (tctx in MUST) tctx = "x"
         return plain (TCOM ? " # <redacted>" : "")
       }
       # A header the reader does not recognise: nothing below it shows until the next good one.
@@ -983,7 +1002,7 @@ show() {
         k = ktxt; sub(/=$/, "", k); gsub(/[ \t"\047]/, "", k)
         n = split(k, parts, ".")
         fl = tl; c = tctx
-        for (i = 1; i < n; i++) { fl = lvlof(c, parts[i], fl); c = ctxof(c, parts[i]) }
+        for (i = 1; i < n; i++) { fl = lvlof(c, parts[i], fl); c = ctxof(c, parts[i]); if (c in MUST) c = "x" }
         leaf = parts[n]
         # A quoted part with a dot, a space, or another sign is not a name the reader knows.
         if (ktxt !~ ("^" TPATH "=$")) fl = 2
@@ -1012,7 +1031,9 @@ show() {
     # ---- HCL: Terraform, OpenTofu, and variable files ----
     # A frame for each open bracket: its kind (ht), the context and level of
     # what it holds (hc, hl), whether it is the body of a block (hb), and
-    # whether a bare { directly inside it is an item in the same home (hi).
+    # whether a bare { directly inside it is an item in the same home (hi),
+    # and the shape of the elements that a list of actions or resources
+    # shows line by line (hes).
     #
     # A bracket is in a home only when a line of a known form opens it and
     # closes nothing: a block header in a block body, key = { or key = [ or
@@ -1084,7 +1105,7 @@ show() {
       for (i = 1; i <= length(br); i++) {
         c = substr(br, i, 1)
         if (c == "{" || c == "[" || c == "(") {
-          hsp++; ht[hsp] = c; hc[hsp] = "x"; hl[hsp] = 2; hb[hsp] = 0; hi[hsp] = 0
+          hsp++; ht[hsp] = c; hc[hsp] = "x"; hl[hsp] = 2; hb[hsp] = 0; hi[hsp] = 0; hes[hsp] = ""
           continue
         }
         o = (c == "}") ? "{" : ((c == "]") ? "[" : "(")
@@ -1134,7 +1155,7 @@ show() {
       return 1
     }
 
-    function hcl_line(line,    t, p, st, br, simple, disp, cm, top, ctx, fl, body, out, key, pre, v, sv, tfvars, lab, itemsep) {
+    function hcl_line(line,    t, p, st, br, simple, disp, cm, top, ctx, fl, body, out, key, pre, v, sv, tfvars, lab, itemsep, nq) {
       if (hbroken) return "<redacted>"
       if (hdoc != "") { t = line; gsub(/^[ \t]+|[ \t]+$/, "", t); if (t == hdoc) hdoc = ""; return "<redacted>" }
       if (hblk) {
@@ -1169,13 +1190,27 @@ show() {
         # A block header. It opens a block only in a block body.
         if (!body || !simple || br != "{" || fl >= 2) return "<redacted>"
         key = disp; sub(/^[ \t]+/, "", key); sub(/[ \t"{].*$/, "", key)
-        # A resource or data block is named by its type, the first label.
-        if (key == "resource" || key == "data") {
-          lab = disp; sub(/^[ \t]*[a-z]+[ \t]+/, "", lab)
-          if (match(lab, /^"[A-Za-z0-9_]+"/)) key = key "." substr(lab, 2, RLENGTH - 2)
-        }
-        hc[hsp] = ctxof(ctx, key); hl[hsp] = lvlof(ctx, key, fl); hb[hsp] = 1
+        # A block is a home only with the labels its type takes: a resource
+        # or data block has two quoted labels and is named by the first, its
+        # type. Every other block that is a home has none.
+        lab = disp; sub(/^[ \t]*[A-Za-z_][A-Za-z0-9_-]*/, "", lab); sub(/[ \t]*[{]$/, "", lab)
+        t = lab; nq = gsub(/"[^"\\]*"/, "", t)
+        hl[hsp] = lvlof(ctx, key, fl); hb[hsp] = 1
+        if (t !~ /^[ \t]*$/) hc[hsp] = "x"
+        else if (key == "resource" || key == "data") {
+          if (nq == 2 && match(lab, /^[ \t]*"[A-Za-z0-9_]+"/)) {
+            sub(/^[ \t]*"/, "", lab); sub(/".*$/, "", lab); key = key "." lab
+          }
+          hc[hsp] = ctxof(ctx, key)
+        } else hc[hsp] = (nq == 0) ? ctxof(ctx, key) : "x"
         return disp cm
+      }
+      if (!tfvars && top > 0 && hes[top] != "") {
+        # An element of a list of actions or resources, alone on its line.
+        if (onlystruct(disp)) return disp cm
+        t = disp; sub(/^[ \t]+/, "", t); sub(/[ \t]*,$/, "", t)
+        if (simple && br == "" && (t ~ /^"[^"\\]*"$/ || t ~ ("^" HREF "$")) && okval(t, hes[top])) return disp cm
+        return "<redacted>"
       }
       if (match(disp, /^[ \t]*("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*)[ \t]*[=:]/) && substr(disp, RLENGTH + 1, 1) != "=") {
         pre = substr(disp, 1, RLENGTH); v = substr(disp, RLENGTH + 1); sub(/^[ \t]+/, "", v)
@@ -1188,13 +1223,19 @@ show() {
         gsub(/"/, "", key)
         if (fl >= 2) return "<redacted>"
         if (!simple) return pre " <redacted>" cm
+        # HCL has no string in single quotes.
+        if (index(v, "\047")) return pre " <redacted>" cm
         # A value on one line: it leaves no bracket open, and it closes none
         # that was open before it.
         if (hsp == top) return pre " " render(v, decide(key, ctx, fl), 1) cm
         if (hsp - top == length(br)) {
           # The value opens brackets and closes none.
           sv = st; sub(/^[^=:]*[=:][ \t]*/, "", sv); sub(/[ \t]+$/, "", sv)
-          if (hhome(top, ctx, key, fl, sv)) return pre " " ((v ~ /^[[{( \t]+$/) ? v : "<redacted>") cm
+          if (hhome(top, ctx, key, fl, sv)) {
+            t = decide(key, ctx, fl)
+            if (sv == "[" && (t == "act" || t == "res")) hes[hsp] = t
+            return pre " " ((v ~ /^[[{( \t]+$/) ? v : "<redacted>") cm
+          }
         }
         return pre " <redacted>" cm
       }
