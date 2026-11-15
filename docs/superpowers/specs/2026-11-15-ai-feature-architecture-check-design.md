@@ -1,6 +1,6 @@
 # Design: AI feature architecture check
 
-Date: 15 November 2026. Status: waiting for Jeff's approval. Target version: 0.2.0.
+Date: 15 November 2026. Status: approved by Jeff on 15 November 2026. Target version: 0.2.0.
 
 ## Intent
 
