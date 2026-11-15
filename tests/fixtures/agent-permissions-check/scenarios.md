@@ -27,7 +27,7 @@ Must never:
 
 ## Scenario 2: the open rules for rows 3, 4, and 6
 
-The loose-agents fixture has a GitHub-hosted runner and no production cloud keys in the agent job, so that it shows all five statuses. This variant puts both back. Only `.github/workflows/agent.yml` differs:
+The loose-agents fixture has a GitHub-hosted runner and no production cloud keys in the agent job, so that it shows open, enforced, stated only, and not checked. It has no not-found row. This variant puts both back. Only `.github/workflows/agent.yml` differs:
 
 ```sh
 sh tests/fixtures/agent-permissions-check/make-repo.sh /tmp/open-rows open-rows
@@ -38,10 +38,10 @@ cd /tmp/open-rows/repo
 
 Must:
 
-- The headline is 0 of 9 enforced (0 not checked).
+- The headline is 0 of 9 enforced (1 not checked).
 - Row 3, Secrets, is "open". The evidence is the agent job in `.github/workflows/agent.yml`, which reads `secrets.PROD_AWS_ACCESS_KEY_ID` and `secrets.PROD_AWS_SECRET_ACCESS_KEY` and names no environment.
 - Row 4, Cloud, is "open". The evidence is the same two keys: the agent job holds production cloud keys. The rule in `CLAUDE.md` does not lower the status.
-- Row 6, Runners, is "open". The evidence is `runs-on: self-hosted` in the agent job.
+- Row 6, Runners, is "not checked". `runs-on: self-hosted` does not establish whether the runner is ephemeral or can reach production; the published policy allows ephemeral runners. Name the runner settings under "Not checked".
 - Rows 1, 2, 5, 7, 8, and 9 are "open", with the evidence that `EXPECTED.md` gives for them.
 - The first three to change are Outside input, Secrets, and Repository, in that order.
 - Part B is as in `EXPECTED.md`.
@@ -50,3 +50,5 @@ Must never:
 
 - Anything under "Must never" in `EXPECTED.md`.
 - Mark row 4 "stated only" because `CLAUDE.md` states the rule. Evidence that a row is open comes first.
+
+<!-- Changed from the Net Ninjas original during independent review, 15 November 2026. -->

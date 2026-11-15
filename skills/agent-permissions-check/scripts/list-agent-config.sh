@@ -4,6 +4,7 @@
 #
 # Copyright 2026 Net Ninjas Consulting
 # SPDX-License-Identifier: Apache-2.0
+# Changed from the Net Ninjas original: fail closed on escaped and multiline credentials.
 #
 # Usage:
 #   sh list-agent-config.sh [path]             list agent files in the repository at path
@@ -241,6 +242,7 @@ show() {
     function elem(str,    q, body) {
       q = substr(str, 1, 1)
       body = substr(str, 2, length(str) - 2)
+      if (index(body, "\\")) return q "<redacted>" q
       if (pend) { pend = 0; return q "<redacted>" q }
       if (body ~ /^-p./) return q "-p<redacted>" q
       if (body ~ /^--?[A-Za-z0-9_-]+$/ && ((body in VFLAG) || secretword(body))) pend = 1
@@ -258,7 +260,7 @@ show() {
     }
 
     # How deep the braces are at this point of the line.
-    function jnow() { return jdepth + cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}") }
+    function jnow() { return jdepth + cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}") + cnt(LSTRUCT, "[") - cnt(LSTRUCT, "]") }
 
     # A key that sits directly in a list of servers is the name of a server.
     # A server can carry the name of a hidden block, and it is not one.
@@ -311,7 +313,7 @@ show() {
       }
       if (pendkey != "") {
         Jkey = pendkey
-        if ((Jkey in HIDE) && !pendname) Jhide = 1
+        if (((Jkey in HIDE) || index(Jkey, "\\")) && !pendname) Jhide = 1
         if (Jkey == "mcpServers") LMCP = 1
         pendkey = ""
       }
@@ -327,7 +329,7 @@ show() {
           Jout = Jout str
           Jafter = ""; pend = 0
           Jname = servername(Jkey)
-          if ((Jkey in HIDE) && !Jname) { if (!Jhide) Jhideafter = ""; Jhide = 1 }
+          if (((Jkey in HIDE) || index(Jkey, "\\")) && !Jname) { if (!Jhide) Jhideafter = ""; Jhide = 1 }
           if (Jkey == "mcpServers") { LMCP = 1; LMCPAFTER = "" }
         } else {
           gov = (Jkey != "") ? Jkey : arraykey
@@ -349,10 +351,10 @@ show() {
       }
 
       if (hide) {
-        hidedepth += cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}")
+        hidedepth += cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}") + cnt(LSTRUCT, "[") - cnt(LSTRUCT, "]")
         if (hidedepth <= 0) hide = 0
       } else if (Jhide) {
-        d = cnt(Jhideafter, "{") - cnt(Jhideafter, "}")
+        d = cnt(Jhideafter, "{") - cnt(Jhideafter, "}") + cnt(Jhideafter, "[") - cnt(Jhideafter, "]")
         if (d > 0) { hide = 1; hidedepth = d }
       }
 
@@ -360,7 +362,7 @@ show() {
       else if (cnt(LSTRUCT, "]") > cnt(LSTRUCT, "[")) { arraykey = ""; pend = 0 }
       # The key ended the line: its value starts on the next one.
       if (Jkey != "" && !instr && Jafter ~ /^[ \t]*:[ \t]*$/) { pendkey = Jkey; pendname = Jname }
-      jdepth += cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}")
+      jdepth += cnt(LSTRUCT, "{") - cnt(LSTRUCT, "}") + cnt(LSTRUCT, "[") - cnt(LSTRUCT, "]")
       return Jout
     }
 
@@ -493,25 +495,41 @@ show() {
 
     # The value of a key whose name marks a credential is hidden, unless it
     # is an expression such as ${{ secrets.NAME }} or a permission word.
-    function yaml_line(line,    ind, key, v, lk) {
+    function quoteend(s, q,    i, c) {
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (q == "\"" && c == "\\") { i++; continue }
+        if (c == q) {
+          if (q == "\047" && substr(s, i + 1, 1) == q) { i++; continue }
+          return 1
+        }
+      }
+      return 0
+    }
+
+    function yaml_line(line,    ind, key, v, lk, q) {
       if (line ~ /^[ \t]*$/) return line
+      if (yquote != "") { if (quoteend(line, yquote)) yquote = ""; return "<redacted>" }
       ind = match(line, /[^ ]/) - 1
       if (yhide >= 0) {
         if (ind > yhide) {
-          if (!yscalar && line ~ /^[ \t-]*[A-Za-z0-9_.-]+[ \t]*:[ \t]*["\047]?\$\{\{/) return line
+          if (!yscalar && line ~ /^[ \t-]*[A-Za-z0-9_.-]+[ \t]*:[ \t]*["\047]?\$\{\{[^}]*\}\}["\047]?[ \t]*$/) return line
           return "<redacted>"
         }
         yhide = -1
       }
       if (line ~ /^[ \t]*#/) return "# <redacted>"
-      if (match(line, /^[ \t-]*[A-Za-z0-9_.-]+[ \t]*:/)) {
+      if (line ~ /[\[{]/ && secretword(line) && line !~ /\$\{\{[^}]*\}\}/) return "<redacted>"
+      if (match(line, /^[ \t-]*["\047]?[A-Za-z0-9_.-]+["\047]?[ \t]*:/)) {
         key = substr(line, 1, RLENGTH)
         v = substr(line, RLENGTH + 1); gsub(/^[ \t]+|[ \t]+$/, "", v)
-        lk = key; gsub(/[ \t:-]/, "", lk)
+        lk = key; gsub(/[ \t:"\047-]/, "", lk)
         if (secretword(lk)) {
+          q = substr(v, 1, 1)
+          if ((q == "\"" || q == "\047") && !quoteend(substr(v, 2), q)) yquote = q
           if (v == "") { yhide = ind; yscalar = 0; return line }
           if (v ~ /^[|>]/) { yhide = ind; yscalar = 1; return key " <redacted>" }
-          if (v ~ /^["\047]?\$\{\{/) return line
+          if (v ~ /^["\047]?\$\{\{[^}]*\}\}["\047]?$/) return line
           if (v ~ /^(read|write|none|true|false|inherit)$/) return line
           return key " <redacted>"
         }
@@ -547,6 +565,7 @@ show() {
     format == "yaml" { emit(yaml_line($0)); next }
     { emit($0) }
   ' < "$SHOW_FILE" | sed -E \
+    -e 's/\\.*$/<redacted:escaped-text>/' \
     -e 's/(AKIA|ASIA)[0-9A-Z]{16}/<redacted:aws-access-key-id>/g' \
     -e 's/-----BEGIN ([A-Z]+ )?PRIVATE KEY-----.*/<redacted:private-key-block>/g' \
     -e 's/(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/<redacted:github-token>/g' \

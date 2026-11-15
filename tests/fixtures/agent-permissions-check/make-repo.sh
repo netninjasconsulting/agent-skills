@@ -3,12 +3,14 @@
 #
 # Copyright 2026 Net Ninjas Consulting
 # SPDX-License-Identifier: Apache-2.0
+# Changed from the Net Ninjas original during independent review, 15 November 2026.
 #
 # Usage: sh make-repo.sh <new-directory> [open-rows]
 #
 # With "open-rows", the files in open-rows/ replace their namesakes before the
 # commit. That variant runs the agent on a self-hosted runner and gives it
-# production cloud keys, so rows 3, 4, and 6 of the check are "open".
+# production cloud keys, so rows 3 and 4 are "open". Row 6 is "not checked":
+# the runner label alone cannot establish its lifetime or network isolation.
 #
 # A fixture cannot carry its own .git folder inside this repository, so this
 # script builds one. It creates two folders:
