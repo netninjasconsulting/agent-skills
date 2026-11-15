@@ -4,13 +4,14 @@ Every skill carries the same version number. Dates are in day, month, year order
 
 ## 0.2.0 (15 November 2026)
 
-Three new skills. The four skills from 0.1.0 keep their checks.
+Four new skills. The four skills from 0.1.0 keep their checks.
 
 ### Added
 
 - `agent-permissions-check`: what the AI coding agents on a repository can do, and what stops them. Part A is the nine rows of the published policy. Part B covers agents at a developer's desk.
 - `ai-feature-architecture-check`: a score out of 12 for an AI feature from what the code shows, the path personal data takes through it, and whether its cost per action can be measured.
 - `serverless-deploy-check`: whether a deploy to AWS Lambda, Vercel, Cloudflare Workers, or Supabase is sized on purpose and safe to expose. It scores eight efficiency checks and ten security checks from what the repository shows, maps what each function can reach, and gives a verdict and the first three things to change. It reads configuration through `scripts/read-serverless-config.sh`, which hides values, and it gives no memory size, saving, or cost.
+- `kubernetes-workload-check`: whether each workload on Kubernetes is sized on purpose and confined to what it needs. It reads plain manifests, Helm charts, and Kustomize overlays, and scores sizing and security for each environment from what the repository shows. It maps what each workload can reach, and gives a verdict and the first three things to change. It gives no size, saving, or cost. With a yes, it renders locally with `helm`, `kustomize`, or `kubectl`, and reads measured use from a cluster through `kubectl`, read-only.
 
 ### Changed
 
