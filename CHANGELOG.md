@@ -13,7 +13,7 @@ Two new skills. The four existing skills are unchanged apart from the version nu
 ### Changed
 
 - `scripts/validate.mjs` accepts GitHub's product name "audit log", and nothing else that holds the word "audit". It also skips the scratch folder of the planning tools.
-- Every skill carries version 0.2.0. The four existing skills have no other change.
+- Every skill carries version 0.2.0. The four skills from 0.1.0 have one other change: the guided app starter now says "three other skills" where it said "the other three", because the kit has grown. What it runs is the same.
 
 ### Verified for this release (15 November 2026)
 

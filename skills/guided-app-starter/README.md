@@ -16,7 +16,7 @@ I'm starting to see a lot of first products stall on the same early choice. The 
 6. **Build.** Ponytail keeps the build to the smallest complete version. UI UX Pro Max guides the interface.
 7. **Security pass.** Cloudflare's security-audit skill runs before the first deploy.
 8. **Repository and CI/CD.** Branch protection, checks on every pull request, preview deploys, a production environment with approval, OIDC with no long-lived keys, secret scanning, and dependency updates.
-9. **Close the loop.** The other three skills in this kit run on the result: the pre-launch check, the GitOps hygiene check, and the runbook generator.
+9. **Close the loop.** Three other skills in this kit run on the result: the pre-launch check, the GitOps hygiene check, and the runbook generator.
 
 ## What it writes, and what it asks first
 

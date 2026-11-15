@@ -139,7 +139,7 @@ Before each provider step, check the sign-in with the provider's status command.
 
 ### 9. Close the loop
 
-Run the other three skills of this kit on the result, in this order:
+Run three other skills of this kit on the result, in this order:
 
 1. `vibe-code-pre-launch-check`
 2. `gitops-hygiene-check`
