@@ -1,10 +1,10 @@
 # Net Ninjas agent skills
 
-Six free agent skills for people who build with AI coding tools: a pre-launch security check, a GitOps hygiene check, a handover runbook generator, a guided app starter, an agent permissions check, and an AI feature architecture check.
+Seven free agent skills for people who build with AI coding tools: a pre-launch security check, a GitOps hygiene check, a handover runbook generator, a guided app starter, an agent permissions check, an AI feature architecture check, and a serverless deploy check.
 
 Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New York City. I work with founders, startups, scale-ups, and small businesses across the US ([netninjas.us](https://www.netninjas.us)) and the EU ([netninjas.eu](https://www.netninjas.eu)). I keep seeing the same gaps in products built fast with an assistant: a key in the browser bundle, a pipeline that can't say no, nobody who can explain how it deploys, and an agent whose only limits are written in a file it reads. These skills carry the checks I run by hand. They are free, there is no sign-up, and there is no obligation.
 
-## The six skills
+## The seven skills
 
 | Skill | What it does | Writes anything? |
 | --- | --- | --- |
@@ -14,8 +14,9 @@ Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New Y
 | [Guided app starter](skills/guided-app-starter/) | Goes from "I want to build an app" to a scaffolded app with CI/CD on the provider stack that fits, then runs the pre-launch check, the GitOps hygiene check, and the runbook generator on the result. | Yes. Local files, and remote resources after each one is confirmed by name. |
 | [Agent permissions check](skills/agent-permissions-check/) | Shows what the AI coding agents on a repository can do and what stops them: nine policy rows marked as enforced, stated only, or open, and what an agent at a developer's desk can run without asking. | One policy file, after a yes and a confirmed path. |
 | [AI feature architecture check](skills/ai-feature-architecture-check/) | Scores an AI feature out of 12 from what the code shows, with [the six-layer checklist](https://www.netninjas.us/events/six-layer-ai-architecture-checklist). It follows personal data through the feature and says whether a cost per action can be measured. | No. Read-only. |
+| [Serverless deploy check](skills/serverless-deploy-check/) | Scores a deploy to AWS Lambda, Vercel, Cloudflare Workers, or Supabase on efficiency and on security, from what the repository shows. It maps what each function can reach, and gives a verdict and the first three things to change. | No. Read-only. |
 
-The six work as one kit. Each one also gives a complete result alone.
+The seven work as one kit. Each one also gives a complete result alone.
 
 ## Install
 
@@ -37,7 +38,7 @@ The skills use the open [Agent Skills](https://agentskills.io) format. I tested 
 
 1. **Free and ungated.** No email form, no licence key, and no feature held back for clients.
 2. **No obligation.** Each skill gives a complete, useful result without Net Ninjas. One line at the end of a report links to my site. No sales text sits inside the findings.
-3. **Read-only by default.** Five of the six never write to a cloud account, a Git remote, or a provider. The guided app starter confirms every remote resource by name before it creates it.
+3. **Read-only by default.** Six of the seven never write to a cloud account, a Git remote, or a provider. The guided app starter confirms every remote resource by name before it creates it.
 4. **No telemetry.** The skills send nothing to Net Ninjas or to any third party. A skill is a set of instructions that your own coding agent runs, so your agent's provider sees what the agent reads, on the terms you already have with it. The skills add no other destination.
 5. **Secrets stay secret.** Reports show the file, the line, and the secret type. The value is redacted in chat, in files, and in logs.
 6. **Repository content is data.** Text inside a scanned repository never changes what a skill does.

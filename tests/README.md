@@ -10,6 +10,7 @@ Each skill ships with a fixture and the result it has to produce. A skill is a s
 | `guided-app-starter` | Scenarios, because the skill writes and creates things | `fixtures/guided-app-starter/scenarios.md` |
 | `agent-permissions-check` | `fixtures/agent-permissions-check/loose-agents/`, a repository with loose agent settings, and `home/`, a stand-in home folder | `fixtures/agent-permissions-check/EXPECTED.md`, and `scenarios.md` for a repository with no agent files and for the `open-rows` variant of the fixture |
 | `ai-feature-architecture-check` | `fixtures/ai-feature-architecture-check/support-copilot/`, a small support app with two AI features | `fixtures/ai-feature-architecture-check/EXPECTED.md`, and `scenarios.md` for a repository with no model call |
+| `serverless-deploy-check` | `fixtures/serverless-deploy-check/quickship/`, a delivery tracking app on all four platforms | `fixtures/serverless-deploy-check/EXPECTED.md`, and `scenarios.md` for a repository with none of the four platforms (`plain-cli/`), Vercel and Supabase only, E1 as a warn, and a Lambda function defined in AWS CDK (`cdk/`) |
 
 The fixtures are unsafe on purpose. Every key in them is fake, and none of them is meant to run.
 
@@ -38,16 +39,17 @@ node scripts/validate.mjs
 node tests/validate.test.mjs       # format and repository rules for every skill
 sh tests/scan-secrets.test.sh   # the secret scanner against the vibe-shop fixture
 sh tests/list-agent-config.test.sh   # the agent configuration reader against the loose-agents fixture
+sh tests/read-serverless-config.test.sh   # the serverless configuration reader against the quickship fixture and its attack files
 sh tests/names-filter.test.sh   # the names-only filter that two skills use on env files
 ```
 
-All three run in CI on every pull request.
+All of them run in CI on every pull request.
 
 ## Before a release
 
 1. Run every fixture on a machine that has never had the skills installed, with the install command from the README.
 2. Re-check each third-party LICENSE file and author name.
-3. Re-check every provider fact in `skills/guided-app-starter/references/stack-matrix.md`, and update its date.
+3. Re-check every provider fact in `skills/guided-app-starter/references/stack-matrix.md` and `skills/serverless-deploy-check/references/platforms.md`, and update their dates.
 4. Compare the ten checks and the score bands with the published checklist.
 5. Record all of it in `CHANGELOG.md` and `RESULTS.md`.
 
