@@ -18,7 +18,7 @@ This is a quick check. It is not a penetration test and it is not legal advice. 
 
 ## The function map
 
-<One line naming each platform found.>
+<One line naming each platform found.> <"The settings for <platform> were read from source code, not through the reader.", for each platform present from source code only.>
 
 | Platform | Function | Entry point | Handler | Configuration |
 | --- | --- | --- | --- | --- |
@@ -81,7 +81,7 @@ Secret names only. No value, and no part of one.
 - <Each hidden setting: file, line, and key, with "not found in what the reader shows".>
 - <Each file the reader does not show (exit code 4), by path.>
 - <Each function whose code is built outside the repository.>
-- <Code whose platform file is not in the reader's list, such as a Worker entry file with no Wrangler file.>
+- <A Worker entry file with no Wrangler configuration, by path: it does not make Cloudflare Workers present.>
 - <"The app's host is not one of the four platforms: <file>.", when another host's file was found and no Vercel signal.>
 - <Settings held in each provider's console, from "Not checked in version 1" in references/platforms.md, for the platforms found.>
 - The reader works by line and does not parse: some valid layouts show as "not found in what the reader shows", and anything in its output that looked like a credential is reported above by path, line, and type only.

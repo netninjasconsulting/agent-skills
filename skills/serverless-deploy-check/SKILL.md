@@ -148,8 +148,9 @@ Before judging anything, list what exists. The map is printed in the report as t
 
    Add an `--exclude` for any other path in the reader's list. Never run a search that prints matching lines across the repository: it prints lines from env files. Never open a file the reader lists with any other command.
 5. Name each platform that is present, by these rules:
-   - Only the platform column of the reader's list counts. A file with the platform `shared` never makes a platform present.
-   - Code with no file of its platform in the list does not make that platform present: a Worker entry file with no Wrangler file, a folder under `supabase/functions/` with no `supabase/config.toml`, or a Lambda function in CDK, SST, or Pulumi. List it under "Not checked".
+   - A platform is present when the reader's list has a file whose platform column names it. A file with the platform `shared` never counts.
+   - A platform is also present when source code defines a function for it. A Lambda function construct in AWS CDK, SST, or Pulumi makes AWS Lambda present. A folder under `supabase/functions/` makes Supabase present, with or without `supabase/config.toml`. A framework app with route handlers makes Vercel present under the signal rules below. When a platform is present from source code only, its settings are read from code and not through the reader, and the report says so.
+   - The one exception: a Worker entry file with no Wrangler configuration does not make Cloudflare Workers present. List it under "Not checked".
    - A framework app with route handlers and no `vercel.json` (most Next.js apps on Vercel have none) makes Vercel present when one Vercel signal exists: a `.vercel/project.json`, a dependency whose name starts with `@vercel/`, or `vercel` in a package script or in a workflow. Check for `.vercel/project.json` by its name only (`ls .vercel/project.json`): its presence is the signal, so do not open it. Read `package.json` directly as source code, one file per command with line numbers, for the names under `dependencies` and `devDependencies` and the text of `scripts`. In a workflow, only what the reader shows counts, such as a `uses` line, a step name, or a secret name.
    - With no Vercel signal, the app makes Vercel present only when no other host's file is found: a `Dockerfile`, `netlify.toml`, `fly.toml`, `amplify.yml`, an OpenNext or Wrangler configuration, or a similar file. Check for those by name only. Then the report says at the top "Vercel is assumed: no file names the host", and each Vercel evidence cell carries the word "assumption".
    - With another host's file and no Vercel signal, Vercel is not present, and the report says under "Not checked" that the app's host is not one of the four platforms, naming the file.
@@ -218,5 +219,6 @@ When any check is "ask the team", offer once after the report, in the words the 
 | Asking the team about a check that failed | The second pass asks only the checks marked "ask the team". |
 | Adding the team's yes answers to a headline, or changing the verdict after the second pass | The first headlines and the verdict never change. The team's answers stand apart, in the second block. |
 | Citing line numbers from a view that joins several files | One file per command. |
+| Stopping with "nothing to score" when the functions are defined only in CDK, SST, Pulumi, or `supabase/functions/` | Source code makes the platform present. Score it from code, and say that its settings were read from code and not through the reader. |
 
 Guides and more free skills: https://www.netninjas.us/skills
