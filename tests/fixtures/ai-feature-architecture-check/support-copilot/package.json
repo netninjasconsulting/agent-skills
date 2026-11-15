@@ -1,0 +1,16 @@
+{
+  "name": "support-copilot",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "test": "node --test",
+    "evals": "tsx evals/run.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@sentry/node": "^9.0.0",
+    "next": "^15.0.0",
+    "pg": "^8.13.0",
+    "zod": "^3.24.0"
+  }
+}
