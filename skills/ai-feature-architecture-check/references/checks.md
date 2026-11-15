@@ -132,7 +132,7 @@ The request ID, the model and prompt version, the retrieved sources, and the app
 - **Look at:** what each call site writes after the call, and where it writes it.
 - **Pass:** every call writes the five fields, to a store that infrastructure code shows the feature cannot change: an append-only table, a write-only role, object lock, or a separate log account.
 - **Ask the team:** every call writes the five fields, and nothing in the repository shows whether the feature can change the store.
-- **Warn:** some fields, or some call sites.
+- **Warn:** some fields, or some call sites. A field that every call writes as empty counts as missing.
 - **Fail:** no trace is written.
 - **Question:** "Is the trace store protected from edits by the feature itself?"
 
