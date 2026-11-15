@@ -19,7 +19,8 @@
 # it shows, are the ones named in references/platforms.md.
 #
 # Hiding is the default. --show prints keys and structure, and a value only
-# when its key is on the list of shown keys for that file, the value has the
+# when its key is on the list of shown keys for that file and sits in its
+# home (a container that the list names), the value has the
 # shape of a setting (a number, a word, a schedule, a path, or an origin), and
 # it then passes the token, address, and long-word filters. It works by line
 # and does not parse, so a broken file is still hidden. A value that spans
@@ -57,34 +58,147 @@ while [ $# -gt 0 ]; do
 done
 
 # Keys whose values are shown, by file, from references/platforms.md.
-# key:shape shows the key under any parent; parent>key:shape only under that
-# parent (an empty parent is the top of the file); parent>*:shape every key
-# under that parent. A shape that ends in ! is one of the listed exceptions:
-# it holds under a names-only parent, and over the never-shown list.
-# Shapes: n number, m number or "max", b boolean, d date, w word, t short
-# text, c schedule, p path or route, r method and path, o origin, a address,
-# u action reference, pm workflow permission. The other shapes are closed
-# sets of values, listed in the ENUM table of the awk program below.
-SHOW_WRANGLER='>name:w ratelimits>name:w main:p compatibility_date:d compatibility_flags:w workers_dev:b route:p routes:p pattern:p custom_domain:b triggers>crons:c limits>cpu_ms:n placement>mode:plc enabled:b head_sampling_rate:n invocation_logs:b kv_namespaces>binding:w r2_buckets>binding:w d1_databases>binding:w bindings>binding:w producers>binding:w services>binding:w hyperdrive>binding:w ai>binding:w vectorize>binding:w analytics_engine_datasets>binding:w browser>binding:w images>binding:w version_metadata>binding:w dispatch_namespaces>binding:w mtls_certificates>binding:w send_email>binding:w workflows>binding:w bindings>name:w bindings>class_name:w bindings>script_name:w r2_buckets>bucket_name:w producers>queue:w consumers>queue:w services>service:w services>entrypoint:w assets>directory:p assets>run_worker_first:b upload_source_maps:b keep_vars:b limit:n period:n secrets>required:w!'
+#
+# Every map and list the reader enters gets a context: the top of the file is
+# "top", and each entry ctx>key=next names the context of the container that
+# key opens. ctx>*=next does the same for every key, which is how a name the
+# user picks (a function, a resource, a job) leads to its settings. A key that
+# no entry names opens the context "x", and so does every key below it: there
+# the reader prints key names only, at any depth. A shown key is a real
+# setting only in its home, so a list of homes, not a list of maps to hide,
+# decides what prints.
+#
+# ctx>key:shape shows the value of key in context ctx, when the value has that
+# shape. ctx>*:shape does the same for every key. A shape that ends in ! holds
+# over the never-shown list. Shapes: n number, m number or "max", b boolean,
+# d date, w word, t short text, c schedule, p path or route, r method and path,
+# o origin, a address, u action reference, pm workflow permission, rp a
+# Worker route pattern (a path with a slash). The other
+# shapes are closed sets or fixed forms, in the ENUM table of the awk program.
+SHOW_SERVERLESS='
+top>service:w top>provider=prov top>functions=fns top>package=pkg
+prov>name:w prov>runtime:w prov>memorySize:n prov>timeout:n prov>architecture:arch
+prov>logRetentionInDays:n prov>region:rg prov>stage:w prov>role:w prov>layers:lyr
+prov>tracing=trc trc>lambda:b trc>apiGateway:b
+prov>iam=iam iam>role:w iam>role=iamr iamr>mode:iamm iamr>managedPolicies:w iamr>statements=stmt
+stmt>Effect:eff stmt>Action:w stmt>Resource:w
+prov>apiGateway=apigw apigw>usagePlan=up up>*=up up>throttle=thr up>quota=quota
+thr>burstLimit:n thr>rateLimit:n quota>limit:n quota>period:perd quota>offset:n
+prov>httpApi=hapi hapi>disableDefaultEndpoint:b hapi>cors:b hapi>cors=cors
+hapi>authorizers=auths auths>*=auth auth>type:atype auth>scopes:w
+prov>logs=logs logs>lambda:b logs>restApi:b logs>httpApi:b logs>websocket:b
+fns>*=fn fn>handler:w fn>runtime:w fn>memorySize:n fn>timeout:n fn>architecture:arch
+fn>reservedConcurrency:n fn>provisionedConcurrency:n fn>logRetentionInDays:n fn>role:w
+fn>layers:lyr fn>url:b fn>url=url fn>events=evs fn>package=pkg
+fn>iam=fniam fniam>inheritStatements:b fniam>role=iamr
+url>authorizer:atype url>invokeMode:inv url>cors:b url>cors=cors
+cors>allowedOrigins:o cors>allowedHeaders:w cors>allowedMethods:w cors>allowCredentials:b
+cors>exposedResponseHeaders:w cors>maxAge:n cors>origin:o cors>origins:o cors>headers:w
+evs>schedule:c evs>sqs:arn evs>http:r evs>httpApi:r
+evs>http=ev evs>httpApi=ev evs>schedule=ev evs>sqs=ev
+ev>path:r ev>method:meth ev>private:b ev>batchSize:n ev>maximumConcurrency:n ev>rate:c
+ev>enabled:b ev>arn:arn ev>cors:b ev>cors=cors ev>authorizer:w ev>authorizer=authz
+authz>name:w authz>type:atype authz>scopes:w
+pkg>patterns:p pkg>individually:b pkg>excludeDevDependencies:b'
+SHOW_SAM='
+top>AWSTemplateFormatVersion:w top>Transform:w top>Resources=res top>Globals=glob
+res>*=rsc rsc>Type:w rsc>Properties=props glob>Function=props
+props>Runtime:w props>Handler:w props>CodeUri:p props>MemorySize:n props>Timeout:n
+props>Architectures:arch props>ReservedConcurrentExecutions:n props>AutoPublishAlias:w
+props>PackageType:pkg props>Policies:w props>Role:w props>PermissionsBoundary:w
+props>Tracing:trc props>RetentionInDays:n
+props>ProvisionedConcurrencyConfig=pcc pcc>ProvisionedConcurrentExecutions:n
+props>EphemeralStorage=eph eph>Size:n
+props>FunctionUrlConfig=furl furl>AuthType:auth furl>InvokeMode:inv furl>Cors=scors
+scors>AllowOrigins:o scors>AllowMethods:w scors>AllowHeaders:w scors>AllowCredentials:b
+scors>MaxAge:n scors>ExposeHeaders:w
+props>LoggingConfig=logc logc>LogFormat:lfmt logc>ApplicationLogLevel:llvl logc>SystemLogLevel:llvl
+props>RuntimeManagementConfig=rmc rmc>UpdateRuntimeOn:upd props>SnapStart=snapc snapc>ApplyOn:snap
+props>Events=sevs sevs>*=sev sev>Type:w sev>Properties=sevp
+sevp>Path:p sevp>Method:meth sevp>Schedule:c sevp>Auth=sauth
+sauth>Authorizer:w sauth>DefaultAuthorizer:w sauth>ApiKeyRequired:b! sauth>AddDefaultAuthorizerToCorsPreflight:b
+props>Policies=pols pols>Statement=stmts
+props>PolicyDocument=pdoc props>AssumeRolePolicyDocument=pdoc pdoc>Statement=stmts
+stmts>Effect:eff stmts>Action:w stmts>Resource:w stmts>Principal:prsv stmts>Principal=prin
+prin>Service:svc prin>AWS:prin'
+SHOW_WRANGLER='
+top>name:w top>main:p top>compatibility_date:d top>compatibility_flags:w top>workers_dev:b
+top>route:rp top>routes:rp top>upload_source_maps:b top>keep_vars:b
+top>routes=rt rt>pattern:rp rt>custom_domain:b
+top>triggers=trig trig>crons:c top>limits=lim lim>cpu_ms:n top>placement=plc plc>mode:plc
+top>observability=obs obs>enabled:b obs>head_sampling_rate:n obs>invocation_logs:b obs>logs=obs
+top>assets=as as>directory:p as>run_worker_first:b as>binding:w
+top>env=envs envs>*=top top>secrets=sec sec>required:w
+top>kv_namespaces=bind top>d1_databases=bind top>hyperdrive=bind top>vectorize=bind
+top>analytics_engine_datasets=bind top>ai=bind top>browser=bind top>images=bind
+top>version_metadata=bind top>dispatch_namespaces=bind top>mtls_certificates=bind
+top>send_email=bind bind>binding:w
+top>r2_buckets=r2 r2>binding:w r2>bucket_name:w
+top>services=svc svc>binding:w svc>service:w svc>entrypoint:w
+top>queues=qs qs>producers=qp qp>binding:w qp>queue:w qs>consumers=qc qc>queue:w
+top>durable_objects=dob dob>bindings=dobb dobb>name:w dobb>class_name:w dobb>script_name:w
+top>workflows=wfl wfl>binding:w wfl>name:w wfl>class_name:w wfl>script_name:w
+top>ratelimits=rl rl>name:w rl>simple=rls rls>limit:n rls>period:n'
 # shellcheck disable=SC2016  # $schema is a key name, not a variable
-SHOW_VERCEL='maxDuration:m memory:n regions:vrg functionFailoverRegions:vrg includeFiles:p excludeFiles:p supportsCancellation:b runtime:w fluid:b bunVersion:w $schema:a framework:w schedule:c path:p requestMethod:meth function:p topic:w timezone:w jitter:n headers>source:p rewrites>source:p headers>key:t!'
-SHOW_SAM='Type:w Runtime:w Handler:w CodeUri:p MemorySize:n Timeout:n Architectures:arch ReservedConcurrentExecutions:n ProvisionedConcurrencyConfig>ProvisionedConcurrentExecutions:n AutoPublishAlias:w EphemeralStorage>Size:n PackageType:pkg AuthType:auth InvokeMode:inv AllowOrigins:o AllowMethods:w AllowHeaders:w AllowCredentials:b MaxAge:n ExposeHeaders:w Policies:w Role:w PermissionsBoundary:w Tracing:trc LogFormat:lfmt ApplicationLogLevel:llvl SystemLogLevel:llvl UpdateRuntimeOn:upd ApplyOn:snap RetentionInDays:n Effect:eff Action:w Resource:w Principal:prsv Principal>Service:svc Principal>AWS:prin Transform:w AWSTemplateFormatVersion:w Path:p Method:meth Schedule:c Auth>Authorizer:w Auth>DefaultAuthorizer:w Auth>ApiKeyRequired:b! Auth>AddDefaultAuthorizerToCorsPreflight:b'
-SHOW_SERVERLESS='service:w provider>name:w runtime:w memorySize:n timeout:n architecture:arch reservedConcurrency:n provisionedConcurrency:n logRetentionInDays:n handler:w region:rg stage:w role:w patterns:p individually:b excludeDevDependencies:b url:b invokeMode:inv url>authorizer:atype authorizer:w authorizer>name:w type:atype scopes:w cors:b allowedOrigins:o allowedHeaders:w allowedMethods:w allowCredentials:b exposedResponseHeaders:w maxAge:n origin:o origins:o headers:w disableDefaultEndpoint:b http>private:b burstLimit:n rateLimit:n limit:n period:perd offset:n mode:iamm inheritStatements:b managedPolicies:w Effect:eff Action:w Resource:w layers:lyr tracing:b lambda:b apiGateway:b restApi:b httpApi:b websocket:b path:r method:meth batchSize:n maximumConcurrency:n rate:c enabled:b events>schedule:c events>sqs:arn events>http:r events>httpApi:r'
-SHOW_WORKFLOW='name:t on:w branches:w branches-ignore:w tags:w paths:p types:w cron:c permissions:pm permissions>*:pm! runs-on:w uses:u environment:w with>role-to-assume:iamrole! with>aws-region:rg!'
-SHOW_SAMCONFIG='version:n stack_name:w capabilities:w confirm_changeset:b resolve_s3:b region:rg cached:b parallel:b watch:b'
-SHOW_SUPABASE='verify_jwt:b entrypoint:p import_map:p static_files:p enabled:b policy:epol port:n schemas:w extra_search_path:w max_rows:n major_version:n pool_mode:pool default_pool_size:n max_client_conn:n site_url:a additional_redirect_urls:a jwt_expiry:n enable_signup:b enable_anonymous_sign_ins:b enable_confirmations:b file_size_limit:w sql_paths:p'
-SHOW_HCL='runtime:w handler:w function_name:w role:w memory_size:n timeout:n architectures:arch reserved_concurrent_executions:n package_type:pkg filename:p ephemeral_storage>size:n authorization_type:auth invoke_mode:inv allow_origins:o allow_methods:w allow_headers:w allow_credentials:b max_age:n function_url_auth_type:auth invoked_via_function_url:b action:w principal:prsv effect:eff actions:w resources:w retention_in_days:n log_format:lfmt application_log_level:llvl system_log_level:llvl tracing_config>mode:trc layers:lyr condition>test:w! condition>variable:w! Effect:eff Action:w Resource:w'
+SHOW_VERCEL='
+top>$schema:a top>framework:w top>regions:vrg top>functionFailoverRegions:vrg top>fluid:b top>bunVersion:w
+top>functions=vfns vfns>*=vfn vfn>memory:n vfn>maxDuration:m vfn>runtime:w vfn>includeFiles:p
+vfn>excludeFiles:p vfn>supportsCancellation:b vfn>regions:vrg
+top>crons=vcron vcron>path:p vcron>schedule:c
+top>schedules=scheds scheds>*=sched sched>schedule:c sched>path:p sched>requestMethod:meth
+sched>function:p sched>topic:w sched>timezone:w sched>jitter:n
+top>headers=hdrs hdrs>source:p hdrs>headers=hdr hdr>key:t!
+top>rewrites=rw rw>source:p'
+SHOW_WORKFLOW='
+top>name:t top>on:w top>on=on on>*=onev on>schedule=onsch onsch>cron:c
+onev>branches:w onev>branches-ignore:w onev>tags:w onev>paths:p onev>types:w
+top>permissions:pm top>permissions=perm perm>*:pm!
+top>jobs=jobs jobs>*=job job>runs-on:w job>name:t job>environment:w job>uses:u
+job>permissions:pm job>permissions=perm job>environment=jenv jenv>name:t job>secrets=x
+job>steps=step step>name:t step>uses:u step>with=with with>role-to-assume:iamrole with>aws-region:rg'
+SHOW_SAMCONFIG='
+top>version:n top>*=sce sce>*=scc scc>parameters=scp
+scp>stack_name:w scp>capabilities:w scp>confirm_changeset:b scp>resolve_s3:b scp>region:rg
+scp>cached:b scp>parallel:b scp>watch:b'
+SHOW_SUPABASE='
+top>api=sapi sapi>enabled:b sapi>port:n sapi>schemas:w sapi>extra_search_path:w sapi>max_rows:n
+top>db=sdb sdb>port:n sdb>major_version:n sdb>pooler=spool spool>enabled:b spool>port:n
+spool>pool_mode:pool spool>default_pool_size:n spool>max_client_conn:n
+sdb>seed=sseed sseed>enabled:b sseed>sql_paths:p
+top>auth=sauth sauth>enabled:b sauth>site_url:a sauth>additional_redirect_urls:a sauth>jwt_expiry:n
+sauth>enable_signup:b sauth>enable_anonymous_sign_ins:b
+sauth>email=smail smail>enable_signup:b smail>enable_confirmations:b
+sauth>external=sext sext>*=sextp sextp>enabled:b
+top>functions=sfns sfns>*=sfn sfn>verify_jwt:b sfn>entrypoint:p sfn>import_map:p
+sfn>static_files:p sfn>enabled:b
+top>edge_runtime=ser ser>enabled:b ser>policy:epol
+top>storage=sst sst>enabled:b sst>file_size_limit:w'
+# In HCL a block of type resource or data is named by its type, as in
+# resource.aws_lambda_function.
+SHOW_HCL='
+top>resource.aws_lambda_function=lam
+lam>function_name:w lam>runtime:w lam>handler:w lam>role:w lam>memory_size:n lam>timeout:n
+lam>architectures:arch lam>reserved_concurrent_executions:n lam>package_type:pkg
+lam>filename:p lam>layers:lyr
+lam>ephemeral_storage=heph heph>size:n lam>tracing_config=htc htc>mode:trc
+lam>logging_config=hlc hlc>log_format:lfmt hlc>application_log_level:llvl hlc>system_log_level:llvl
+top>resource.aws_lambda_function_url=hfurl hfurl>authorization_type:auth hfurl>invoke_mode:inv
+hfurl>cors=hcors hcors>allow_origins:o hcors>allow_methods:w hcors>allow_headers:w
+hcors>allow_credentials:b hcors>max_age:n
+top>resource.aws_lambda_permission=hperm hperm>action:w hperm>principal:prsv
+hperm>function_url_auth_type:auth hperm>invoked_via_function_url:b hperm>function_name:w
+top>resource.aws_cloudwatch_log_group=hlg hlg>retention_in_days:n
+top>resource.aws_iam_role_policy=hpol top>resource.aws_iam_policy=hpol top>resource.aws_iam_role=hpol
+hpol>role:w hpol>policy=jpol hpol>assume_role_policy=jpol
+jpol>Statement=jst jst>Effect:eff jst>Action:w jst>Resource:w
+top>data.aws_iam_policy_document=hpd hpd>statement=hpst hpst>effect:eff hpst>actions:w
+hpst>resources:w hpst>condition=hcond hcond>test:w hcond>variable:w'
 
 # Never shown, matched by name in any file. A key whose name holds secret,
 # token, password, credential, private key, API key, access key, connection
 # string, or database URL is never shown either. Under one of these keys,
 # names and values are hidden.
 NEVER_KEYS='secret secrets token password passwd apikey api_key apiKeys access_key secret_key client_secret auth_token private_key localConnectionString connection_string database_url aws-access-key-id aws-secret-access-key CRON_SECRET input request buildCommand installCommand run key parameter_overrides'
-
-# Maps that show their key names and hide every value below them. Each file
-# adds its own, below: maps whose key names the user picks, where a key that
-# is shown elsewhere can hold anything.
-NAMES_KEYS='environment Environment Variables variables vars inputs Condition condition'
 
 # A SAM or CloudFormation template, whatever its name.
 TEMPLATE_MARK='AWSTemplateFormatVersion|AWS::Serverless'
@@ -198,31 +312,30 @@ show() {
   fi
 
   case "$family" in
-    wrangler) keys=$SHOW_WRANGLER; names=secrets ;;
-    vercel) keys=$SHOW_VERCEL; names='env' ;;
-    sam) keys=$SHOW_SAM; names='Mappings Parameters Outputs Metadata' ;;
-    serverless) keys=$SHOW_SERVERLESS; names='custom params' ;;
-    workflow) keys=$SHOW_WORKFLOW; names='env with secrets matrix outputs' ;;
-    samconfig) keys=$SHOW_SAMCONFIG; names= ;;
-    supabase) keys=$SHOW_SUPABASE; names='vault' ;;
-    hcl) keys=$SHOW_HCL; names='locals variable module output' ;;
-    *) keys=; names= ;;
+    wrangler) keys=$SHOW_WRANGLER ;;
+    vercel) keys=$SHOW_VERCEL ;;
+    sam) keys=$SHOW_SAM ;;
+    serverless) keys=$SHOW_SERVERLESS ;;
+    workflow) keys=$SHOW_WORKFLOW ;;
+    samconfig) keys=$SHOW_SAMCONFIG ;;
+    supabase) keys=$SHOW_SUPABASE ;;
+    hcl) keys=$SHOW_HCL ;;
+    *) keys= ;;
   esac
+  keys=$(printf '%s\n' "$keys" | tr -s ' \n' '  ')
 
   # A word that marks a name as the name of a credential, in either case.
   W='([Kk][Ee][Yy]|[Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss]|[Pp][Ww][Dd]|[Aa][Uu][Tt][Hh]|[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll]|[Bb][Ee][Aa][Rr][Ee][Rr]|[Cc][Oo][Oo][Kk][Ii][Ee]|[Ss][Ee][Ss][Ss][Ii][Oo][Nn])'
   Q="'"
 
-  awk -v format="$format" -v family="$family" -v showkeys="$keys" -v familynames="$names" \
-    -v neverkeys="$NEVER_KEYS" -v nameskeys="$NAMES_KEYS" '
+  awk -v format="$format" -v family="$family" -v showkeys="$keys" -v neverkeys="$NEVER_KEYS" '
     BEGIN {
       n = split(showkeys, list, " ")
       for (i = 1; i <= n; i++) {
-        if (match(list[i], /:[A-Za-z!]+$/)) ALLOW[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
+        if (match(list[i], /=[A-Za-z0-9_]+$/)) HOME[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
+        else if (match(list[i], /:[A-Za-z!]+$/)) ALLOW[substr(list[i], 1, RSTART - 1)] = substr(list[i], RSTART + 1)
       }
       n = split(neverkeys, list, " "); for (i = 1; i <= n; i++) NEVER[list[i]] = 1
-      n = split(nameskeys, list, " "); for (i = 1; i <= n; i++) NAMES[list[i]] = 1
-      n = split(familynames, list, " "); for (i = 1; i <= n; i++) FNAMES[list[i]] = 1
       UNKNOWN = "\001"
       # Closed sets of values, and two fixed forms.
       ENUM["arch"] = "x86_64|arm64"
@@ -256,7 +369,7 @@ show() {
       # YAML
       ysp = 0; yh = -1; yhd = 0; yq = ""; yflow = 0; ypend = 0
       # TOML
-      tml = ""; tq = ""; tarr = 0; ttab = ""; tl = 0; tpl = 0
+      tml = ""; tq = ""; tarr = 0; tctx = "top"; tl = 0
       # HCL
       hsp = 0; hdepth = 0; hdoc = ""; hblk = 0; hstr = 0
       # env
@@ -275,33 +388,42 @@ show() {
     # a line the handlers can judge: it is hidden whole.
     function emit(s) { printf "%6d\t%s\n", NR, (CRLINE ? "<redacted>" : s) }
 
-    # 0: an ordinary key. 1: a map whose names show and whose values hide.
-    # 2: a key that is never shown; below it, names and values hide.
+    # 2 for a key that is never shown (below it, names hide too), else 0.
     function keyclass(k,    lk) {
       if (k == UNKNOWN || index(k, "\\")) return 2
-      if (k in FNAMES) return 1
       if (k in NEVER) return 2
       if (k == "parameters" && family == "serverless") return 2
       lk = tolower(k); gsub(/[-_]/, "", lk)
       if (lk ~ /secret|token|passw|credential|privatekey|apikey|accesskey|connectionstring|databaseurl/) return 2
-      if (k in NAMES) return 1
       return 0
     }
 
-    # The shape a shown value must have, or "" when the value hides. fl is the
-    # level of the map the key sits in, fpl the level of the map above it.
-    function decide(key, par, fl, fpl,    e) {
-      if (key == UNKNOWN || index(key, "\\")) return ""
+    # The context of the container that key opens, inside context ctx.
+    # A key that no entry names opens "x", where only names print.
+    function ctxof(ctx, key) {
+      if (key == UNKNOWN || index(key, "\\")) return "x"
+      if ((ctx ">" key) in HOME) return HOME[ctx ">" key]
+      if ((ctx ">*") in HOME && keyclass(key) < 2) return HOME[ctx ">*"]
+      return "x"
+    }
+
+    # The level below key: 2 hides names and values, 0 shows names. A key
+    # that an entry names as a home holds over the never-shown list.
+    function lvlof(ctx, key, lvl) {
+      if (lvl >= 2) return 2
+      if ((ctx ">" key) in HOME && !index(key, "\\")) return lvl
+      return (keyclass(key) >= 2) ? 2 : lvl
+    }
+
+    # The shape a shown value must have, or "" when the value hides.
+    function decide(key, ctx, lvl,    e) {
+      if (lvl >= 2 || key == UNKNOWN || index(key, "\\")) return ""
       e = ""
-      if ((par ">" key) in ALLOW) e = ALLOW[par ">" key]
-      else if ((par ">*") in ALLOW) e = ALLOW[par ">*"]
-      else if (key in ALLOW) e = ALLOW[key]
+      if ((ctx ">" key) in ALLOW) e = ALLOW[ctx ">" key]
+      else if ((ctx ">*") in ALLOW) e = ALLOW[ctx ">*"]
       if (e == "") return ""
-      if (substr(e, length(e)) == "!") {
-        if (fl > 1 || fpl > 0) return ""
-        return substr(e, 1, length(e) - 1)
-      }
-      if (fl > 0 || keyclass(key) == 2) return ""
+      if (substr(e, length(e)) == "!") return substr(e, 1, length(e) - 1)
+      if (keyclass(key) == 2) return ""
       return e
     }
 
@@ -314,15 +436,20 @@ show() {
     }
 
     # A path or a route: no query, no user, no fragment, and no part that looks like a token.
-    function pathok(s,    n, parts, i, seg, t) {
+    # A segment of the path itself (not the host) longer than 15 characters can
+    # be a shared secret made of letters only, so it hides the value too.
+    function pathok(s,    n, parts, i, seg, t, host) {
       if (length(s) > 200) return 0
       if (s ~ /[?=@#%" \t\\]/ || index(s, "\047")) return 0
+      host = (s ~ /^https?:\/\//)
       sub(/^https?:\/\//, "", s)
       if (index(s, "://")) return 0
       n = split(s, parts, "/")
+      if (!host && n > 1 && parts[1] ~ /[A-Za-z0-9-][.][A-Za-z]/ && parts[1] !~ /^[.]/) host = 1
       for (i = 1; i <= n; i++) {
         seg = parts[i]
         if (length(seg) > 40) return 0
+        if (length(seg) > 15 && !(host && i == 1)) return 0
         t = seg; gsub(/[A-Za-z0-9._*:{}()$+~-]/, "", t); gsub(/\[/, "", t); gsub(/\]/, "", t)
         if (t != "") return 0
         if (length(seg) >= 8 && seg ~ /[0-9]/ && seg ~ /[A-Za-z]/) return 0
@@ -346,9 +473,15 @@ show() {
         return length(s) <= 128 && t ~ /^[A-Za-z0-9_.:*\/+,-]+$/ && index(s, "//") == 0
       }
       if (shape == "t") return length(s) <= 80 && s ~ /^[A-Za-z0-9 _.:,()\/*+-]+$/
-      # A schedule has fields, or is rate(...), cron(...), or @name.
-      if (shape == "c") return length(s) <= 64 && s ~ /^[A-Za-z0-9 *\/,?#().-]+$/ && (index(s, " ") || s ~ /^(rate|cron)[(]/ || s ~ /^@[a-z]+$/)
+      # A schedule has fields, or is rate(<number> <unit>), cron(<fields>), or @name.
+      if (shape == "c") {
+        if (length(s) > 64 || s !~ /^[A-Za-z0-9 *\/,?#().-]+$/) return 0
+        if (s ~ /^rate[(]/) return s ~ /^rate[(][0-9]+ [a-z]+[)]$/
+        if (s ~ /^cron[(]/) return s ~ /^cron[(][0-9A-Z*?\/,#L-]+( [0-9A-Z*?\/,#L-]+)+[)]$/
+        return index(s, " ") > 0 || s ~ /^@[a-z]+$/
+      }
       if (shape == "p") return pathok(s)
+      if (shape == "rp") return pathok(s) && index(s, "/") > 0
       if (shape == "r") { t = s; sub(/^[A-Za-z*]+ +/, "", t); return pathok(t) }
       if (shape == "o") return s == "*" || s ~ /^https?:\/\/[A-Za-z0-9.*-]+(:[0-9]+)?\/?$/
       if (shape == "a") return s ~ /^https?:\/\/[A-Za-z0-9.-]+(:[0-9]+)?(\/.*)?$/ && pathok(s)
@@ -409,42 +542,43 @@ show() {
 
     # ---- JSON and JSON with comments ----
     # A frame for each open object or array: its type, the key it belongs
-    # to, that key s parent, and the levels at which they sit.
+    # to, the context and level of its children, and the context and level
+    # where its key sits. An object inside an array shares the array s frame data.
 
-    function jpush(t,    k, p, l, pl, ppl) {
-      if (jsp == 0) { k = ""; p = ""; l = 0; pl = 0; ppl = 0 }
+    function jpush(t,    k, c, l, pc, pl) {
+      if (jsp == 0) { k = ""; c = "top"; l = 0; pc = ""; pl = 0 }
       else if (jt[jsp] == "o") {
         k = (jexp == "v") ? jcur : UNKNOWN
-        p = jk[jsp]; pl = jl[jsp]; ppl = jpl[jsp]
-        l = max(pl, keyclass(k))
-      } else { k = jk[jsp]; p = jp[jsp]; l = jl[jsp]; pl = jpl[jsp]; ppl = jppl[jsp] }
+        pc = jc[jsp]; pl = jl[jsp]
+        c = ctxof(pc, k); l = lvlof(pc, k, pl)
+      } else { k = jk[jsp]; c = jc[jsp]; l = jl[jsp]; pc = jpc[jsp]; pl = jpl[jsp] }
       jsp++
-      jt[jsp] = t; jk[jsp] = k; jp[jsp] = p; jl[jsp] = l; jpl[jsp] = pl; jppl[jsp] = ppl
+      jt[jsp] = t; jk[jsp] = k; jc[jsp] = c; jl[jsp] = l; jpc[jsp] = pc; jpl[jsp] = pl
       jack[jsp] = 0; jpend[jsp] = 0; jln[jsp] = NR
     }
 
-    function jvalue(tok,    hidden, key, par, fl, shape, r) {
+    function jvalue(tok,    hidden, key, fl, shape, r) {
       hidden = (substr(tok, 1, 1) == "\"") ? "\"<redacted>\"" : "<redacted>"
       if (jsp == 0) return hidden
       if (jt[jsp] == "o") {
         if (jexp != "v") return hidden
-        key = jcur; par = jk[jsp]; fl = jl[jsp]
-        shape = decide(key, par, fl, jpl[jsp])
+        key = jcur; fl = jl[jsp]
+        shape = decide(key, jc[jsp], fl)
         # A vercel.json header: the value shows only for an Access-Control- key,
         # as an origin for Allow-Origin and as a list of words for the others.
-        if (family == "vercel" && par == "headers" && fl == 0) {
+        if (family == "vercel" && jc[jsp] == "hdr" && fl == 0) {
           if (key == "key") jack[jsp] = (unq(tok) == "Access-Control-Allow-Origin") ? 1 : ((unq(tok) ~ /^Access-Control-/) ? 2 : 0)
           if (key == "value") shape = (jack[jsp] == 1) ? "o" : ((jack[jsp] == 2) ? "hl" : "")
         }
-        r = render(tok, shape, fl <= 1)
+        r = render(tok, shape, fl < 2)
         return (r == "<redacted>") ? hidden : r
       }
       # An element of an array: shown only on the line the array opens, and
       # never after a flag.
-      if (NR != jln[jsp] || keyclass(jk[jsp]) >= 1) return hidden
+      if (NR != jln[jsp] || jl[jsp] >= 2) return hidden
       if (jpend[jsp]) { jpend[jsp] = 0; return hidden }
       if (substr(unq(tok), 1, 1) == "-") { jpend[jsp] = 1; return hidden }
-      shape = decide(jk[jsp], jp[jsp], jpl[jsp], jppl[jsp])
+      shape = decide(jk[jsp], jpc[jsp], jpl[jsp])
       if (shape != "" && okval(tok, shape)) return tok
       return hidden
     }
@@ -612,7 +746,7 @@ show() {
       return pre render(v, shape, namesvisible)
     }
 
-    function yaml_line(line,    ind, rest, col, ndash, top, par, fl, fpl, shape, v, prefix, cls, out, cm, gp, gpl) {
+    function yaml_line(line,    ind, rest, col, ndash, top, ctx, fl, nl, shape, v, prefix, out, cm) {
       if (yq != "") { if (quoteend(line, yq)) yq = ""; return "<redacted>" }
       if (yflow > 0) { yflow += flowdelta(line); if (yflow < 0) yflow = 0; return "<redacted>" }
       if (line ~ /^[ \t]*$/) return line
@@ -637,21 +771,21 @@ show() {
       if (ykeyparse(rest)) {
         while (ysp > 0 && yind[ysp] >= col) ysp--
         if (ndash == 1) ypend = 0
-        top = ysp; par = top ? ykey[top] : ""; fl = top ? ylvl[top] : 0; fpl = top ? yplvl[top] : 0
+        top = ysp; ctx = top ? yctx[top] : "top"; fl = top ? ylvl[top] : 0
         if (fl >= 2) { yh = col; yhd = 1; return "<redacted>" }
         prefix = substr(line, 1, col + YKL)
         v = ystrip(YV); cm = YC ? " # <redacted>" : ""
         gsub(/^[ \t]+|[ \t]+$/, "", v)
-        cls = keyclass(YK)
+        nl = lvlof(ctx, YK, fl)
         if (v == "" ) {
-          if (cls >= 2) { yh = col; yhd = 1 }
-          else { ysp++; yind[ysp] = col; ykey[ysp] = YK; ylvl[ysp] = max(fl, cls); yplvl[ysp] = fl }
+          if (nl >= 2) { yh = col; yhd = 1 }
+          else { ysp++; yind[ysp] = col; ykey[ysp] = YK; yctx[ysp] = ctxof(ctx, YK); ylvl[ysp] = nl; ypctx[ysp] = ctx; yplvl[ysp] = fl }
           return prefix cm
         }
-        shape = decide(YK, par, fl, fpl)
+        shape = decide(YK, ctx, fl)
         out = yvalue(v, shape, 1, col)
         # A key that is never shown, with a block below it: its sequence hides too.
-        if (cls >= 2 && yh == col) yhd = 1
+        if (nl >= 2 && yh == col) yhd = 1
         return prefix " " out cm
       }
 
@@ -662,9 +796,8 @@ show() {
       v = ystrip(rest); cm = YC ? " # <redacted>" : ""
       gsub(/^[ \t]+|[ \t]+$/, "", v)
       top = ysp
-      if (top == 0 || ylvl[top] >= 1) { yvalue(v, "", 0, ind); return substr(line, 1, col) "<redacted>" cm }
-      gp = (top > 1) ? ykey[top - 1] : ""; gpl = (top > 1) ? yplvl[top - 1] : 0
-      shape = decide(ykey[top], gp, yplvl[top], gpl)
+      if (top == 0) { yvalue(v, "", 0, ind); return substr(line, 1, col) "<redacted>" cm }
+      shape = decide(ykey[top], ypctx[top], yplvl[top])
       if (ypend) { ypend = 0; shape = "" }
       if (substr(unq(v), 1, 1) == "-") { ypend = 1; shape = "" }
       return substr(line, 1, col) yvalue(v, shape, 0, ind) cm
@@ -702,7 +835,7 @@ show() {
       return 0
     }
 
-    function toml_line(line,    st, plain, inner, n, parts, i, ktxt, k, v, vv, fl, fpl, par, leaf, d, hidden) {
+    function toml_line(line,    st, plain, inner, n, parts, i, ktxt, k, v, vv, fl, c, leaf, d, hidden) {
       if (tml != "") { if (index(line, tml)) tml = ""; return "<redacted>" }
       if (tq != "") { if (index(line, tq)) tq = ""; return "<redacted>" }
       if (tarr > 0) {
@@ -720,19 +853,18 @@ show() {
       if (TOPEN == "" && plain ~ /^[ \t]*\[\[?[ \t]*[A-Za-z0-9_."\047 -]+[ \t]*\]\]?$/) {
         inner = plain; gsub(/[ \t"\047]/, "", inner); gsub(/\[/, "", inner); gsub(/\]/, "", inner)
         n = split(inner, parts, ".")
-        tl = 0; tpl = 0
-        for (i = 1; i <= n; i++) { tpl = tl; tl = max(tl, keyclass(parts[i])) }
-        ttab = parts[n]
+        tl = 0; tctx = "top"
+        for (i = 1; i <= n; i++) { tl = lvlof(tctx, parts[i], tl); tctx = ctxof(tctx, parts[i]) }
         return plain (TCOM ? " # <redacted>" : "")
       }
       # A header the reader does not recognise: nothing below it shows until the next good one.
-      if (plain ~ /^[ \t]*\[/) { tl = 2; tpl = 2; ttab = UNKNOWN; return "<redacted>" }
+      if (plain ~ /^[ \t]*\[/) { tl = 2; tctx = "x"; return "<redacted>" }
       if (match(line, /^[ \t]*([A-Za-z0-9_-]+|"[^"\\]*"|\047[^\047]*\047)([ \t]*[.][ \t]*([A-Za-z0-9_-]+|"[^"\\]*"|\047[^\047]*\047))*[ \t]*=/)) {
         ktxt = substr(line, 1, RLENGTH); v = substr(line, RLENGTH + 1)
         k = ktxt; sub(/=$/, "", k); gsub(/[ \t"\047]/, "", k)
         n = split(k, parts, ".")
-        fl = tl; fpl = tpl; par = ttab
-        for (i = 1; i < n; i++) { fpl = fl; fl = max(fl, keyclass(parts[i])); par = parts[i] }
+        fl = tl; c = tctx
+        for (i = 1; i < n; i++) { fl = lvlof(c, parts[i], fl); c = ctxof(c, parts[i]) }
         leaf = parts[n]
         hidden = (fl >= 2) ? "<redacted>" : ktxt " <redacted>"
         sub(/^[ \t]+/, "", v)
@@ -748,7 +880,7 @@ show() {
         if (fl >= 2) return hidden
         vv = TCOM ? substr(v, 1, TCOM - 1) : v
         sub(/[ \t]+$/, "", vv)
-        return ktxt " " render(vv, decide(leaf, par, fl, fpl), 1) (TCOM ? " # <redacted>" : "")
+        return ktxt " " render(vv, decide(leaf, c, fl), 1) (TCOM ? " # <redacted>" : "")
       }
       if (tmlopen(line)) tml = TMLD
       else if (TOPEN != "") tq = TOPEN
@@ -793,11 +925,11 @@ show() {
       return cnt(st, "{") + cnt(st, "[") + cnt(st, "(") - cnt(st, "}") - cnt(st, "]") - cnt(st, ")")
     }
 
-    function hpush(k, l, pl, d) { hsp++; hk[hsp] = k; hl[hsp] = l; hpl[hsp] = pl; hd[hsp] = d }
+    # A frame: the context and level of its children, and the depth inside it.
+    function hpush(c, l, d) { hsp++; hc[hsp] = c; hl[hsp] = l; hd[hsp] = d }
 
     function hmove(net,    fl) {
-      fl = hsp ? hl[hsp] : 0
-      if (net > 0) hpush(UNKNOWN, 2, fl, hdepth + net)
+      if (net > 0) hpush("x", 2, hdepth + net)
       hdepth += net
       while (hsp > 0 && hd[hsp] > hdepth) hsp--
     }
@@ -813,7 +945,7 @@ show() {
       return t == ""
     }
 
-    function hcl_line(line,    t, p, st, net, disp, cm, top, par, fl, fpl, out, key, pre, v, cls, tfvars) {
+    function hcl_line(line,    t, p, st, net, disp, cm, top, ctx, fl, out, key, pre, v, tfvars, lab) {
       if (hdoc != "") { t = line; gsub(/^[ \t]+|[ \t]+$/, "", t); if (t == hdoc) hdoc = ""; return "<redacted>" }
       if (hblk) {
         p = index(line, "*/"); if (!p) return "<redacted>"
@@ -830,33 +962,36 @@ show() {
       disp = HCOM ? substr(line, 1, HCOM - 1) : line
       sub(/[ \t]+$/, "", disp)
       cm = (HCOM && !tfvars) ? " # <redacted>" : ""
-      top = hsp; par = top ? hk[top] : ""; fl = top ? hl[top] : 0; fpl = top ? hpl[top] : 0
+      top = hsp; ctx = top ? hc[top] : "top"; fl = top ? hl[top] : 0
       if (disp ~ /^[ \t]*$/) {
         out = HCOM ? "# <redacted>" : "<redacted>"
-        if (net > 0) hpush(UNKNOWN, 2, fl, hdepth + net)
+        if (net > 0) hpush("x", 2, hdepth + net)
       } else if (!tfvars && disp ~ /^[ \t]*[A-Za-z_][A-Za-z0-9_-]*([ \t]+("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*))*[ \t]*[{]$/) {
         key = disp; sub(/^[ \t]+/, "", key); sub(/[ \t"{].*$/, "", key)
+        # A resource or data block is named by its type.
+        if ((key == "resource" || key == "data") && match(disp, /"[A-Za-z0-9_]+"/)) {
+          lab = substr(disp, RSTART + 1, RLENGTH - 2); key = key "." lab
+        }
         out = (fl >= 2) ? "<redacted>" : disp cm
-        if (net > 0) hpush(key, max(fl, keyclass(key)), fl, hdepth + net)
+        if (net > 0) hpush(ctxof(ctx, key), lvlof(ctx, key, fl), hdepth + net)
       } else if (match(disp, /^[ \t]*("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*)[ \t]*[=:]/) && substr(disp, RLENGTH + 1, 1) != "=") {
         pre = substr(disp, 1, RLENGTH); v = substr(disp, RLENGTH + 1); sub(/^[ \t]+/, "", v)
         key = pre; sub(/^[ \t]+/, "", key); sub(/[ \t]*[=:]$/, "", key); gsub(/"/, "", key)
-        cls = keyclass(key)
         if (tfvars) {
           out = (top == 0) ? pre " <redacted>" : "<redacted>"
-          if (net > 0) hpush(key, 2, fl, hdepth + net)
+          if (net > 0) hpush("x", 2, hdepth + net)
         } else {
           if (fl >= 2) out = "<redacted>"
           else if (HDOC != "" || HOPEN || HBLK || net != 0) out = (net > 0 && v ~ /^[[{( \t]+$/) ? pre " " v : pre " <redacted>"
-          else out = pre " " render(v, decide(key, par, fl, fpl), 1)
-          if (net > 0) hpush(key, max(fl, cls), fl, hdepth + net)
+          else out = pre " " render(v, decide(key, ctx, fl), 1)
+          if (net > 0) hpush(ctxof(ctx, key), lvlof(ctx, key, fl), hdepth + net)
           if (out != "<redacted>") out = out cm
         }
       } else if (onlystruct(disp)) {
         out = disp cm
       } else {
         out = "<redacted>"
-        if (net > 0) hpush(UNKNOWN, 2, fl, hdepth + net)
+        if (net > 0) hpush("x", 2, hdepth + net)
       }
       hdepth += net
       while (hsp > 0 && hd[hsp] > hdepth) hsp--

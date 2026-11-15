@@ -824,6 +824,108 @@ jobs:
         with:
           role-to-assume: FIXTUREVALUE
 YAML
+# 5r. Review round 2: a shown key prints only under a container that is its home.
+put home/serverless.yml <<'YAML'
+provider:
+  runtime: nodejs22.x
+  stackTags:
+    runtime: FIXTUREVALUE
+functions:
+  f:
+    handler: index.handler
+    tags:
+      handler: FIXTUREVALUE
+resources:
+  Mappings:
+    M:
+      us-east-1:
+        handler: FIXTUREVALUE
+  Parameters:
+    P:
+      runtime: FIXTUREVALUE
+  Outputs:
+    O:
+      handler: FIXTUREVALUE
+YAML
+put home/main.tf <<'HCL'
+resource "aws_cloudformation_stack" "s" {
+  parameters = {
+    runtime = "FIXTUREVALUE"
+    handler = "FIXTUREVALUE"
+    role    = "FIXTUREVALUE"
+  }
+}
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+  tags = {
+    runtime = "FIXTUREVALUE"
+  }
+}
+resource "aws_s3_bucket" "b" {
+  runtime = "FIXTUREVALUE"
+}
+HCL
+put home/template.yaml <<'YAML'
+Conditions:
+  C:
+    Handler: FIXTUREVALUE
+Metadata:
+  X:
+    Runtime: FIXTUREVALUE
+Resources:
+  Fn:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs22.x
+      Tags:
+        Runtime: FIXTUREVALUE
+YAML
+put home/vercel.json <<'JSON'
+{
+  "images": { "runtime": "FIXTUREVALUE" },
+  "functions": { "api/*.ts": { "runtime": "nodejs22.x" } }
+}
+JSON
+put home/wrangler.toml <<'TOML'
+name = "w"
+[unsafe]
+name = "FIXTUREVALUE"
+[env.production]
+name = "w-prod"
+TOML
+put home/.github/workflows/h.yml <<'YAML'
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        runs-on: FIXTUREVALUE
+YAML
+put home/supabase/config.toml <<'TOML'
+[studio]
+schemas = ["FIXTUREVALUE"]
+[api]
+schemas = ["public"]
+TOML
+# A route or path segment longer than 15 characters is hidden.
+put longseg/wrangler.toml <<'TOML'
+routes = [ "api.example.com/hooks/FIXTUREVALUEsharedsecret" ]
+route = "api.example.com/hooks/abcdefghijklmnopq"
+TOML
+put longseg/vercel.json <<'JSON'
+{ "crons": [{ "path": "/api/FIXTUREVALUEsharedsecret", "schedule": "0 * * * *" }] }
+JSON
+# A schedule rate is a number and a unit, and a Worker route is a pattern with a slash.
+put fixedform2/serverless.yml <<'YAML'
+functions:
+  f:
+    events:
+      - schedule: rate(FIXTUREVALUE)
+      - schedule: rate(5 minutes)
+YAML
+put fixedform2/wrangler.json <<'JSON'
+{ "route": "FIXTUREVALUE", "routes": ["api.example.com/*"] }
+JSON
 
 attack_count=0
 for file in $(cd "$a" && find . -type f | sort); do
@@ -833,7 +935,7 @@ for file in $(cd "$a" && find . -type f | sort); do
   [ "$code" -eq 0 ] || fail "attack $file: exit $code, so the file was not read"
   no_marker "$out" "attack $file"
 done
-[ "$attack_count" -ge 60 ] || fail "attack: only $attack_count files were written"
+[ "$attack_count" -ge 75 ] || fail "attack: only $attack_count files were written"
 
 # The attack files still show what the checks need.
 expect_text "$(sh "$reader" --show "$a/span/vercel.json")" '"framework": "kept"' "attack span/vercel.json"
@@ -871,7 +973,8 @@ expect_text "$more_wf" 'environment: production' "attack more workflow"
 expect_text "$more_wf" 'REF: ${{ secrets.DEPLOY_TOKEN }}' "attack more workflow"
 expect_text "$more_wf" 'branches: [main]' "attack more workflow"
 expect_re "$(sh "$reader" --show "$a/next/serverless.yml")" 'timeout: 5$' "attack next/serverless.yml"
-expect_text "$(sh "$reader" --show "$a/next/vercel.json")" '"maxDuration": 60' "attack next/vercel.json"
+# maxDuration is a setting under functions.<glob> only, so here it hides; regions is a top-level setting.
+expect_text "$(sh "$reader" --show "$a/next/vercel.json")" '"regions" : ["iad1"]' "attack next/vercel.json"
 expect_text "$(sh "$reader" --show "$a/next/wrangler.toml")" 'compatibility_date = "2024-01-01"' "attack next/wrangler.toml"
 expect_re "$(sh "$reader" --show "$a/next/main.tf")" 'timeout = 10$' "attack next/main.tf"
 expect_text "$(sh "$reader" --show "$a/next/.github/workflows/w.yml")" 'name: ok step' "attack next workflow"
@@ -895,6 +998,17 @@ expect_text "$(sh "$reader" --show "$a/fixedform/vercel.json")" '"value": "https
 expect_text "$(sh "$reader" --show "$a/fixedform/main.tf")" 'arn:aws:lambda:us-east-1:123456789012:layer:x:1' "fixed forms main.tf"
 expect_text "$(sh "$reader" --show "$a/fixedform/template.yaml")" 'Service: lambda.amazonaws.com' "fixed forms template"
 expect_text "$(sh "$reader" --show "$a/fixedform/serverless.yml")" 'schedule: rate(1 hour)' "fixed forms serverless"
+expect_re "$(sh "$reader" --show "$a/home/serverless.yml")" 'runtime: nodejs22\.x$' "home serverless"
+expect_re "$(sh "$reader" --show "$a/home/serverless.yml")" 'handler: index\.handler$' "home serverless"
+expect_re "$(sh "$reader" --show "$a/home/main.tf")" 'runtime = "nodejs22\.x"$' "home main.tf"
+expect_re "$(sh "$reader" --show "$a/home/template.yaml")" 'Runtime: nodejs22\.x$' "home template"
+expect_text "$(sh "$reader" --show "$a/home/vercel.json")" '"runtime": "nodejs22.x"' "home vercel"
+expect_text "$(sh "$reader" --show "$a/home/wrangler.toml")" 'name = "w-prod"' "home wrangler"
+expect_text "$(sh "$reader" --show "$a/home/.github/workflows/h.yml")" 'runs-on: ubuntu-latest' "home workflow"
+expect_text "$(sh "$reader" --show "$a/home/supabase/config.toml")" 'schemas = ["public"]' "home supabase"
+expect_text "$(sh "$reader" --show "$a/fixedform2/serverless.yml")" 'schedule: rate(5 minutes)' "fixed forms rate"
+expect_text "$(sh "$reader" --show "$a/fixedform2/wrangler.json")" '"api.example.com/*"' "fixed forms route"
+sh "$reader" --show "$a/longseg/wrangler.toml" | grep -q abcdefghijklmnopq && fail "long segment: a route segment over 15 characters is shown"
 
 # The other CloudFormation template is listed with the platform files.
 git -C "$a" init -q -b main
