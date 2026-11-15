@@ -1005,6 +1005,691 @@ provider:
 service: kept
 YAML
 
+# 5t. Review round 4.
+# One rule for HCL: a bracket is in a home only when a line of a known form
+# opens it and closes nothing. A line that closes and then opens, a bracket
+# with no key, a block header inside an object, and object syntax in a block
+# body all open an unknown container. The one exception is an item of a list
+# home. A closer of the wrong kind breaks the file, and the rest is hidden.
+put r4/hcl-comment/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+} /* c */ resource "aws_s3_bucket" "b" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "g" {
+  timeout = 9
+}
+HCL
+put r4/hcl-comment2/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+} /* x */ {
+  handler = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "g" {
+  runtime = "nodejs22.x"
+} // resource "aws_s3_bucket" "c" {
+resource "aws_lambda_function" "h" {
+  timeout = 8
+}
+HCL
+put r4/hcl-bare/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+} {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "g" {
+  runtime = "nodejs22.x"
+}, {
+  handler = "FIXTUREVALUE"
+}
+HCL
+put r4/hcl-quoted/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  "runtime" = "FIXTUREVALUE"
+  "handler" : "FIXTUREVALUE"
+  role : "FIXTUREVALUE"
+  timeout = 7
+}
+HCL
+put r4/hcl-barebrace/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+  {
+    runtime = "FIXTUREVALUE"
+  }
+  [
+    handler = "FIXTUREVALUE"
+  ]
+  timeout = 6
+}
+HCL
+put r4/hcl-splitheader/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  dynamic "environment"
+  {
+    runtime = "FIXTUREVALUE"
+  }
+}
+resource "aws_s3_bucket" "b"
+{
+  handler = "FIXTUREVALUE"
+}
+HCL
+put r4/hcl-listkey/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = [
+      Resource = "FIXTUREVALUE"
+    ]
+  })
+}
+HCL
+put r4/hcl-listlist/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = [[{
+      Resource = "FIXTUREVALUE"
+    }]]
+  })
+}
+resource "aws_iam_role_policy" "q" {
+  policy = jsonencode({
+    Statement = [
+      [
+        {
+          Resource = "FIXTUREVALUE"
+        }
+      ]
+    ]
+  })
+}
+HCL
+put r4/hcl-mismatch/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  environment {
+    variables = {
+      A = "b" ])
+      runtime = "FIXTUREVALUE"
+    }
+  }
+}
+HCL
+put r4/hcl-paren/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = (
+      Resource = "FIXTUREVALUE"
+    )
+  })
+}
+resource "aws_iam_role_policy" "q" {
+  policy = merge(local.base, {
+    Statement = [{
+      Resource = "FIXTUREVALUE"
+    }]
+  })
+}
+HCL
+put r4/hcl-objsep/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = [{
+      Effect = "Allow"
+      Condition = {
+        a = "b"
+      }, {
+        Resource = "FIXTUREVALUE"
+      }
+    }]
+  })
+}
+resource "aws_iam_role_policy" "q" {
+  policy = jsonencode({
+    Statement = {
+      Effect = "Allow"
+    }, {
+      Resource = "FIXTUREVALUE"
+    }
+  })
+}
+HCL
+put r4/hcl-blockinobj/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement {
+      Resource = "FIXTUREVALUE"
+    }
+  })
+}
+HCL
+put r4/hcl-spancomment/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  runtime = "nodejs22.x"
+} /* a comment
+that goes on */ resource "aws_s3_bucket" "b" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "g" {
+  runtime = "nodejs22.x"
+  /* c */ } /* d */ { /* e */
+  handler = "FIXTUREVALUE"
+}
+HCL
+# Valid layouts of a policy and of a function still show.
+put r4/hcl-valid/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode(
+    {
+      "Version" : "2012-10-17"
+      Statement = [
+        {
+          Effect   = "Allow"
+          Resource = "arn:aws:s3:::first/*"
+        },
+        {
+          "Effect" : "Deny"
+          "Resource" = "arn:aws:s3:::second/*"
+        }, {
+          Effect   = "Allow"
+          Resource = "arn:aws:s3:::third/*"
+        }
+      ]
+    }
+  )
+}
+resource "aws_lambda_function" "f" {
+  memory_size = 256 /* c */
+  architectures = ["arm64"]
+  ephemeral_storage {
+    size = 1024
+  }
+}
+HCL
+# One rule for YAML and JSON: an item is in a list home only when its parent
+# is the key of that list. An item of an item is unknown. A YAML container is
+# a map or a sequence, fixed by its first child, with one indent. A JSON file
+# is one value, and a closer of the wrong kind breaks it.
+put r4/listlist/serverless.yml <<'YAML'
+provider:
+  name: aws
+  iam:
+    role:
+      statements:
+        -
+          - Effect: Allow
+            Resource: FIXTUREVALUE
+        - Effect: Allow
+          Resource: okres
+functions:
+  f:
+    handler: ok.h
+    events:
+      -
+        - schedule: rate(9 minutes)
+          http: GET /leakpath
+      - http: GET /okpath
+YAML
+put r4/listlist/wrangler.json <<'JSON'
+{
+  "kv_namespaces": [ { "binding": "OKKV" }, [ { "binding": "FIXTUREVALUE" } ] ],
+  "name": "topok"
+}
+JSON
+put r4/listlist/vercel.json <<'JSON'
+{ "crons": [ [ { "path": "/leakpath", "schedule": "0 * * * *" } ] ],
+  "headers": [ { "source": "/a", "headers": [ [ { "key": "FIXTUREVALUE" } ] ] } ],
+  "rewrites": [ { "source": "/ok" } ] }
+JSON
+put r4/yaml-deep/serverless.yml <<'YAML'
+provider:
+  iam:
+    role:
+      statements:
+        -
+          -
+            Resource: FIXTUREVALUE
+        -
+          -
+            - Resource: FIXTUREVALUE
+      managedPolicies:
+      -
+        - FIXTUREVALUE
+functions:
+  f:
+    events:
+    -
+      - http: GET /leakpath
+YAML
+put r4/yaml-mixkey/serverless.yml <<'YAML'
+provider:
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+        Resource: FIXTUREVALUE
+functions:
+  f:
+    events:
+      - schedule: rate(1 minute)
+      http: GET /leakpath
+    timeout: 4
+YAML
+put r4/yaml-mixdash/serverless.yml <<'YAML'
+provider:
+  iam:
+    role:
+      statements:
+        Effect: Allow
+        - Resource: FIXTUREVALUE
+service: kept
+YAML
+put r4/yaml-indent/serverless.yml <<'YAML'
+provider:
+  iam:
+    role:
+      statements:
+            - Effect: Allow
+          - Resource: FIXTUREVALUE
+        - Resource: FIXTUREVALUE
+functions:
+  f:
+    events:
+        - schedule: rate(1 minute)
+      - http: GET /leakpath
+YAML
+put r4/yaml-doc/serverless.yml <<'YAML'
+functions:
+  f:
+    handler: ok.h
+    events:
+---
+      - http: GET /leakpath
+---
+provider:
+  iam:
+    role:
+      statements:
+...
+        - Resource: FIXTUREVALUE
+YAML
+put r4/yaml-wf/.github/workflows/w.yml <<'YAML'
+name: w
+on:
+  schedule:
+    -
+      - cron: 0 0 * * 1
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        - name: FIXTUREVALUE
+      - name: ok step
+YAML
+put r4/yaml-sam/template.yaml <<'YAML'
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  F:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies:
+        -
+          - Statement:
+              - Resource: FIXTUREVALUE
+        - Statement:
+            -
+              - Resource: FIXTUREVALUE
+            - Resource: oksam
+YAML
+put r4/json-mismatch/wrangler.json <<'JSON'
+{
+  "vars": { "A": [ "b" } ],
+  "name": "FIXTUREVALUE"
+}
+JSON
+put r4/json-mismatch2/wrangler.json <<'JSON'
+{ "workers_dev": true, "vars": { "A": 1 ], "name": "FIXTUREVALUE" } }
+JSON
+put r4/json-two/wrangler.json <<'JSON'
+{ "vars": { "A": "b" } }
+{ "name": "FIXTUREVALUE" }
+JSON
+put r4/json-two2/vercel.json <<'JSON'
+[]
+{ "framework": "FIXTUREVALUE" }
+JSON
+put r4/json-arrarr/wrangler.json <<'JSON'
+{
+  "compatibility_flags": [ "nodejs_compat", [ "FIXTUREVALUE" ] ],
+  "r2_buckets": [[[ { "binding": "FIXTUREVALUE", "bucket_name": "FIXTUREVALUE" } ]]],
+  "queues": { "producers": [ [ { "queue": "FIXTUREVALUE" } ], { "queue": "okqueue" } ] }
+}
+JSON
+put r4/json-arrarr/template.json <<'JSON'
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": { "F": { "Type": "AWS::Serverless::Function", "Properties": {
+    "Policies": [ [ { "Statement": [ { "Resource": "FIXTUREVALUE" } ] } ],
+                  { "Statement": [ [ { "Resource": "FIXTUREVALUE" } ], { "Resource": "okjson" } ] } ]
+  } } }
+}
+JSON
+# A single binding is one object, so as a list it is not in its home.
+put r4/single/wrangler.json <<'JSON'
+{
+  "ai": [ { "binding": "FIXTUREVALUE" } ],
+  "browser": [ { "binding": "FIXTUREVALUE" } ],
+  "images": [ { "binding": "FIXTUREVALUE" } ],
+  "version_metadata": [ { "binding": "FIXTUREVALUE" } ],
+  "send_email": [ { "binding": "FIXTUREVALUE" } ],
+  "kv_namespaces": [ { "binding": "OKLIST" } ]
+}
+JSON
+put r4/single/wrangler.toml <<'TOML'
+[[ai]]
+binding = "FIXTUREVALUE"
+[[env.s.browser]]
+binding = "FIXTUREVALUE"
+[[images]]
+binding = "FIXTUREVALUE"
+[[version_metadata]]
+binding = "FIXTUREVALUE"
+[[send_email]]
+binding = "FIXTUREVALUE"
+[[kv_namespaces]
+binding = "FIXTUREVALUE"
+[r2_buckets]]
+binding = "FIXTUREVALUE"
+[[d1_databases]]
+binding = "OKLIST"
+TOML
+put r4/single-ok/wrangler.json <<'JSON'
+{ "ai": { "binding": "AI" }, "browser": { "binding": "BROWSER" } }
+JSON
+put r4/single-ok/wrangler.toml <<'TOML'
+[ai]
+binding = "AI"
+[env.s.images]
+binding = "IMAGES"
+TOML
+# Valid YAML with mixed but valid indentation still shows its settings.
+put r4/yaml-valid/serverless.yml <<'YAML'
+---
+service: mixed
+provider:
+    name: aws
+    iam:
+      role:
+        statements:
+        - Effect: Allow
+          Resource: okallow
+        -
+          Effect: Deny
+          Resource: okdeny
+functions:
+  f:
+        handler: mixed.handler
+        events:
+          - http: GET /okpath
+          - schedule:
+              rate: rate(2 hours)
+        timeout: 12
+---
+service: second
+YAML
+
+# 5u. Layouts tried after the round 4 fix, by the same two rules.
+put r4b/hcl-twoobj/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode(
+    {
+      Version = "x"
+    }
+    {
+      Statement = [
+        {
+          Resource = "FIXTUREVALUE"
+        }
+      ]
+    }
+  )
+}
+HCL
+put r4b/hcl-openstring/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  description = "a
+} resource "aws_s3_bucket" "b" { "
+  runtime = "FIXTUREVALUE"
+}
+HCL
+put r4b/hcl-nocomma/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = [
+      {
+        Effect = "Allow"
+      } {
+        Resource = "FIXTUREVALUE"
+      }
+    ]
+  })
+}
+HCL
+put r4b/hcl-seplist/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = [
+      {
+        Effect = "Allow"
+      }, [{
+        Resource = "FIXTUREVALUE"
+      }]
+    ]
+  })
+}
+HCL
+put r4b/hcl-parenlist/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode({
+    Statement = [
+      (
+        {
+          Resource = "FIXTUREVALUE"
+        }
+      )
+    ]
+  })
+}
+HCL
+put r4b/hcl-attrparen/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode(
+    Statement = [{
+      Resource = "FIXTUREVALUE"
+    }]
+  )
+}
+HCL
+put r4b/hcl-topbrace/main.tf <<'HCL'
+{
+  resource "aws_lambda_function" "f" {
+    runtime = "FIXTUREVALUE"
+  }
+}
+HCL
+put r4b/hcl-arraypolicy/main.tf <<'HCL'
+resource "aws_iam_role_policy" "p" {
+  policy = jsonencode([{
+    Statement = [{
+      Resource = "FIXTUREVALUE"
+    }]
+  }])
+}
+HCL
+put r4b/yaml-docmark/serverless.yml <<'YAML'
+functions:
+  f:
+    handler: ok.h
+    events:
+--- # a comment
+      - http: GET /leakpath
+provider:
+  iam:
+    role:
+      statements:
+... text
+        - Resource: FIXTUREVALUE
+YAML
+put r4b/yaml-sameindent/serverless.yml <<'YAML'
+functions:
+- f:
+    events:
+    -
+      -
+        http: GET /leakpath
+    - http: GET /okpath
+YAML
+put r4b/json-lines/wrangler.json <<'JSON'
+{
+  "kv_namespaces": [
+    [
+      { "binding": "FIXTUREVALUE" }
+    ],
+    { "binding": "OKLINES" }
+  ],
+  "secrets": { "required": [ [ "FIXTUREVALUE" ] ] }
+}
+JSON
+put r4b/json-after/wrangler.json <<'JSON'
+{ "workers_dev": true } { "name": "FIXTUREVALUE" }
+JSON
+put r4b/toml-openstring/wrangler.toml <<'TOML'
+workers_dev = true
+main = "src/index.ts
+[vars]
+x = "
+name = "FIXTUREVALUE"
+TOML
+put r4b/toml-arrheader/wrangler.toml <<'TOML'
+workers_dev = true
+compatibility_flags = [
+[vars]
+]
+name = "FIXTUREVALUE"
+TOML
+put r4b/toml-envlist/wrangler.toml <<'TOML'
+name = "w"
+[[env.s]]
+name = "FIXTUREVALUE"
+[[observability]]
+enabled = true
+[[assets]]
+binding = "FIXTUREVALUE"
+TOML
+# Layouts where the reader lost its place in a valid file: a template in an
+# HCL string, a heredoc end word with a dash, a block type that is not
+# quoted, a YAML document that is one value, a bracket in a YAML comment, a
+# value on the line after its key, an escaped quote in a TOML string, and a
+# quoted TOML name with a dot.
+put r4b/hcl-template/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  environment {
+    variables = {
+      A = "${join("}}", local.x)}"
+      runtime = "FIXTUREVALUE"
+    }
+  }
+}
+HCL
+put r4b/hcl-template-ok/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  description = "${join("}}", local.x)} and $${literal} %%{ too"
+  timeout = 11
+}
+HCL
+put r4b/hcl-label/main.tf <<'HCL'
+resource aws_s3_bucket "aws_lambda_function" {
+  role = "FIXTUREVALUE"
+}
+resource "aws-s3" "aws_lambda_function" {
+  handler = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "g" {
+  timeout = 12
+}
+HCL
+put r4b/hcl-heredocword/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  description = <<END-X
+END
+  runtime = "FIXTUREVALUE"
+END-X
+}
+HCL
+put r4b/yaml-docscalar/serverless.yml <<'YAML'
+service: first
+--- |
+service: FIXTUREVALUE
+provider:
+  runtime: FIXTUREVALUE
+--- # a comment
+service: third
+YAML
+put r4b/yaml-flowcomment/serverless.yml <<'YAML'
+provider:
+  tags: [a,
+    # ]
+  runtime: FIXTUREVALUE
+  ]
+  stackTags: [a, "x
+    ] y",
+  stage: FIXTUREVALUE
+  ]
+  timeout: 13
+YAML
+put r4b/yaml-ownline/serverless.yml <<'YAML'
+provider:
+  |
+  runtime: FIXTUREVALUE
+ stage: FIXTUREVALUE
+service: kept
+YAML
+put r4b/toml-mlescape/wrangler.toml <<'TOML'
+workers_dev = true
+main = """
+x \"""
+name = "FIXTUREVALUE"
+"""
+TOML
+put r4b/toml-mlarray/wrangler.toml <<'TOML'
+workers_dev = true
+compatibility_flags = ["""
+a "b
+name = "FIXTUREVALUE"
+"""]
+TOML
+put r4b/toml-mlarray2/wrangler.toml <<'TOML'
+workers_dev = true
+compatibility_flags = ["""a"
+name = "FIXTUREVALUE"
+"""]
+TOML
+put r4b/toml-quoteddot/wrangler.toml <<'TOML'
+workers_dev = true
+"env.s".name = "FIXTUREVALUE"
+["env.s"]
+name = "FIXTUREVALUE"
+[e nv.s]
+name = "FIXTUREVALUE"
+[ env . "t" ]
+name = "w-t"
+TOML
+printf '\357\273\277{ "name": "bomok" }\n' > "$a/r4b-bom.json"
+mkdir -p "$a/r4b/bom" && mv "$a/r4b-bom.json" "$a/r4b/bom/wrangler.json"
+
 attack_count=0
 for file in $(cd "$a" && find . -type f | sort); do
   attack_count=$((attack_count + 1))
@@ -1012,8 +1697,10 @@ for file in $(cd "$a" && find . -type f | sort); do
   out=$(sh "$reader" --show "$a/$file" 2>&1) || code=$?
   [ "$code" -eq 0 ] || fail "attack $file: exit $code, so the file was not read"
   no_marker "$out" "attack $file"
+  # A second marker, in lower case, for a path: the capitals of the first one hide a path by themselves.
+  case "$out" in *leakpath*) fail "attack $file: a planted path leaked" ;; esac
 done
-[ "$attack_count" -ge 75 ] || fail "attack: only $attack_count files were written"
+[ "$attack_count" -ge 135 ] || fail "attack: only $attack_count files were written"
 
 # The attack files still show what the checks need.
 expect_text "$(sh "$reader" --show "$a/span/vercel.json")" '"framework": "kept"' "attack span/vercel.json"
@@ -1097,6 +1784,68 @@ expect_text "$(sh "$reader" --show "$a/seqarray/serverless.yml")" 'handler: arr.
 expect_text "$(sh "$reader" --show "$a/seqitem/vercel.json")" '"schedule": "0 * * * *"' "sequence item json"
 expect_re "$(sh "$reader" --show "$a/dedent/serverless.yml")" 'runtime: nodejs22\.x$' "broken dedent"
 expect_text "$(sh "$reader" --show "$a/dedent/serverless.yml")" 'service: kept' "broken dedent"
+r4=$(sh "$reader" --show "$a/r4/hcl-comment/main.tf")
+expect_re "$r4" 'runtime = "nodejs22\.x"$' "round 4 hcl comment"
+expect_re "$r4" 'timeout = 9$' "round 4 hcl comment"
+expect_re "$(sh "$reader" --show "$a/r4/hcl-comment2/main.tf")" 'timeout = 8$' "round 4 hcl comment 2"
+expect_re "$(sh "$reader" --show "$a/r4/hcl-quoted/main.tf")" 'timeout = 7$' "round 4 hcl quoted name"
+expect_re "$(sh "$reader" --show "$a/r4/hcl-barebrace/main.tf")" 'timeout = 6$' "round 4 hcl bare brace"
+r4=$(sh "$reader" --show "$a/r4/hcl-valid/main.tf")
+expect_text "$r4" 'Resource = "arn:aws:s3:::first/*"' "round 4 hcl valid"
+expect_text "$r4" '"Effect" : "Deny"' "round 4 hcl valid"
+expect_text "$r4" '"Resource" = "arn:aws:s3:::second/*"' "round 4 hcl valid"
+expect_text "$r4" 'Resource = "arn:aws:s3:::third/*"' "round 4 hcl valid"
+expect_text "$r4" 'memory_size = 256' "round 4 hcl valid"
+expect_text "$r4" 'architectures = ["arm64"]' "round 4 hcl valid"
+expect_re "$r4" 'size = 1024$' "round 4 hcl valid"
+r4=$(sh "$reader" --show "$a/r4/listlist/serverless.yml")
+expect_text "$r4" 'Resource: okres' "round 4 list of lists yaml"
+expect_text "$r4" 'http: GET /okpath' "round 4 list of lists yaml"
+r4=$(sh "$reader" --show "$a/r4/listlist/wrangler.json")
+expect_text "$r4" '"binding": "OKKV"' "round 4 list of lists wrangler"
+expect_text "$r4" '"name": "topok"' "round 4 list of lists wrangler"
+expect_text "$(sh "$reader" --show "$a/r4/listlist/vercel.json")" '"source": "/ok"' "round 4 list of lists vercel"
+expect_re "$(sh "$reader" --show "$a/r4/yaml-mixkey/serverless.yml")" 'timeout: 4$' "round 4 yaml key after items"
+expect_text "$(sh "$reader" --show "$a/r4/yaml-mixdash/serverless.yml")" 'service: kept' "round 4 yaml item after keys"
+expect_text "$(sh "$reader" --show "$a/r4/yaml-doc/serverless.yml")" 'handler: ok.h' "round 4 yaml documents"
+expect_text "$(sh "$reader" --show "$a/r4/yaml-wf/.github/workflows/w.yml")" 'name: ok step' "round 4 workflow"
+expect_text "$(sh "$reader" --show "$a/r4/yaml-sam/template.yaml")" 'Resource: oksam' "round 4 sam"
+expect_text "$(sh "$reader" --show "$a/r4/json-mismatch2/wrangler.json")" '<redacted>' "round 4 json wrong closer"
+expect_text "$(sh "$reader" --show "$a/r4/json-arrarr/wrangler.json")" '"queue": "okqueue"' "round 4 json array in array"
+expect_text "$(sh "$reader" --show "$a/r4/json-arrarr/template.json")" '"Resource": "okjson"' "round 4 json array in array"
+expect_text "$(sh "$reader" --show "$a/r4/single/wrangler.json")" '"binding": "OKLIST"' "round 4 single binding json"
+expect_text "$(sh "$reader" --show "$a/r4/single/wrangler.toml")" 'binding = "OKLIST"' "round 4 single binding toml"
+r4=$(sh "$reader" --show "$a/r4/single-ok/wrangler.json")
+expect_text "$r4" '"binding": "AI"' "round 4 single binding json"
+expect_text "$r4" '"binding": "BROWSER"' "round 4 single binding json"
+r4=$(sh "$reader" --show "$a/r4/single-ok/wrangler.toml")
+expect_text "$r4" 'binding = "AI"' "round 4 single binding toml"
+expect_text "$r4" 'binding = "IMAGES"' "round 4 single binding toml"
+r4=$(sh "$reader" --show "$a/r4/yaml-valid/serverless.yml")
+expect_text "$r4" 'service: mixed' "round 4 valid yaml"
+expect_text "$r4" 'Resource: okallow' "round 4 valid yaml"
+expect_text "$r4" 'Resource: okdeny' "round 4 valid yaml"
+expect_text "$r4" 'handler: mixed.handler' "round 4 valid yaml"
+expect_text "$r4" 'http: GET /okpath' "round 4 valid yaml"
+expect_text "$r4" 'rate: rate(2 hours)' "round 4 valid yaml"
+expect_re "$r4" 'timeout: 12$' "round 4 valid yaml"
+expect_text "$r4" 'service: second' "round 4 valid yaml"
+expect_text "$(sh "$reader" --show "$a/r4b/yaml-docmark/serverless.yml")" 'handler: ok.h' "round 4 document marker"
+expect_text "$(sh "$reader" --show "$a/r4b/yaml-sameindent/serverless.yml")" 'http: GET /okpath' "round 4 same indent"
+expect_text "$(sh "$reader" --show "$a/r4b/json-lines/wrangler.json")" '"binding": "OKLINES"' "round 4 json lines"
+expect_text "$(sh "$reader" --show "$a/r4b/toml-openstring/wrangler.toml")" 'workers_dev = true' "round 4 toml open string"
+expect_text "$(sh "$reader" --show "$a/r4b/toml-arrheader/wrangler.toml")" 'workers_dev = true' "round 4 toml array"
+expect_text "$(sh "$reader" --show "$a/r4b/toml-envlist/wrangler.toml")" 'name = "w"' "round 4 toml list of tables"
+expect_text "$(sh "$reader" --show "$a/r4b/bom/wrangler.json")" '"name": "bomok"' "round 4 byte order mark"
+expect_re "$(sh "$reader" --show "$a/r4b/hcl-template-ok/main.tf")" 'timeout = 11$' "round 4 hcl template"
+expect_re "$(sh "$reader" --show "$a/r4b/hcl-label/main.tf")" 'timeout = 12$' "round 4 hcl first label"
+r4=$(sh "$reader" --show "$a/r4b/yaml-docscalar/serverless.yml")
+expect_text "$r4" 'service: first' "round 4 yaml document of one value"
+expect_text "$r4" 'service: third' "round 4 yaml document of one value"
+expect_re "$(sh "$reader" --show "$a/r4b/yaml-flowcomment/serverless.yml")" 'timeout: 13$' "round 4 yaml flow"
+expect_text "$(sh "$reader" --show "$a/r4b/yaml-ownline/serverless.yml")" 'service: kept' "round 4 yaml value on its own line"
+expect_text "$(sh "$reader" --show "$a/r4b/toml-mlescape/wrangler.toml")" 'workers_dev = true' "round 4 toml escaped quote"
+expect_text "$(sh "$reader" --show "$a/r4b/toml-quoteddot/wrangler.toml")" 'name = "w-t"' "round 4 toml quoted name"
 for file in longseg2/wrangler.toml longseg2/vercel.json; do
   sh "$reader" --show "$a/$file" | grep -q lowercasesharedsecretvalue && fail "long segment: $file shows a lowercase segment over 15 characters"
 done

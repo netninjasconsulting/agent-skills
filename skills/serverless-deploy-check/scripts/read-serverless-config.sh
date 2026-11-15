@@ -69,7 +69,10 @@ done
 # decides what prints.
 #
 # ctx>[] marks a context that is a list: an item of a sequence or array is in
-# that context only when it is marked so, and otherwise in "x".
+# that context only when it is marked so and the list is the value of its
+# key, and otherwise in "x". An item of an item is always in "x". A context
+# without the mark is one object, so bind1 (a single Wrangler binding) is not
+# a home when it is written as a list.
 #
 # ctx>key:shape shows the value of key in context ctx, when the value has that
 # shape. ctx>*:shape does the same for every key. A shape that ends in ! holds
@@ -136,9 +139,10 @@ WRANGLER_SETTINGS='
 @>assets=as as>directory:p as>run_worker_first:b as>binding:w
 @>secrets=sec sec>required:w
 @>kv_namespaces=bind @>d1_databases=bind @>hyperdrive=bind @>vectorize=bind
-@>analytics_engine_datasets=bind @>ai=bind @>browser=bind @>images=bind
-@>version_metadata=bind @>dispatch_namespaces=bind @>mtls_certificates=bind
-@>send_email=bind bind>binding:w bind>[]
+@>analytics_engine_datasets=bind @>dispatch_namespaces=bind @>mtls_certificates=bind
+bind>binding:w bind>[]
+@>ai=bind1 @>browser=bind1 @>images=bind1 @>version_metadata=bind1 @>send_email=bind1
+bind1>binding:w
 @>r2_buckets=r2 r2>binding:w r2>bucket_name:w r2>[]
 @>services=svc svc>binding:w svc>service:w svc>entrypoint:w svc>[]
 @>queues=qs qs>producers=qp qp>binding:w qp>queue:w qp>[] qs>consumers=qc qc>queue:w qc>[]
@@ -200,7 +204,7 @@ hperm>function_url_auth_type:auth hperm>invoked_via_function_url:b hperm>functio
 top>resource.aws_cloudwatch_log_group=hlg hlg>retention_in_days:n
 top>resource.aws_iam_role_policy=hpol top>resource.aws_iam_policy=hpol top>resource.aws_iam_role=hpol
 hpol>role:w hpol>policy=jpol hpol>assume_role_policy=jpol
-jpol>Statement=jst jst>Effect:eff jst>Action:w jst>Resource:w
+jpol>Statement=jst jst>[] jst>Effect:eff jst>Action:w jst>Resource:w
 top>data.aws_iam_policy_document=hpd hpd>statement=hpst hpst>effect:eff hpst>actions:w
 hpst>resources:w hpst>condition=hcond hcond>test:w hcond>variable:w'
 
@@ -376,13 +380,16 @@ show() {
       ENUM["arn"] = "arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:[0-9]*:[A-Za-z0-9_+=,.@/:*-]+"
       ENUM["hl"] = "[A-Za-z0-9*-]+(, *[A-Za-z0-9*-]+)*"
       # JSON
-      jsp = 0; jexp = "v"; jcur = ""; jstr = 0; jcom = 0
+      jsp = 0; jexp = "v"; jcur = ""; jstr = 0; jcom = 0; jdone = 0; jbroken = 0
       # YAML
-      ysp = 0; yrootchild = ""; yh = -1; yhd = 0; yq = ""; yflow = 0; ypend = 0
+      ysp = 0; yrootchild = ""; yrootkind = ""; yh = -1; yhd = 0; yq = ""; yflow = 0; yfon = 0; yfq = ""; ypend = 0; ydoc = 0
       # TOML
-      tml = ""; tq = ""; tarr = 0; tctx = "top"; tl = 0
+      tml = ""; tq = ""; tarr = 0; tctx = "top"; tl = 0; tbroken = 0
+      # A part of a TOML key: bare, or quoted with the letters of a bare one.
+      TPART = "([A-Za-z0-9_-]+|\"[A-Za-z0-9_-]+\"|\047[A-Za-z0-9_-]+\047)"
+      TPATH = "[ \t]*" TPART "([ \t]*[.][ \t]*" TPART ")*[ \t]*"
       # HCL
-      hsp = 0; hdepth = 0; hdoc = ""; hblk = 0; hstr = 0
+      hsp = 0; hdoc = ""; hblk = 0; hbroken = 0
       # env
       envq = ""
     }
@@ -554,7 +561,13 @@ show() {
     # ---- JSON and JSON with comments ----
     # A frame for each open object or array: its type, the key it belongs
     # to, the context and level of its children, and the context and level
-    # where its key sits. An object inside an array shares the array s frame data.
+    # where its key sits. An object inside an array shares the array s frame
+    # data when the array is a list home and the value of its key. An array
+    # inside an array is unknown, and so is all that it holds.
+    #
+    # The file is one value. A closer of the wrong kind, a closer with nothing
+    # open, and anything after the end of that value break the file: the line
+    # and the rest of the file are hidden.
 
     function jpush(t,    k, c, l, pc, pl) {
       if (jsp == 0) { k = ""; c = "top"; l = 0; pc = ""; pl = 0 }
@@ -565,7 +578,8 @@ show() {
       } else {
         k = jk[jsp]; c = jc[jsp]; l = jl[jsp]; pc = jpc[jsp]; pl = jpl[jsp]
         # An object in an array is in a home only when the home is a list.
-        if (t == "o" && !(c in LISTCTX)) c = "x"
+        if (t == "o") { if (!(c in LISTCTX)) c = "x" }
+        else { k = UNKNOWN; c = "x"; pc = "x" }
       }
       jsp++
       jt[jsp] = t; jk[jsp] = k; jc[jsp] = c; jl[jsp] = l; jpc[jsp] = pc; jpl[jsp] = pl
@@ -600,6 +614,7 @@ show() {
 
     function json_line(line,    out, i, n, ch, p, s, j, tok) {
       out = ""; i = 1; n = length(line)
+      if (jbroken) return "<redacted>"
       if (jcom) {
         p = index(line, "*/")
         if (!p) return "<redacted>"
@@ -619,6 +634,7 @@ show() {
           if (!p) { jcom = 1; out = out "/* <redacted>"; break }
           out = out "/* <redacted> */"; i = i + p + 3; continue
         }
+        if (jsp == 0 && (jdone || (ch != "{" && ch != "["))) { jbroken = 1; return "<redacted>" }
         if (ch == "\"") {
           p = strend(line, i + 1)
           if (!p) { jstr = 1; out = out "\"<redacted>"; break }
@@ -640,7 +656,11 @@ show() {
         if (ch == "{" || ch == "[") {
           jpush((ch == "{") ? "o" : "a"); out = out ch; jexp = (ch == "{") ? "k" : "v"; i++; continue
         }
-        if (ch == "}" || ch == "]") { if (jsp > 0) jsp--; out = out ch; jexp = "c"; i++; continue }
+        if (ch == "}" || ch == "]") {
+          if (jt[jsp] != ((ch == "}") ? "o" : "a")) { jbroken = 1; return "<redacted>" }
+          jsp--; if (jsp == 0) jdone = 1
+          out = out ch; jexp = "c"; i++; continue
+        }
         # A bare value: a number, true, false, null, or anything else.
         j = i
         while (j <= n) {
@@ -659,6 +679,23 @@ show() {
     # A stack of the keys that hold a block, with their indent. A line more
     # indented than yh is hidden: the rest of a block scalar, of a plain
     # scalar that goes on, or of a key that is never shown.
+    #
+    # A container is a map or a sequence. Its first child fixes which one
+    # (ykind) and at which indent (ychild). A child of the other kind, or at
+    # another indent, is broken YAML: it and everything below it are hidden.
+    # An item is in a home only when its parent is the key of a list home. An
+    # item of an item is unknown.
+
+    # Records a child of kind k ("m" a key, "s" an item, "v" a value) at indent col under
+    # the frame top (0 for the root). Returns 0 when the child does not fit.
+    function ychildok(top, k, col) {
+      if (top == 0) {
+        if (yrootchild == "") { yrootchild = col; yrootkind = k; return 1 }
+        return (yrootchild == col && yrootkind == k)
+      }
+      if (ychild[top] == "") { ychild[top] = col; ykind[top] = k; return 1 }
+      return (ychild[top] == col && ykind[top] == k)
+    }
 
     function quoteend(s, q,    i, c) {
       for (i = 1; i <= length(s); i++) {
@@ -672,17 +709,20 @@ show() {
       return 0
     }
 
-    # Brackets opened minus brackets closed, outside quotes.
-    function flowdelta(s,    i, c, q, d) {
-      d = 0; q = ""
-      for (i = 1; i <= length(s); i++) {
+    # Brackets opened minus brackets closed in s, outside quotes and
+    # comments. A quote that stays open is kept in yfq for the next line.
+    function flowscan(s,    i, c, d, n, pc) {
+      d = 0; n = length(s)
+      for (i = 1; i <= n; i++) {
         c = substr(s, i, 1)
-        if (q != "") {
-          if (q == "\"" && c == "\\") { i++; continue }
-          if (c == q) q = ""
+        if (yfq != "") {
+          if (yfq == "\"" && c == "\\") { i++; continue }
+          if (c == yfq) { if (yfq == "\047" && substr(s, i + 1, 1) == yfq) { i++; continue } yfq = "" }
           continue
         }
-        if (c == "\"" || c == "\047") { q = c; continue }
+        pc = (i == 1) ? " " : substr(s, i - 1, 1)
+        if ((c == "\"" || c == "\047") && (pc ~ /[ \t,{:]/ || pc == "[")) { yfq = c; continue }
+        if (c == "#" && pc ~ /[ \t]/) break
         if (c == "[" || c == "{") d++
         if (c == "]" || c == "}") d--
       }
@@ -755,26 +795,39 @@ show() {
       if ((q == "\"" || q == "\047") && !quoteend(substr(v, 2), q)) { yq = q; return pre "<redacted>" }
       yh = col; yhd = 0
       if (q == "[" || q == "{") {
-        if (flowdelta(v) > 0) { yflow = flowdelta(v); return pre "<redacted>" }
+        yfq = ""; yflow = flowscan(v)
+        if (yflow > 0 || yfq != "") { yfon = 1; return pre "<redacted>" }
+        yflow = 0
         if (q == "{") return pre "<redacted>"
       }
       return pre render(v, shape, namesvisible)
     }
 
-    function yaml_line(line,    ind, rest, col, ndash, top, ctx, fl, nl, shape, v, prefix, out, cm) {
+    function yaml_line(line,    ind, rest, col, ndash, top, ctx, fl, nl, shape, v, prefix, out, cm, first) {
+      # A document marker ends everything that is open. A marker with text
+      # after it starts a document that is one value: it is hidden whole.
+      if (line ~ /^(---|[.][.][.])([ \t]|$)/) {
+        ysp = 0; yrootchild = ""; yrootkind = ""; ypend = 0; yq = ""; yflow = 0; yfon = 0; yfq = ""; yh = -1; yhd = 0
+        if (line ~ /^(---|[.][.][.])[ \t]*$/) { ydoc = 0; return line }
+        ydoc = (line !~ /^(---|[.][.][.])[ \t]+#/)
+        return ydoc ? "<redacted>" : substr(line, 1, 3) " # <redacted>"
+      }
+      if (ydoc) return "<redacted>"
       if (yq != "") { if (quoteend(line, yq)) yq = ""; return "<redacted>" }
-      if (yflow > 0) { yflow += flowdelta(line); if (yflow < 0) yflow = 0; return "<redacted>" }
+      if (yfon) {
+        yflow += flowscan(line)
+        if (yflow <= 0 && yfq == "") { yfon = 0; yflow = 0 }
+        return "<redacted>"
+      }
       if (line ~ /^[ \t]*$/) return line
       match(line, /^ */); ind = RLENGTH
-      if (yh >= 0) {
+      if (yh > -1) {
         if (ind > yh) return "<redacted>"
         if (yhd && ind == yh && substr(line, ind + 1) ~ /^-([ \t]|$)/) return "<redacted>"
         yh = -1; yhd = 0
       }
       if (substr(line, ind + 1, 1) == "\t") return "<redacted>"
       if (line ~ /^[ ]*#/) return "# <redacted>"
-      if (line ~ /^(---|[.][.][.])[ \t]*$/) return line
-      if (line ~ /^(---|[.][.][.])/) return "<redacted>"
 
       rest = substr(line, ind + 1); col = ind; ndash = 0
       while (rest ~ /^-([ \t]|$)/) {
@@ -785,23 +838,21 @@ show() {
 
       if (ndash == 1) {
         # An item of a sequence: a frame at the dash, in its home only when
-        # the home is a list, and otherwise in "x".
+        # its parent is the key of a list home, and otherwise in "x".
         while (ysp > 0 && (yind[ysp] > ind || (yind[ysp] == ind && ykey[ysp] == "-"))) ysp--
+        top = ysp
+        if (!ychildok(top, "s", ind)) { yh = ind; yhd = 1; return "<redacted>" }
         if (rest == "" || ykeyparse(rest)) {
-          top = ysp
           ysp++; yind[ysp] = ind; ykey[ysp] = "-"
-          yctx[ysp] = (top && (yctx[top] in LISTCTX)) ? yctx[top] : "x"
+          yctx[ysp] = (top && ykey[top] != "-" && (yctx[top] in LISTCTX)) ? yctx[top] : "x"
           ylvl[ysp] = top ? ylvl[top] : 0; ypctx[ysp] = yctx[ysp]; yplvl[ysp] = ylvl[ysp]
-          ychild[ysp] = (rest == "") ? "" : col
+          ychild[ysp] = ""; ykind[ysp] = ""
           if (rest == "") return line
         }
       }
       if (ykeyparse(rest)) {
         while (ysp > 0 && yind[ysp] >= col) ysp--
-        # The keys of one map share an indent. A key at another indent is
-        # broken YAML: it and everything below it are hidden.
-        if (ysp > 0) { if (ychild[ysp] == "") ychild[ysp] = col; else if (ychild[ysp] != col) { yh = col; yhd = 1; return "<redacted>" } }
-        else { if (yrootchild == "") yrootchild = col; else if (yrootchild != col) { yh = col; yhd = 1; return "<redacted>" } }
+        if (!ychildok(ysp, "m", col)) { yh = col; yhd = 1; return "<redacted>" }
         if (ndash == 1) ypend = 0
         top = ysp; ctx = top ? yctx[top] : "top"; fl = top ? ylvl[top] : 0
         if (fl >= 2) { yh = col; yhd = 1; return "<redacted>" }
@@ -811,7 +862,7 @@ show() {
         nl = lvlof(ctx, YK, fl)
         if (v == "" ) {
           if (nl >= 2) { yh = col; yhd = 1 }
-          else { ysp++; yind[ysp] = col; ykey[ysp] = YK; yctx[ysp] = ctxof(ctx, YK); ylvl[ysp] = nl; ypctx[ysp] = ctx; yplvl[ysp] = fl; ychild[ysp] = "" }
+          else { ysp++; yind[ysp] = col; ykey[ysp] = YK; yctx[ysp] = ctxof(ctx, YK); ylvl[ysp] = nl; ypctx[ysp] = ctx; yplvl[ysp] = fl; ychild[ysp] = ""; ykind[ysp] = "" }
           return prefix cm
         }
         shape = decide(YK, ctx, fl)
@@ -821,14 +872,25 @@ show() {
         return prefix " " out cm
       }
 
-      if (ndash == 0) { yh = ind; return "<redacted>" }
-      # An item of a sequence.
-      while (ysp > 0 && (yind[ysp] > ind || (yind[ysp] == ind && ykey[ysp] == "-"))) ysp--
+      if (ndash == 0) {
+        # A line that is no key and no item: a value on its own line. As
+        # the first child of its key it is that key s whole value, so its
+        # indent and everything deeper are hidden.
+        while (ysp > 0 && yind[ysp] >= ind) ysp--
+        first = (ysp > 0) ? (ychild[ysp] == "") : (yrootchild == "")
+        ychildok(ysp, "v", ind)
+        v = ystrip(rest); gsub(/^[ \t]+|[ \t]+$/, "", v)
+        yvalue(v, "", 0, ind)
+        yh = first ? ind - 0.5 : ind; yhd = 0
+        return "<redacted>"
+      }
+      # An item of a sequence that is a value. It shows as its key allows,
+      # and an item of an item never shows.
       v = ystrip(rest); cm = YC ? " # <redacted>" : ""
       gsub(/^[ \t]+|[ \t]+$/, "", v)
       top = ysp
       if (top == 0) { yvalue(v, "", 0, ind); return substr(line, 1, col) "<redacted>" cm }
-      shape = decide(ykey[top], ypctx[top], yplvl[top])
+      shape = (ykey[top] == "-") ? "" : decide(ykey[top], ypctx[top], yplvl[top])
       if (ypend) { ypend = 0; shape = "" }
       if (substr(unq(v), 1, 1) == "-") { ypend = 1; shape = "" }
       return substr(line, 1, col) yvalue(v, shape, 0, ind) cm
@@ -857,21 +919,43 @@ show() {
 
     function tdepth(st) { return cnt(st, "[") + cnt(st, "{") - cnt(st, "]") - cnt(st, "}") }
 
-    # A line that opens a multi-line string. Sets TMLD to its delimiter.
+    # 1 when text, with its comment cut, opens a multi-line string and leaves it open.
     function tmlopen(s,    t, n) {
       t = s; n = gsub(/"""/, "", t)
-      if (n % 2) { TMLD = "\"\"\""; return 1 }
+      if (n % 2) return 1
       t = s; n = gsub(/\047\047\047/, "", t)
-      if (n % 2) { TMLD = "\047\047\047"; return 1 }
+      return n % 2
+    }
+
+    # Where the multi-line string with delimiter d closes in s. 0 for nowhere.
+    function tmlend(s, d,    i, n) {
+      n = length(s)
+      for (i = 1; i <= n; i++) {
+        if (d == "\"\"\"" && substr(s, i, 1) == "\\") { i++; continue }
+        if (substr(s, i, 3) == d) return i
+      }
       return 0
     }
 
+    # A multi-line string is followed only as the whole value of a key. One
+    # that opens anywhere else, such as inside an array, hides the rest of
+    # the file.
     function toml_line(line,    st, plain, inner, n, parts, i, ktxt, k, v, vv, fl, c, leaf, d, hidden) {
-      if (tml != "") { if (index(line, tml)) tml = ""; return "<redacted>" }
-      if (tq != "") { if (index(line, tq)) tq = ""; return "<redacted>" }
+      if (tbroken) return "<redacted>"
+      if (tml != "") { if (tmlend(line, tml)) tml = ""; return "<redacted>" }
+      # A string that goes on past its line is broken TOML. A line in it that
+      # starts like a table header leaves the table unknown.
+      if (tq != "") {
+        if (line ~ /^[ \t]*\[/) { tl = 2; tctx = "x" }
+        if (index(line, tq)) tq = ""
+        return "<redacted>"
+      }
       if (tarr > 0) {
-        if (tmlopen(line)) { tml = TMLD; return "<redacted>" }
-        st = tstrip(line); tarr += tdepth(st)
+        st = tstrip(line)
+        if (tmlopen(TCOM ? substr(line, 1, TCOM - 1) : line)) { tbroken = 1; return "<redacted>" }
+        tarr += tdepth(st)
+        # A line of an array that reads as a table header leaves the table unknown.
+        if (st ~ /^[ \t]*\[\[?[ \t]*[A-Za-z0-9_."\047 -]+[ \t]*\]\]?[ \t]*$/) { tl = 2; tctx = "x" }
         if (TOPEN != "") tq = TOPEN
         if (tarr < 0) tarr = 0
         return "<redacted>"
@@ -881,11 +965,15 @@ show() {
       st = tstrip(line)
       plain = TCOM ? substr(line, 1, TCOM - 1) : line
       sub(/[ \t]+$/, "", plain)
-      if (TOPEN == "" && plain ~ /^[ \t]*\[\[?[ \t]*[A-Za-z0-9_."\047 -]+[ \t]*\]\]?$/) {
+      # A table header [a.b], or an array of tables [[a.b]], which is in a
+      # home only when the home is a list. One bracket on one side and two on
+      # the other is not a header.
+      if (TOPEN == "" && (plain ~ ("^[ \t]*[[]" TPATH "[]]$") || plain ~ ("^[ \t]*[[][[]" TPATH "[]][]]$"))) {
         inner = plain; gsub(/[ \t"\047]/, "", inner); gsub(/\[/, "", inner); gsub(/\]/, "", inner)
         n = split(inner, parts, ".")
         tl = 0; tctx = "top"
         for (i = 1; i <= n; i++) { tl = lvlof(tctx, parts[i], tl); tctx = ctxof(tctx, parts[i]) }
+        if (plain ~ /^[ \t]*\[\[/ && !(tctx in LISTCTX)) tctx = "x"
         return plain (TCOM ? " # <redacted>" : "")
       }
       # A header the reader does not recognise: nothing below it shows until the next good one.
@@ -897,14 +985,17 @@ show() {
         fl = tl; c = tctx
         for (i = 1; i < n; i++) { fl = lvlof(c, parts[i], fl); c = ctxof(c, parts[i]) }
         leaf = parts[n]
+        # A quoted part with a dot, a space, or another sign is not a name the reader knows.
+        if (ktxt !~ ("^" TPATH "=$")) fl = 2
         hidden = (fl >= 2) ? "<redacted>" : ktxt " <redacted>"
         sub(/^[ \t]+/, "", v)
         if (substr(v, 1, 3) == "\"\"\"" || substr(v, 1, 3) == "\047\047\047") {
           d = substr(v, 1, 3)
-          if (index(substr(v, 4), d) == 0) tml = d
+          if (tmlend(substr(v, 4), d) == 0) tml = d
           return hidden
         }
         st = tstrip(v)
+        if (tmlopen(TCOM ? substr(v, 1, TCOM - 1) : v)) { tbroken = 1; return hidden }
         if (TOPEN != "") { tq = TOPEN; return hidden }
         d = tdepth(st)
         if (d > 0) { tarr = d; return hidden }
@@ -913,28 +1004,51 @@ show() {
         sub(/[ \t]+$/, "", vv)
         return ktxt " " render(vv, decide(leaf, c, fl), 1) (TCOM ? " # <redacted>" : "")
       }
-      if (tmlopen(line)) tml = TMLD
+      if (tmlopen(plain)) tbroken = 1
       else if (TOPEN != "") tq = TOPEN
       return "<redacted>"
     }
 
     # ---- HCL: Terraform, OpenTofu, and variable files ----
-    # A frame for each open block or value: its key, the level of its
-    # children, the level it sits at, and the depth inside it.
+    # A frame for each open bracket: its kind (ht), the context and level of
+    # what it holds (hc, hl), whether it is the body of a block (hb), and
+    # whether a bare { directly inside it is an item in the same home (hi).
+    #
+    # A bracket is in a home only when a line of a known form opens it and
+    # closes nothing: a block header in a block body, key = { or key = [ or
+    # key = jsonencode( with these brackets alone, and a bare { or }, { that
+    # is an item of a list home. Every other bracket is unknown, at level 2,
+    # so a line that closes and then opens puts the reader in an unknown
+    # container, whatever text or comment stands between. A closer that does
+    # not match the last open bracket, a quoted string that does not end on
+    # its line, and a heredoc whose end word is not plain break the file: the
+    # line and the rest of the file are hidden.
 
     # The text with strings emptied and comments cut. Sets HCOM (where the
     # comment starts, 0 for none), HBLK (a block comment stays open), HOPEN
-    # (a string stays open), and HDOC (the end word of a heredoc).
-    function hstrip(s,    out, i, c, n, q, p) {
-      out = ""; n = length(s); HCOM = 0; HBLK = 0; HOPEN = 0; HDOC = ""; q = 0
+    # (a string stays open), HDOC (the end word of a heredoc), and HBAD (a
+    # heredoc whose end word the reader cannot tell).
+    function hstrip(s,    out, i, c, n, p, sp, t) {
+      out = ""; n = length(s); HCOM = 0; HBLK = 0; HOPEN = 0; HDOC = ""; HBAD = 0; sp = 0
       for (i = 1; i <= n; i++) {
         c = substr(s, i, 1)
-        if (q) {
+        if (sp > 0 && hm[sp] == "s") {
+          # In a string. ${ and %{ open a template sequence, in which code
+          # and strings nest. $${ and %%{ are the two signs themselves.
           if (c == "\\") { i++; continue }
-          if (c == "\"") { q = 0; out = out c }
+          if (c == "\"") { sp--; if (sp == 0) out = out c; continue }
+          if ((c == "$" || c == "%") && substr(s, i + 1, 1) == c && substr(s, i + 2, 1) == "{") { i += 2; continue }
+          if ((c == "$" || c == "%") && substr(s, i + 1, 1) == "{") { sp++; hm[sp] = "t"; hbd[sp] = 0; i++ }
           continue
         }
-        if (c == "\"") { q = 1; out = out c; continue }
+        if (sp > 0) {
+          # In a template sequence, up to the brace that closes it.
+          if (c == "\"") { sp++; hm[sp] = "s" }
+          else if (c == "{") hbd[sp]++
+          else if (c == "}") { if (hbd[sp] == 0) sp--; else hbd[sp]-- }
+          continue
+        }
+        if (c == "\"") { sp = 1; hm[1] = "s"; out = out c; continue }
         if (c == "#" || (c == "/" && substr(s, i + 1, 1) == "/")) { if (!HCOM) HCOM = i; break }
         if (c == "/" && substr(s, i + 1, 1) == "*") {
           if (!HCOM) HCOM = i
@@ -942,33 +1056,49 @@ show() {
           if (!p) { HBLK = 1; break }
           i = i + p + 2; continue
         }
-        if (c == "<" && substr(s, i + 1, 1) == "<" && match(substr(s, i + 2), /^-?[A-Za-z_][A-Za-z0-9_]*/)) {
-          HDOC = substr(s, i + 2, RLENGTH); sub(/^-/, "", HDOC)
-          out = out "<<"; i = i + 1 + RLENGTH; continue
+        if (c == "<" && substr(s, i + 1, 1) == "<") {
+          # A heredoc: its end word is the last thing on the line.
+          t = substr(s, i + 2); sub(/^-/, "", t); sub(/[ \t]+$/, "", t)
+          if (t ~ /^[A-Za-z_][A-Za-z0-9_-]*$/) { HDOC = t; out = out "<<" }
+          else HBAD = 1
+          break
         }
         out = out c
       }
-      if (q) HOPEN = 1
+      if (sp > 0) HOPEN = 1
       return out
     }
 
-    function hnet(st) {
-      return cnt(st, "{") + cnt(st, "[") + cnt(st, "(") - cnt(st, "}") - cnt(st, "]") - cnt(st, ")")
+    # The brackets of stripped text, in order.
+    function hbrackets(st,    i, c, b) {
+      b = ""
+      for (i = 1; i <= length(st); i++) {
+        c = substr(st, i, 1)
+        if (c == "{" || c == "}" || c == "(" || c == ")" || c == "[" || c == "]") b = b c
+      }
+      return b
     }
 
-    # A frame: the context and level of its children, and the depth inside it.
-    function hpush(c, l, d) { hsp++; hc[hsp] = c; hl[hsp] = l; hd[hsp] = d }
-
-    function hmove(net,    fl) {
-      if (net > 0) hpush("x", 2, hdepth + net)
-      hdepth += net
-      while (hsp > 0 && hd[hsp] > hdepth) hsp--
+    # Applies the brackets br to the frames. Each bracket it opens is unknown.
+    function hwalk(br,    i, c, o) {
+      for (i = 1; i <= length(br); i++) {
+        c = substr(br, i, 1)
+        if (c == "{" || c == "[" || c == "(") {
+          hsp++; ht[hsp] = c; hc[hsp] = "x"; hl[hsp] = 2; hb[hsp] = 0; hi[hsp] = 0
+          continue
+        }
+        o = (c == "}") ? "{" : ((c == "]") ? "[" : "(")
+        if (hsp == 0 || ht[hsp] != o) { hbroken = 1; return }
+        hsp--
+      }
     }
 
-    # What follows the end of a hidden span on the same line counts for depth only.
+    # What follows the end of a hidden span on the same line counts for brackets only.
     function hrest(s,    st) {
-      st = hstrip(s); hmove(hnet(st))
-      hblk = HBLK; hstr = HOPEN; if (HDOC != "") hdoc = HDOC
+      st = hstrip(s)
+      if (HOPEN || HBAD) { hbroken = 1; return }
+      hwalk(hbrackets(st))
+      hblk = HBLK; if (HDOC != "") hdoc = HDOC
     }
 
     function onlystruct(s,    t) {
@@ -976,85 +1106,108 @@ show() {
       return t == ""
     }
 
-    # The lowest depth reached on the line, relative to its start.
-    function hdip(st,    i, c, d, m) {
+    # 1 when the brackets br close one that was open before the line and then open one.
+    function hreopens(br,    i, c, d, m) {
       d = 0; m = 0
-      for (i = 1; i <= length(st); i++) {
-        c = substr(st, i, 1)
-        if (c == "{" || c == "[" || c == "(") d++
-        else if (c == "}" || c == "]" || c == ")") { d--; if (d < m) m = d }
+      for (i = 1; i <= length(br); i++) {
+        c = substr(br, i, 1)
+        if (c == "{" || c == "[" || c == "(") { if (m < 0) return 1; d++ }
+        else { d--; if (d < m) m = d }
       }
-      return m
+      return 0
     }
 
-    function hcl_onlystruct(line, com,    t) {
-      t = com ? substr(line, 1, com - 1) : line
-      return onlystruct(t)
+    # Gives a home to the brackets that key = <openers> opened above frame
+    # top, when the openers sv are one of: { or [ or [{ alone, or the same
+    # after jsonencode(. A [ is in the home only when the home is a list.
+    function hhome(top, ctx, key, fl, sv,    c, l, d) {
+      if (sv !~ /^(jsonencode[ \t]*[(][ \t]*)?(\[[ \t]*)?[{]?$/) return 0
+      c = ctxof(ctx, key); l = lvlof(ctx, key, fl)
+      for (d = top + 1; d <= hsp; d++) {
+        hl[d] = l
+        if (ht[d] == "(") { hc[d] = c; hi[d] = 1 }
+        else if (ht[d] == "[") {
+          if (!(c in LISTCTX)) c = "x"
+          hc[d] = c; hi[d] = (c != "x")
+        } else hc[d] = c
+      }
+      return 1
     }
 
-    function hcl_line(line,    t, p, st, net, disp, cm, top, ctx, fl, out, key, pre, v, tfvars, lab, mind) {
+    function hcl_line(line,    t, p, st, br, simple, disp, cm, top, ctx, fl, body, out, key, pre, v, sv, tfvars, lab, itemsep) {
+      if (hbroken) return "<redacted>"
       if (hdoc != "") { t = line; gsub(/^[ \t]+|[ \t]+$/, "", t); if (t == hdoc) hdoc = ""; return "<redacted>" }
       if (hblk) {
         p = index(line, "*/"); if (!p) return "<redacted>"
         hblk = 0; hrest(substr(line, p + 2)); return "<redacted>"
       }
-      if (hstr) {
-        p = strend(line, 1); if (!p) return "<redacted>"
-        hstr = 0; hrest(substr(line, p + 1)); return "<redacted>"
-      }
       if (line ~ /^[ \t]*$/) return line
       tfvars = (family == "tfvars")
-      st = hstrip(line)
-      net = hnet(st)
-      # A line that closes a block and then opens another: the new block is
-      # unknown, so nothing below it shows until it closes.
-      mind = hdip(st)
-      if (mind < 0 && net > mind && !hcl_onlystruct(line, HCOM)) {
-        hdepth += mind
-        while (hsp > 0 && hd[hsp] > hdepth) hsp--
-        hpush("x", 2, hdepth + net - mind)
-        hdepth += net - mind
-        hblk = HBLK; hstr = HOPEN; if (HDOC != "") hdoc = HDOC
-        return "<redacted>"
-      }
+      st = hstrip(line); br = hbrackets(st)
+      # A quoted string ends on its line. One that does not breaks the file.
+      if (HOPEN || HBAD) { hbroken = 1; return "<redacted>" }
+      simple = (!HBLK && HDOC == "")
       disp = HCOM ? substr(line, 1, HCOM - 1) : line
       sub(/[ \t]+$/, "", disp)
       cm = (HCOM && !tfvars) ? " # <redacted>" : ""
+      # The frame the line starts in.
       top = hsp; ctx = top ? hc[top] : "top"; fl = top ? hl[top] : 0
-      if (disp ~ /^[ \t]*$/) {
-        out = HCOM ? "# <redacted>" : "<redacted>"
-        if (net > 0) hpush("x", 2, hdepth + net)
-      } else if (!tfvars && disp ~ /^[ \t]*[A-Za-z_][A-Za-z0-9_-]*([ \t]+("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*))*[ \t]*[{]$/) {
-        key = disp; sub(/^[ \t]+/, "", key); sub(/[ \t"{].*$/, "", key)
-        # A resource or data block is named by its type.
-        if ((key == "resource" || key == "data") && match(disp, /"[A-Za-z0-9_]+"/)) {
-          lab = substr(disp, RSTART + 1, RLENGTH - 2); key = key "." lab
-        }
-        out = (fl >= 2) ? "<redacted>" : disp cm
-        if (net > 0) hpush(ctxof(ctx, key), lvlof(ctx, key, fl), hdepth + net)
-      } else if (match(disp, /^[ \t]*("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*)[ \t]*[=:]/) && substr(disp, RLENGTH + 1, 1) != "=") {
-        pre = substr(disp, 1, RLENGTH); v = substr(disp, RLENGTH + 1); sub(/^[ \t]+/, "", v)
-        key = pre; sub(/^[ \t]+/, "", key); sub(/[ \t]*[=:]$/, "", key); gsub(/"/, "", key)
-        if (tfvars) {
-          out = (top == 0) ? pre " <redacted>" : "<redacted>"
-          if (net > 0) hpush("x", 2, hdepth + net)
-        } else {
-          if (fl >= 2) out = "<redacted>"
-          else if (HDOC != "" || HOPEN || HBLK || net != 0) out = (net > 0 && v ~ /^[[{( \t]+$/) ? pre " " v : pre " <redacted>"
-          else out = pre " " render(v, decide(key, ctx, fl), 1)
-          if (net > 0) hpush(ctxof(ctx, key), lvlof(ctx, key, fl), hdepth + net)
-          if (out != "<redacted>") out = out cm
-        }
-      } else if (onlystruct(disp)) {
-        out = disp cm
-      } else {
-        out = "<redacted>"
-        if (net > 0) hpush("x", 2, hdepth + net)
+      body = top ? hb[top] : 1
+      hwalk(br)
+      hblk = HBLK; if (HDOC != "") hdoc = HDOC
+      if (hbroken) return "<redacted>"
+      # A line that closes and then opens: only }, { between two items of a
+      # list home keeps a home. Everything else is hidden, with what it opens.
+      if (hreopens(br)) {
+        itemsep = (simple && !tfvars && st ~ /^[ \t]*}[ \t]*,[ \t]*[{][ \t]*$/ && hsp > 1 && ht[hsp - 1] == "[" && hi[hsp - 1])
+        if (!itemsep) return "<redacted>"
+        hc[hsp] = hc[hsp - 1]; hl[hsp] = hl[hsp - 1]
+        return disp cm
       }
-      hdepth += net
-      while (hsp > 0 && hd[hsp] > hdepth) hsp--
-      hblk = HBLK; hstr = HOPEN; if (HDOC != "") hdoc = HDOC
-      return out
+      if (disp ~ /^[ \t]*$/) return HCOM ? "# <redacted>" : "<redacted>"
+      if (!tfvars && disp ~ /^[ \t]*[A-Za-z_][A-Za-z0-9_-]*([ \t]+("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*))*[ \t]*[{]$/) {
+        # A block header. It opens a block only in a block body.
+        if (!body || !simple || br != "{" || fl >= 2) return "<redacted>"
+        key = disp; sub(/^[ \t]+/, "", key); sub(/[ \t"{].*$/, "", key)
+        # A resource or data block is named by its type, the first label.
+        if (key == "resource" || key == "data") {
+          lab = disp; sub(/^[ \t]*[a-z]+[ \t]+/, "", lab)
+          if (match(lab, /^"[A-Za-z0-9_]+"/)) key = key "." substr(lab, 2, RLENGTH - 2)
+        }
+        hc[hsp] = ctxof(ctx, key); hl[hsp] = lvlof(ctx, key, fl); hb[hsp] = 1
+        return disp cm
+      }
+      if (match(disp, /^[ \t]*("[^"\\]*"|[A-Za-z_][A-Za-z0-9_-]*)[ \t]*[=:]/) && substr(disp, RLENGTH + 1, 1) != "=") {
+        pre = substr(disp, 1, RLENGTH); v = substr(disp, RLENGTH + 1); sub(/^[ \t]+/, "", v)
+        key = pre; sub(/^[ \t]+/, "", key); sub(/[ \t]*[=:]$/, "", key)
+        if (tfvars) return (top == 0) ? pre " <redacted>" : "<redacted>"
+        # An attribute sits in a block body, with a bare name and =, or in
+        # an object, where a quoted name and a colon are allowed too.
+        if (body) { if (pre ~ /:$/ || key ~ /^"/) return "<redacted>" }
+        else if (ht[top] != "{") return "<redacted>"
+        gsub(/"/, "", key)
+        if (fl >= 2) return "<redacted>"
+        if (!simple) return pre " <redacted>" cm
+        # A value on one line: it leaves no bracket open, and it closes none
+        # that was open before it.
+        if (hsp == top) return pre " " render(v, decide(key, ctx, fl), 1) cm
+        if (hsp - top == length(br)) {
+          # The value opens brackets and closes none.
+          sv = st; sub(/^[^=:]*[=:][ \t]*/, "", sv); sub(/[ \t]+$/, "", sv)
+          if (hhome(top, ctx, key, fl, sv)) return pre " " ((v ~ /^[[{( \t]+$/) ? v : "<redacted>") cm
+        }
+        return pre " <redacted>" cm
+      }
+      if (onlystruct(disp)) {
+        # A bare { is an item of a list home, or the object of a jsonencode call.
+        # A call holds one object.
+        if (!tfvars && simple && br == "{" && top > 0 && hi[top]) {
+          hc[hsp] = hc[top]; hl[hsp] = hl[top]
+          if (ht[top] == "(") hi[top] = 0
+        }
+        return disp cm
+      }
+      return "<redacted>"
     }
 
     # ---- env files: names only ----
@@ -1082,6 +1235,7 @@ show() {
       return "<redacted>"
     }
 
+    NR == 1 { sub(/^\357\273\277/, "") }
     { sub(/\r$/, ""); CRLINE = (index($0, "\r") > 0) }
     format == "json" { emit(json_line($0)); next }
     format == "yaml" { emit(yaml_line($0)); next }
