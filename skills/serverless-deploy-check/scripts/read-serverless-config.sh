@@ -63,24 +63,27 @@ done
 # it holds under a names-only parent, and over the never-shown list.
 # Shapes: n number, m number or "max", b boolean, d date, w word, t short
 # text, c schedule, p path or route, r method and path, o origin, a address,
-# u action reference, pm workflow permission.
-SHOW_WRANGLER='>name:w ratelimits>name:w main:p compatibility_date:d compatibility_flags:w workers_dev:b route:p routes:p pattern:p custom_domain:b triggers>crons:c limits>cpu_ms:n placement>mode:w enabled:b head_sampling_rate:n invocation_logs:b binding:w class_name:w script_name:w bucket_name:w queue:w service:w entrypoint:w assets>directory:p assets>run_worker_first:b upload_source_maps:b keep_vars:b limit:n period:n secrets>required:w!'
+# u action reference, pm workflow permission. The other shapes are closed
+# sets of values, listed in the ENUM table of the awk program below.
+SHOW_WRANGLER='>name:w ratelimits>name:w main:p compatibility_date:d compatibility_flags:w workers_dev:b route:p routes:p pattern:p custom_domain:b triggers>crons:c limits>cpu_ms:n placement>mode:plc enabled:b head_sampling_rate:n invocation_logs:b kv_namespaces>binding:w r2_buckets>binding:w d1_databases>binding:w bindings>binding:w producers>binding:w services>binding:w hyperdrive>binding:w ai>binding:w vectorize>binding:w analytics_engine_datasets>binding:w browser>binding:w images>binding:w version_metadata>binding:w dispatch_namespaces>binding:w mtls_certificates>binding:w send_email>binding:w workflows>binding:w bindings>name:w bindings>class_name:w bindings>script_name:w r2_buckets>bucket_name:w producers>queue:w consumers>queue:w services>service:w services>entrypoint:w assets>directory:p assets>run_worker_first:b upload_source_maps:b keep_vars:b limit:n period:n secrets>required:w!'
 # shellcheck disable=SC2016  # $schema is a key name, not a variable
-SHOW_VERCEL='maxDuration:m memory:n regions:w functionFailoverRegions:w includeFiles:p excludeFiles:p supportsCancellation:b runtime:w fluid:b bunVersion:w $schema:a framework:w schedule:c path:p requestMethod:w function:p topic:w timezone:w jitter:n headers>source:p rewrites>source:p headers>key:t!'
-SHOW_SAM='Type:w Runtime:w Handler:w CodeUri:p MemorySize:n Timeout:n Architectures:w ReservedConcurrentExecutions:n ProvisionedConcurrencyConfig>ProvisionedConcurrentExecutions:n AutoPublishAlias:w EphemeralStorage>Size:n PackageType:w AuthType:w InvokeMode:w AllowOrigins:o AllowMethods:w AllowHeaders:w AllowCredentials:b MaxAge:n ExposeHeaders:w Policies:w Role:w PermissionsBoundary:w Tracing:w LogFormat:w ApplicationLogLevel:w SystemLogLevel:w UpdateRuntimeOn:w ApplyOn:w RetentionInDays:n Effect:w Action:w Resource:w Principal:w Principal>Service:w Principal>AWS:w Transform:w AWSTemplateFormatVersion:w Path:p Method:w Schedule:c Auth>Authorizer:w Auth>DefaultAuthorizer:w Auth>ApiKeyRequired:b! Auth>AddDefaultAuthorizerToCorsPreflight:b'
-SHOW_SERVERLESS='service:w provider>name:w runtime:w memorySize:n timeout:n architecture:w reservedConcurrency:n provisionedConcurrency:n logRetentionInDays:n handler:w region:w stage:w role:w patterns:p individually:b excludeDevDependencies:b url:b invokeMode:w authorizer:w authorizer>name:w type:w scopes:w cors:b allowedOrigins:o allowedHeaders:w allowedMethods:w allowCredentials:b exposedResponseHeaders:w maxAge:n origin:o origins:o headers:w disableDefaultEndpoint:b http>private:b burstLimit:n rateLimit:n limit:n period:w offset:n mode:w inheritStatements:b managedPolicies:w Effect:w Action:w Resource:w layers:w tracing:b lambda:b apiGateway:b restApi:b httpApi:b websocket:b path:r method:w batchSize:n maximumConcurrency:n rate:c enabled:b events>schedule:c events>sqs:w events>http:r events>httpApi:r'
-SHOW_WORKFLOW='name:t on:w branches:w branches-ignore:w tags:w paths:p types:w cron:c permissions:pm permissions>*:pm! runs-on:w uses:u environment:w with>role-to-assume:w! with>aws-region:w!'
-SHOW_SAMCONFIG='version:n stack_name:w capabilities:w confirm_changeset:b resolve_s3:b region:w cached:b parallel:b watch:b'
-SHOW_SUPABASE='verify_jwt:b entrypoint:p import_map:p static_files:p enabled:b policy:w port:n schemas:w extra_search_path:w max_rows:n major_version:n pool_mode:w default_pool_size:n max_client_conn:n site_url:a additional_redirect_urls:a jwt_expiry:n enable_signup:b enable_anonymous_sign_ins:b enable_confirmations:b file_size_limit:w sql_paths:p'
-SHOW_HCL='runtime:w handler:w function_name:w role:w memory_size:n timeout:n architectures:w reserved_concurrent_executions:n package_type:w filename:p ephemeral_storage>size:n authorization_type:w invoke_mode:w allow_origins:o allow_methods:w allow_headers:w allow_credentials:b max_age:n function_url_auth_type:w invoked_via_function_url:b action:w principal:w effect:w actions:w resources:w retention_in_days:n log_format:w application_log_level:w system_log_level:w tracing_config>mode:w layers:w condition>test:w! condition>variable:w! Effect:w Action:w Resource:w'
+SHOW_VERCEL='maxDuration:m memory:n regions:vrg functionFailoverRegions:vrg includeFiles:p excludeFiles:p supportsCancellation:b runtime:w fluid:b bunVersion:w $schema:a framework:w schedule:c path:p requestMethod:meth function:p topic:w timezone:w jitter:n headers>source:p rewrites>source:p headers>key:t!'
+SHOW_SAM='Type:w Runtime:w Handler:w CodeUri:p MemorySize:n Timeout:n Architectures:arch ReservedConcurrentExecutions:n ProvisionedConcurrencyConfig>ProvisionedConcurrentExecutions:n AutoPublishAlias:w EphemeralStorage>Size:n PackageType:pkg AuthType:auth InvokeMode:inv AllowOrigins:o AllowMethods:w AllowHeaders:w AllowCredentials:b MaxAge:n ExposeHeaders:w Policies:w Role:w PermissionsBoundary:w Tracing:trc LogFormat:lfmt ApplicationLogLevel:llvl SystemLogLevel:llvl UpdateRuntimeOn:upd ApplyOn:snap RetentionInDays:n Effect:eff Action:w Resource:w Principal:prsv Principal>Service:svc Principal>AWS:prin Transform:w AWSTemplateFormatVersion:w Path:p Method:meth Schedule:c Auth>Authorizer:w Auth>DefaultAuthorizer:w Auth>ApiKeyRequired:b! Auth>AddDefaultAuthorizerToCorsPreflight:b'
+SHOW_SERVERLESS='service:w provider>name:w runtime:w memorySize:n timeout:n architecture:arch reservedConcurrency:n provisionedConcurrency:n logRetentionInDays:n handler:w region:rg stage:w role:w patterns:p individually:b excludeDevDependencies:b url:b invokeMode:inv url>authorizer:atype authorizer:w authorizer>name:w type:atype scopes:w cors:b allowedOrigins:o allowedHeaders:w allowedMethods:w allowCredentials:b exposedResponseHeaders:w maxAge:n origin:o origins:o headers:w disableDefaultEndpoint:b http>private:b burstLimit:n rateLimit:n limit:n period:perd offset:n mode:iamm inheritStatements:b managedPolicies:w Effect:eff Action:w Resource:w layers:lyr tracing:b lambda:b apiGateway:b restApi:b httpApi:b websocket:b path:r method:meth batchSize:n maximumConcurrency:n rate:c enabled:b events>schedule:c events>sqs:arn events>http:r events>httpApi:r'
+SHOW_WORKFLOW='name:t on:w branches:w branches-ignore:w tags:w paths:p types:w cron:c permissions:pm permissions>*:pm! runs-on:w uses:u environment:w with>role-to-assume:iamrole! with>aws-region:rg!'
+SHOW_SAMCONFIG='version:n stack_name:w capabilities:w confirm_changeset:b resolve_s3:b region:rg cached:b parallel:b watch:b'
+SHOW_SUPABASE='verify_jwt:b entrypoint:p import_map:p static_files:p enabled:b policy:epol port:n schemas:w extra_search_path:w max_rows:n major_version:n pool_mode:pool default_pool_size:n max_client_conn:n site_url:a additional_redirect_urls:a jwt_expiry:n enable_signup:b enable_anonymous_sign_ins:b enable_confirmations:b file_size_limit:w sql_paths:p'
+SHOW_HCL='runtime:w handler:w function_name:w role:w memory_size:n timeout:n architectures:arch reserved_concurrent_executions:n package_type:pkg filename:p ephemeral_storage>size:n authorization_type:auth invoke_mode:inv allow_origins:o allow_methods:w allow_headers:w allow_credentials:b max_age:n function_url_auth_type:auth invoked_via_function_url:b action:w principal:prsv effect:eff actions:w resources:w retention_in_days:n log_format:lfmt application_log_level:llvl system_log_level:llvl tracing_config>mode:trc layers:lyr condition>test:w! condition>variable:w! Effect:eff Action:w Resource:w'
 
 # Never shown, matched by name in any file. A key whose name holds secret,
 # token, password, credential, private key, API key, access key, connection
 # string, or database URL is never shown either. Under one of these keys,
 # names and values are hidden.
-NEVER_KEYS='secret secrets token password passwd apikey api_key apiKeys access_key secret_key client_secret auth_token private_key localConnectionString connection_string database_url aws-access-key-id aws-secret-access-key CRON_SECRET input request parameters buildCommand installCommand run key parameter_overrides'
+NEVER_KEYS='secret secrets token password passwd apikey api_key apiKeys access_key secret_key client_secret auth_token private_key localConnectionString connection_string database_url aws-access-key-id aws-secret-access-key CRON_SECRET input request buildCommand installCommand run key parameter_overrides'
 
-# Maps that show their key names and hide every value below them.
+# Maps that show their key names and hide every value below them. Each file
+# adds its own, below: maps whose key names the user picks, where a key that
+# is shown elsewhere can hold anything.
 NAMES_KEYS='environment Environment Variables variables vars inputs Condition condition'
 
 # A SAM or CloudFormation template, whatever its name.
@@ -197,12 +200,12 @@ show() {
   case "$family" in
     wrangler) keys=$SHOW_WRANGLER; names=secrets ;;
     vercel) keys=$SHOW_VERCEL; names='env' ;;
-    sam) keys=$SHOW_SAM; names= ;;
-    serverless) keys=$SHOW_SERVERLESS; names= ;;
-    workflow) keys=$SHOW_WORKFLOW; names='env with secrets' ;;
+    sam) keys=$SHOW_SAM; names='Mappings Parameters Outputs Metadata' ;;
+    serverless) keys=$SHOW_SERVERLESS; names='custom params' ;;
+    workflow) keys=$SHOW_WORKFLOW; names='env with secrets matrix outputs' ;;
     samconfig) keys=$SHOW_SAMCONFIG; names= ;;
-    supabase) keys=$SHOW_SUPABASE; names= ;;
-    hcl) keys=$SHOW_HCL; names= ;;
+    supabase) keys=$SHOW_SUPABASE; names='vault' ;;
+    hcl) keys=$SHOW_HCL; names='locals variable module output' ;;
     *) keys=; names= ;;
   esac
 
@@ -221,6 +224,33 @@ show() {
       n = split(nameskeys, list, " "); for (i = 1; i <= n; i++) NAMES[list[i]] = 1
       n = split(familynames, list, " "); for (i = 1; i <= n; i++) FNAMES[list[i]] = 1
       UNKNOWN = "\001"
+      # Closed sets of values, and two fixed forms.
+      ENUM["arch"] = "x86_64|arm64"
+      ENUM["auth"] = "AWS_IAM|NONE"
+      ENUM["inv"] = "BUFFERED|RESPONSE_STREAM"
+      ENUM["trc"] = "Active|PassThrough|Disabled"
+      ENUM["pkg"] = "Zip|Image"
+      ENUM["lfmt"] = "Text|JSON"
+      ENUM["llvl"] = "TRACE|DEBUG|INFO|WARN|ERROR|FATAL"
+      ENUM["eff"] = "Allow|Deny"
+      ENUM["iamm"] = "shared|perFunction"
+      ENUM["perd"] = "DAY|WEEK|MONTH"
+      ENUM["atype"] = "jwt|request|token|aws_iam|cognito_user_pools|JWT|REQUEST|TOKEN|AWS_IAM|COGNITO_USER_POOLS"
+      ENUM["meth"] = "get|post|put|patch|delete|head|options|any|GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ANY|[*]"
+      ENUM["plc"] = "smart|off"
+      ENUM["pool"] = "transaction|session"
+      ENUM["epol"] = "oneshot|per_worker"
+      ENUM["upd"] = "Auto|FunctionUpdate|Manual"
+      ENUM["snap"] = "PublishedVersions|None"
+      ENUM["rg"] = "[a-z][a-z](-gov)?-[a-z]+-[0-9]+"
+      ENUM["vrg"] = "[a-z][a-z][a-z][0-9]|all"
+      ENUM["iamrole"] = "arn:aws[a-z-]*:iam::[0-9]+:role/[A-Za-z0-9_+=,.@/-]+"
+      ENUM["prin"] = "[*]|[0-9]+|arn:aws[a-z-]*:iam::[0-9]+:[A-Za-z0-9_+=,.@/:-]+"
+      ENUM["svc"] = "[a-z0-9.-]+[.]amazonaws[.]com([.]cn)?"
+      ENUM["prsv"] = ENUM["prin"] "|" ENUM["svc"]
+      ENUM["lyr"] = "arn:aws[a-z-]*:lambda:[a-z0-9-]+:[0-9]+:layer:[A-Za-z0-9_-]+:[0-9]+"
+      ENUM["arn"] = "arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:[0-9]*:[A-Za-z0-9_+=,.@/:*-]+"
+      ENUM["hl"] = "[A-Za-z0-9*-]+(, *[A-Za-z0-9*-]+)*"
       # JSON
       jsp = 0; jexp = "v"; jcur = ""; jstr = 0; jcom = 0
       # YAML
@@ -241,7 +271,9 @@ show() {
       return c
     }
 
-    function emit(s) { printf "%6d\t%s\n", NR, s }
+    # A line that still holds a carriage return after its end is cut is not
+    # a line the handlers can judge: it is hidden whole.
+    function emit(s) { printf "%6d\t%s\n", NR, (CRLINE ? "<redacted>" : s) }
 
     # 0: an ordinary key. 1: a map whose names show and whose values hide.
     # 2: a key that is never shown; below it, names and values hide.
@@ -249,6 +281,7 @@ show() {
       if (k == UNKNOWN || index(k, "\\")) return 2
       if (k in FNAMES) return 1
       if (k in NEVER) return 2
+      if (k == "parameters" && family == "serverless") return 2
       lk = tolower(k); gsub(/[-_]/, "", lk)
       if (lk ~ /secret|token|passw|credential|privatekey|apikey|accesskey|connectionstring|databaseurl/) return 2
       if (k in NAMES) return 1
@@ -303,6 +336,7 @@ show() {
       if (s == UNKNOWN || s == "") return 0
       if (index(s, "\\") || index(s, "\"") || index(s, "\047")) return 0
       if (shape != "n" && shape != "m" && substr(s, 1, 1) == "-") return 0
+      if (shape in ENUM) return s ~ ("^(" ENUM[shape] ")$")
       if (shape == "n") return s ~ /^-?[0-9]+([.][0-9]+)?$/
       if (shape == "m") return s ~ /^[0-9]+$/ || s == "max"
       if (shape == "b") return s ~ /^(true|false|True|False|TRUE|FALSE|yes|no|on|off)$/
@@ -312,7 +346,8 @@ show() {
         return length(s) <= 128 && t ~ /^[A-Za-z0-9_.:*\/+,-]+$/ && index(s, "//") == 0
       }
       if (shape == "t") return length(s) <= 80 && s ~ /^[A-Za-z0-9 _.:,()\/*+-]+$/
-      if (shape == "c") return length(s) <= 64 && s ~ /^[A-Za-z0-9 *\/,?#().-]+$/
+      # A schedule has fields, or is rate(...), cron(...), or @name.
+      if (shape == "c") return length(s) <= 64 && s ~ /^[A-Za-z0-9 *\/,?#().-]+$/ && (index(s, " ") || s ~ /^(rate|cron)[(]/ || s ~ /^@[a-z]+$/)
       if (shape == "p") return pathok(s)
       if (shape == "r") { t = s; sub(/^[A-Za-z*]+ +/, "", t); return pathok(t) }
       if (shape == "o") return s == "*" || s ~ /^https?:\/\/[A-Za-z0-9.*-]+(:[0-9]+)?\/?$/
@@ -395,10 +430,11 @@ show() {
         if (jexp != "v") return hidden
         key = jcur; par = jk[jsp]; fl = jl[jsp]
         shape = decide(key, par, fl, jpl[jsp])
-        # A vercel.json header: the value shows only for an Access-Control- key.
+        # A vercel.json header: the value shows only for an Access-Control- key,
+        # as an origin for Allow-Origin and as a list of words for the others.
         if (family == "vercel" && par == "headers" && fl == 0) {
-          if (key == "key") jack[jsp] = (unq(tok) ~ /^Access-Control-/)
-          if (key == "value") shape = jack[jsp] ? "t" : ""
+          if (key == "key") jack[jsp] = (unq(tok) == "Access-Control-Allow-Origin") ? 1 : ((unq(tok) ~ /^Access-Control-/) ? 2 : 0)
+          if (key == "value") shape = (jack[jsp] == 1) ? "o" : ((jack[jsp] == 2) ? "hl" : "")
         }
         r = render(tok, shape, fl <= 1)
         return (r == "<redacted>") ? hidden : r
@@ -689,6 +725,8 @@ show() {
         ttab = parts[n]
         return plain (TCOM ? " # <redacted>" : "")
       }
+      # A header the reader does not recognise: nothing below it shows until the next good one.
+      if (plain ~ /^[ \t]*\[/) { tl = 2; tpl = 2; ttab = UNKNOWN; return "<redacted>" }
       if (match(line, /^[ \t]*([A-Za-z0-9_-]+|"[^"\\]*"|\047[^\047]*\047)([ \t]*[.][ \t]*([A-Za-z0-9_-]+|"[^"\\]*"|\047[^\047]*\047))*[ \t]*=/)) {
         ktxt = substr(line, 1, RLENGTH); v = substr(line, RLENGTH + 1)
         k = ktxt; sub(/=$/, "", k); gsub(/[ \t"\047]/, "", k)
@@ -851,7 +889,7 @@ show() {
       return "<redacted>"
     }
 
-    { gsub(/\r/, "") }
+    { sub(/\r$/, ""); CRLINE = (index($0, "\r") > 0) }
     format == "json" { emit(json_line($0)); next }
     format == "yaml" { emit(yaml_line($0)); next }
     format == "toml" { emit(toml_line($0)); next }

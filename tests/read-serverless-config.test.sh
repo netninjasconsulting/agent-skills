@@ -618,6 +618,213 @@ jobs:
           role-to-assume: FIXTUREVALUE0123456789abcdef
 YAML
 
+# 5p. Review round 1.
+# I1: a table header the reader does not recognise must not keep the table before it.
+put header/wrangler.toml <<'TOML'
+[[routes]]
+pattern = "api.example.com/hooks/x"
+[env.é.vars]
+service = "FIXTUREVALUE"
+[[routes]]
+pattern = "api.example.com/x"
+[env."eu/prod".vars]
+service = "FIXTUREVALUE"
+TOML
+put header/supabase/config.toml <<'TOML'
+[edge_runtime]
+policy = "per_worker"
+[remotes."feature/x".db]
+policy = "FIXTUREVALUE"
+TOML
+# I2: a file with CR-only line endings.
+mkdir -p "$a/cr/.github/workflows" "$a/cr-toml"
+printf 'name: Deploy\renv:\r  TOKEN: FIXTUREVALUE\r' > "$a/cr/.github/workflows/cr.yml"
+printf 'name = "w"\r[vars]\rTOKEN = "FIXTUREVALUE"\r' > "$a/cr-toml/wrangler.toml"
+# I3: samconfig.toml shows its deploy settings.
+put samconfig/samconfig.toml <<'TOML'
+version = 0.1
+[default.deploy.parameters]
+stack_name = "quickship"
+capabilities = "CAPABILITY_IAM"
+region = "us-east-1"
+parameter_overrides = "DbPassword=FIXTUREVALUE"
+TOML
+# I4: maps whose key names the user picks are names only.
+put usermaps/main.tf <<'HCL'
+locals {
+  handler = "FIXTUREVALUE"
+}
+variable "x" {
+  type    = string
+  default = "FIXTUREVALUE"
+}
+module "m" {
+  runtime = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "f" {
+  timeout = 7
+}
+HCL
+put usermaps/serverless.yml <<'YAML'
+params:
+  prod:
+    handler: FIXTUREVALUE
+custom:
+  x:
+    region: FIXTUREVALUE
+provider:
+  runtime: nodejs22.x
+YAML
+put usermaps/template.yaml <<'YAML'
+AWSTemplateFormatVersion: "2010-09-09"
+Mappings:
+  M:
+    prod:
+      Handler: FIXTUREVALUE
+Parameters:
+  P:
+    Type: FIXTUREVALUE
+Resources:
+  Fn:
+    Properties:
+      MemorySize: 256
+YAML
+put usermaps/.github/workflows/m.yml <<'YAML'
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        type: FIXTUREVALUE
+jobs:
+  a:
+    strategy:
+      matrix:
+        branches: [FIXTUREVALUE]
+        runtime: FIXTUREVALUE
+    runs-on: ubuntu-latest
+YAML
+put usermaps/supabase/config.toml <<'TOML'
+[db.vault]
+policy = "FIXTUREVALUE"
+[edge_runtime.secrets]
+policy = "FIXTUREVALUE"
+[edge_runtime]
+policy = "oneshot"
+TOML
+# I4: a key with a small closed set of values shows only a value from that set.
+put closed/serverless.yml <<'YAML'
+provider:
+  architecture: FIXTUREVALUE
+  region: FIXTUREVALUE
+  iam:
+    role:
+      mode: FIXTUREVALUE
+      statements:
+        - Effect: FIXTUREVALUE
+  apiGateway:
+    usagePlan:
+      quota:
+        period: FIXTUREVALUE
+  httpApi:
+    authorizers:
+      a:
+        type: FIXTUREVALUE
+functions:
+  f:
+    url:
+      invokeMode: FIXTUREVALUE
+    events:
+      - http:
+          method: FIXTUREVALUE
+      - http:
+          method: post
+YAML
+put closed/template.yaml <<'YAML'
+Resources:
+  Fn:
+    Properties:
+      AuthType: FIXTUREVALUE
+      Tracing: FIXTUREVALUE
+      PackageType: FIXTUREVALUE
+      Architectures: [FIXTUREVALUE, arm64]
+YAML
+put closed/main.tf <<'HCL'
+resource "aws_lambda_function_url" "u" {
+  authorization_type = "FIXTUREVALUE"
+  invoke_mode        = "FIXTUREVALUE"
+}
+resource "aws_lambda_function" "f" {
+  logging_config {
+    log_format = "FIXTUREVALUE"
+  }
+  tracing_config {
+    mode = "FIXTUREVALUE"
+  }
+}
+HCL
+put closed/vercel.json <<'JSON'
+{ "regions": ["FIXTUREVALUE", "iad1"], "schedules": { "n": { "requestMethod": "FIXTUREVALUE" } } }
+JSON
+put closed/.github/workflows/c.yml <<'YAML'
+jobs:
+  a:
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: FIXTUREVALUE
+YAML
+# 5q. Shown keys with a fixed form show only that form (from the reviewer's files).
+put fixedform/wrangler.toml <<'TOML'
+[triggers]
+crons = ["0 * * * *", "FIXTUREVALUE"]
+[vars2]
+service = "FIXTUREVALUE"
+binding = "FIXTUREVALUE"
+[[services]]
+binding = "AUTH"
+service = "auth-worker"
+TOML
+put fixedform/vercel.json <<'JSON'
+{ "headers": [{ "source": "/(.*)", "headers": [
+  { "key": "Access-Control-Allow-Origin", "value": "FIXTUREVALUE" },
+  { "key": "Access-Control-Expose-Headers", "value": "X, FIXTUREVALUE one two" },
+  { "key": "Access-Control-Allow-Origin", "value": "https://app.example.com" }
+] }] }
+JSON
+put fixedform/main.tf <<'HCL'
+resource "aws_lambda_function" "f" {
+  layers = ["arn:aws:lambda:us-east-1:123456789012:layer:x:1", "FIXTUREVALUE"]
+}
+HCL
+put fixedform/template.yaml <<'YAML'
+Resources:
+  P:
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Principal:
+              AWS: FIXTUREVALUE
+              Service: FIXTUREVALUE
+          - Principal:
+              Service: lambda.amazonaws.com
+YAML
+put fixedform/serverless.yml <<'YAML'
+functions:
+  f:
+    events:
+      - sqs: FIXTUREVALUE
+      - schedule: FIXTUREVALUE
+      - schedule: rate(1 hour)
+YAML
+put fixedform/.github/workflows/f.yml <<'YAML'
+jobs:
+  a:
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: FIXTUREVALUE
+YAML
+
 attack_count=0
 for file in $(cd "$a" && find . -type f | sort); do
   attack_count=$((attack_count + 1))
@@ -626,7 +833,7 @@ for file in $(cd "$a" && find . -type f | sort); do
   [ "$code" -eq 0 ] || fail "attack $file: exit $code, so the file was not read"
   no_marker "$out" "attack $file"
 done
-[ "$attack_count" -ge 40 ] || fail "attack: only $attack_count files were written"
+[ "$attack_count" -ge 60 ] || fail "attack: only $attack_count files were written"
 
 # The attack files still show what the checks need.
 expect_text "$(sh "$reader" --show "$a/span/vercel.json")" '"framework": "kept"' "attack span/vercel.json"
@@ -668,6 +875,26 @@ expect_text "$(sh "$reader" --show "$a/next/vercel.json")" '"maxDuration": 60' "
 expect_text "$(sh "$reader" --show "$a/next/wrangler.toml")" 'compatibility_date = "2024-01-01"' "attack next/wrangler.toml"
 expect_re "$(sh "$reader" --show "$a/next/main.tf")" 'timeout = 10$' "attack next/main.tf"
 expect_text "$(sh "$reader" --show "$a/next/.github/workflows/w.yml")" 'name: ok step' "attack next workflow"
+expect_text "$(sh "$reader" --show "$a/header/supabase/config.toml")" 'policy = "per_worker"' "review I1 supabase"
+expect_text "$(sh "$reader" --show "$a/samconfig/samconfig.toml")" 'stack_name = "quickship"' "review I3 samconfig"
+expect_text "$(sh "$reader" --show "$a/samconfig/samconfig.toml")" 'capabilities = "CAPABILITY_IAM"' "review I3 samconfig"
+expect_text "$(sh "$reader" --show "$a/samconfig/samconfig.toml")" 'region = "us-east-1"' "review I3 samconfig"
+expect_text "$(sh "$reader" --show "$a/samconfig/samconfig.toml")" 'parameter_overrides = <redacted>' "review I3 samconfig"
+expect_re "$(sh "$reader" --show "$a/usermaps/main.tf")" 'timeout = 7$' "review I4 main.tf"
+expect_text "$(sh "$reader" --show "$a/usermaps/main.tf")" 'handler = <redacted>' "review I4 main.tf"
+expect_re "$(sh "$reader" --show "$a/usermaps/serverless.yml")" 'runtime: nodejs22\.x$' "review I4 serverless.yml"
+expect_re "$(sh "$reader" --show "$a/usermaps/template.yaml")" 'MemorySize: 256$' "review I4 template.yaml"
+expect_text "$(sh "$reader" --show "$a/usermaps/.github/workflows/m.yml")" 'runs-on: ubuntu-latest' "review I4 workflow"
+expect_text "$(sh "$reader" --show "$a/usermaps/supabase/config.toml")" 'policy = "oneshot"' "review I4 supabase"
+expect_re "$(sh "$reader" --show "$a/closed/serverless.yml")" 'method: post$' "review I4 closed sets"
+expect_text "$(sh "$reader" --show "$a/closed/template.yaml")" 'Architectures: [<redacted>, arm64]' "review I4 closed sets"
+expect_text "$(sh "$reader" --show "$a/closed/vercel.json")" '"iad1"' "review I4 closed sets"
+expect_text "$(sh "$reader" --show "$a/fixedform/wrangler.toml")" 'service = "auth-worker"' "fixed forms wrangler"
+expect_text "$(sh "$reader" --show "$a/fixedform/wrangler.toml")" 'binding = "AUTH"' "fixed forms wrangler"
+expect_text "$(sh "$reader" --show "$a/fixedform/vercel.json")" '"value": "https://app.example.com"' "fixed forms vercel"
+expect_text "$(sh "$reader" --show "$a/fixedform/main.tf")" 'arn:aws:lambda:us-east-1:123456789012:layer:x:1' "fixed forms main.tf"
+expect_text "$(sh "$reader" --show "$a/fixedform/template.yaml")" 'Service: lambda.amazonaws.com' "fixed forms template"
+expect_text "$(sh "$reader" --show "$a/fixedform/serverless.yml")" 'schedule: rate(1 hour)' "fixed forms serverless"
 
 # The other CloudFormation template is listed with the platform files.
 git -C "$a" init -q -b main
