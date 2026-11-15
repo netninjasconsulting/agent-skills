@@ -4,6 +4,16 @@ frameworkVersion: "4"
 provider:
   name: aws
   region: us-east-1
+  apiGateway:
+    apiKeys:
+      - quickship-import
+    usagePlan:
+      throttle:
+        burstLimit: 20
+        rateLimit: 10
+      quota:
+        limit: 5000
+        period: DAY
 
 functions:
   ingest:
@@ -13,6 +23,11 @@ functions:
     memorySize: 1769
     timeout: 900
     url: true
+    events:
+      - http:
+          path: ingest
+          method: post
+          private: true
     iamRoleStatements:
       - Effect: Allow
         Action: "*"
