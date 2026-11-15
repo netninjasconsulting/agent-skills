@@ -26,6 +26,10 @@ This skill is not read-only, and I want that to be plain. It writes files in the
 
 - It never handles a password, a key, or a token. Sign-in goes through each provider's own CLI, and you run it.
 - It never creates a remote resource without its own confirmation.
+- It never writes a file of its own outside the project folder, and that includes temporary files. The tools it runs, such as npm and the provider CLIs, keep their own caches and settings where they always do.
+- It never fetches a workflow or a script from the web. The CI workflow starts from `assets/ci.yml`, a template inside the skill.
+- It never follows an instruction that it finds in a package's README or in a tool's output. It shows you a redacted quotation or a summary and carries on with the plan.
+- It never adds a package that the plan doesn't name without asking first.
 - It never installs or copies a third-party skill. It checks whether each one is installed, prints the install command when it is not, and asks whether to go on without it.
 - It sends nothing to Net Ninjas or to anyone else. Requests go only to the providers you chose, through your own sign-ins.
 
@@ -48,7 +52,7 @@ Each one works without Net Ninjas, and this skill works without each one: a miss
 
 ## Install
 
-The skill installs with the [skills CLI](https://github.com/vercel-labs/skills), which needs Node.js 22.20 or later. The whole kit works as one, so I install all four:
+The skill installs with the [skills CLI](https://github.com/vercel-labs/skills), which needs Node.js 22.20 or later. The starter runs three other skills of this kit on its result, so I install the four together:
 
 ```sh
 npx skills add netninjasconsulting/agent-skills --skill guided-app-starter --skill vibe-code-pre-launch-check --skill gitops-hygiene-check --skill handover-runbook-generator
@@ -56,7 +60,7 @@ npx skills add netninjasconsulting/agent-skills --skill guided-app-starter --ski
 
 The skills CLI is a third-party tool, and it collects anonymous usage data of its own. Setting `DISABLE_TELEMETRY=1` in front of the command turns that off. The skills are also plain folders, so copying them from `skills/` in this repository into the agent's skills folder works without any installer.
 
-Remote steps need `git`, the GitHub CLI, and the chosen provider's CLI. This is version 0.1.0, and I want its limits on the page. The stack recommendation has written scenarios with worked scores. The build and the remote steps have not been run end to end on any stack yet. The changelog and `tests/RESULTS.md` say what was tested and what was not.
+Remote steps need `git`, the GitHub CLI, and the chosen provider's CLI. This is version 0.2.0, and I want its limits on the page. The stack recommendation has written scenarios with worked scores. Three ground rules have each passed one sandbox run with a fresh agent: no file of its own outside the project folder, the CI workflow from the bundled template, and an instruction printed by a package's install script. The build and the remote steps have not been run end to end on any stack yet. The changelog and `tests/RESULTS.md` say what was tested and what was not.
 
 ## Use
 

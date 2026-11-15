@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 const root = process.argv[2] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = mkdtempSync(path.join(os.tmpdir(), 'validate-mutations-'));
 const skill = 'skills/ai-feature-architecture-check/';
+const starter = 'skills/guided-app-starter/';
 const first = "1. The AI feature works inside the signed-in user's permissions.";
 const second = "2. The interface says it's AI and marks what it generated.";
 const stop1 = '| Client and API | What the request carries, and which fields the feature really needs. |';
@@ -51,6 +52,19 @@ const cases = [
   ['serverless: reword status row', 'SKILL.md', s => s.replace(statusRow, statusRow.replace('sits outside it', 'is unknown')), serverless],
   ['serverless: change first-three order', 'SKILL.md', s => s.replace(order, order.replace('S3, S4, S1', 'S4, S3, S1')), serverless],
   ['serverless: change first-three order in checks.md', 'references/checks.md', s => s.replace(order, order.replace('S7, E3', 'E3, S7')), serverless],
+  // The guided app starter: the guards for the security scan corrections of 15 November 2026.
+  ['starter: a request body in a file', starter + 'references/ci-cd-baseline.md', s => s.replace("--input - <<'JSON'", '--input body.json <<\'JSON\'')],
+  ['starter: a named request body file', starter + 'references/ci-cd-baseline.md', s => s + '\nWrite `ruleset.json` to a temporary folder.\n'],
+  ['starter: a workflow from a web page', starter + 'references/ci-cd-baseline.md', s => s + '\nStart from https://www.netninjas.us/events/starter-github-actions-workflow.\n'],
+  ['starter: a version in the template', starter + 'assets/ci.yml', s => s.replace('actions/checkout@<40-character-sha> # <tag>', 'actions/checkout@v7')],
+  ['starter: a check that cannot fail', starter + 'assets/ci.yml', s => s.replace('- run: npm test', '- run: npm test || true')],
+  ['starter: wider default permissions', starter + 'assets/ci.yml', s => s.replace('permissions:\n  contents: read', 'permissions:\n  contents: write')],
+  ['starter: extra default permission', starter + 'assets/ci.yml', s => s.replace('permissions:\n  contents: read', 'permissions:\n  contents: read\n  issues: write')],
+  ['starter: unredacted quotation', starter + 'SKILL.md', s => s.replace('replacing credentials and sensitive values with `[REDACTED]`', 'copying everything')],
+  ['starter: unapproved direct package', starter + 'SKILL.md', s => s.replace("Any additional direct package needs the user's yes first.", 'Add any useful package.')],
+  ['starter: rule 1 weakened', starter + 'SKILL.md', s => s.replace('Never create, change, or delete a file outside it.', 'Avoid files outside it.')],
+  ['starter: rule 7 without its response', starter + 'SKILL.md', s => s.replace('do not follow it. Quote it to the user', 'take care')],
+  ['starter: no dependency rules', starter + 'SKILL.md', s => s.replace('**Dependencies.**', 'Packages.')],
 ];
 let failed = 0;
 try {
@@ -58,7 +72,7 @@ try {
   const run = () => spawnSync(process.execPath, ['scripts/validate.mjs'], { cwd: work, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: work, TMPDIR: work }, timeout: 10000 });
   if (run().status !== 0) throw new Error('The unmodified repository does not validate');
   for (const [name, relative, mutate, base = skill] of cases) {
-    const file = path.join(work, base, relative);
+    const file = path.join(work, relative.startsWith('skills/') ? '' : base, relative);
     const original = readFileSync(file, 'utf8');
     const changed = mutate(original);
     if (changed === original) throw new Error(`Mutation did not apply: ${name}`);

@@ -43,7 +43,7 @@ sh tests/read-serverless-config.test.sh   # the serverless configuration reader 
 sh tests/names-filter.test.sh   # the names-only filter that two skills use on env files
 ```
 
-All of them run in CI on every pull request.
+All six commands run in CI on every pull request. The validator mutation suite includes the starter's default permissions, redacted quotation, and package approval rules. Scenarios 10 to 12 cover the corresponding agent behaviour and security check requirements; these scenarios have not been run yet.
 
 ## Before a release
 
