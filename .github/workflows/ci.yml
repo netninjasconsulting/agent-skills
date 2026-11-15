@@ -1,4 +1,4 @@
-# Checks for every pull request: the validator, the two script tests, and shellcheck.
+# Checks for every pull request: the validator, the script tests, and shellcheck.
 name: ci
 
 on:
@@ -34,6 +34,8 @@ jobs:
         run: sh tests/scan-secrets.test.sh
       - name: Test the agent configuration reader
         run: sh tests/list-agent-config.test.sh
+      - name: Test the serverless configuration reader
+        run: sh tests/read-serverless-config.test.sh
       - name: Test the names filter for env files
         run: sh tests/names-filter.test.sh
       - name: Lint the shell scripts
