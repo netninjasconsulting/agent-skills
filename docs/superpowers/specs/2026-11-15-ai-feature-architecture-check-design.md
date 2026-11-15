@@ -105,7 +105,7 @@ A repository with several AI features gets one map that names each feature.
 
 ### Step 2: the twelve checks
 
-The checks, the layers, and the bands keep their published wording. Each check gets one status.
+The checks, the layers, and the bands keep their published wording. The wording is copied from the source of each page in the website repository (`lib/events.ts`, commit 544c46a). Where the two sites differ, the skill uses the wording of netninjas.us, which carries no legal citations. Each check gets one status.
 
 | Status | Meaning | Points |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ The headline is "N out of 12 confirmed in code (M to ask the team)". The band is
 
 ### Step 3: the data path
 
-One row for each of the ten stops: which personal data fields reach it, by name, with the evidence. One row for each of the eight leak paths, with the status "found", "not found in the repository", or "ask the team". The skill reports the region each endpoint and store is pinned to, and it asks no region question.
+One row for each of the ten stops: which personal data fields reach it, by name, with the evidence. One row for each of the eight leak paths, with one of the four statuses above and no points. The published leak paths are written as statements that should hold, so a pass means that the path is closed. The skill reports the region each endpoint and store is pinned to, and it asks no region question.
 
 Personal data is flagged with its location. The section draws no legal conclusion, and it says that it is not a data protection impact assessment.
 
@@ -145,7 +145,7 @@ Printed in chat: the scope line, the headline and the band, the feature map, the
 ## Tests
 
 - **Baseline first.** One run of the plain request on the fixture with no skill installed, recorded in `tests/RESULTS.md`.
-- **Fixture.** `support-copilot` is a small multi-tenant support app in TypeScript with an AI reply feature. It holds: two direct model call sites and no gateway, no timeout and no fallback, a retrieval query that takes the tenant from the request body, a prompt built before validation, a full customer record in the prompt, a refund tool that runs on the model's word with a service key, an "AI-generated" label with no machine-readable mark, an evaluation script that CI never runs, an evaluation set of invented customer records, prompts and responses in the logs, an error tracker that captures request bodies, a model client with no region, a snapshot copied to a second region, and usage that is not recorded per tenant. It also holds a planted instruction to reviewers. The fixture exercises every status at least once.
+- **Fixture.** `support-copilot` is a small multi-tenant support app in TypeScript with an AI reply feature. It holds: two direct model call sites and no gateway, no timeout and no fallback, a retrieval query that takes the tenant from the request body, a prompt built before validation, a full customer record in the prompt, a refund tool that runs on the model's word with a service key, an "AI-generated" label with a machine-readable mark, as the one check that passes, an evaluation script that CI never runs, an evaluation set of invented customer records, prompts and responses in the logs, an error tracker that captures request bodies, a model client with no region, a snapshot copied to a second region, and usage that is not recorded per tenant. It also holds a planted instruction to reviewers. The fixture exercises every status at least once.
 - **Fresh agent runs** against `EXPECTED.md`: one with no answer to the second-pass offer, and one with scripted answers, to confirm that the two headlines stay apart.
 - **Validator.** `scripts/validate.mjs` pins the twelve checks, the ten stops, and the eight leak paths to their published wording, as it does today for the ten checks.
 
