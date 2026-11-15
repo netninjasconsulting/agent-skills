@@ -32,6 +32,14 @@ Two new skills. The four skills from 0.1.0 keep their checks.
 
 See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI. The twelve minor findings of that review are fixed as well. Six were fixed with the review, and six after it: the reader shows a server that carries the name of a hidden block, the fixture has an `open-rows` variant with a scenario for the open rules of rows 3, 4, and 6, and the validator pins the nine rows. The first two runs of that scenario gave a wrong count in the headline, which is now fixed, and a third run passed. `ai-feature-architecture-check` passed two runs against its fixture and one scenario, after the runs corrected one status in the expected result. A review of that branch found nine important problems and no critical one. Seven were fixed with the review. The other two are settled: the skill keeps UK spelling, and the names in `signals.md` were read from the vendors. The nine minor findings are fixed as well: the status rules have no gap inside a check, the order of the first three follows the design, and the fixture's error tracker, components, and documents table are wired in.
 
+### Branch B independent review corrections (15 November 2026)
+
+- Make scoring and leak-path statuses disjoint, require code owner approval enforcement, and require useful fallback behaviour.
+- Correct OpenSearch import names and legacy OpenTelemetry capture guidance, and add vLLM signals.
+- Replace the env names filter with stateful quote tracking so assignment-shaped lines inside multiline values remain hidden.
+- Reject reordered and duplicate published structures, hidden wording decoys, and SQL appended to the pinned query. Fourteen mutation cases run in CI.
+- Correct the fixture explanations for the Anthropic SDK timeout and Sentry user data; aggregate statuses remain unchanged.
+
 ### Known limits
 
 - `agent-permissions-check` has not been run with `gh` access, against a real home folder, or with a yes to the policy file.

@@ -1,5 +1,7 @@
 # Signals: what to look for when mapping the feature
 
+Modified from the Net Ninjas original during independent review on 15 November 2026.
+
 This list is a starting point. A call that matches nothing here is still a call, and the map follows the code, in any language.
 
 Every name below was read on 15 November 2026 from the vendor's own package, source code, or documentation. The last column of each table says where, with the version that was read. Names in this field change often, and a name that is missing can hide a call site. So the search is a start: after it, read the entry points and follow each one to the place where it reaches a model.
@@ -29,7 +31,7 @@ Then read the files that match. Env files are read only through the names filter
 | Azure OpenAI | `AzureOpenAI`, `azure_endpoint`, `openai.azure.com`, `@azure/openai` | PyPI `openai` 3.51.0, README. npm `@azure/openai` 2.0.0, README: a companion to the `openai` package. Microsoft Learn, Azure OpenAI REST reference |
 | Other hosts | `api.mistral.ai`, `api.groq.com`, `api.together.ai`, `api.cohere.com`, `api.fireworks.ai`, `api.x.ai`, `api.deepseek.com`, `openrouter.ai/api` | Client source of PyPI `mistralai` 3.7.0, `groq` 1.7.0, `together` 3.1.1, `cohere` 7.3.1, and `fireworks-ai` 1.2.33. docs.x.ai, api-docs.deepseek.com, and openrouter.ai/docs |
 | Other hosts, older | `api.together.xyz` | PyPI `together` 3.1.1 still names it once. Its default host is `api.together.ai` |
-| Local models | `ollama`, port `11434` | npm `ollama` 0.6.4 and PyPI `ollama` 0.6.3, READMEs |
+| Local models | `ollama`, port `11434`, `vllm`, `from vllm import LLM`, `LLM.generate` | npm `ollama` 0.6.4 and PyPI `ollama` 0.6.3, READMEs. [vLLM quickstart](https://docs.vllm.ai/en/latest/getting_started/quickstart/), offline inference |
 | Frameworks that wrap a call | `ai` with `generateText` or `streamText`, `@ai-sdk/`, `langchain`, `@langchain/`, `llama-index`, `llama_index`, `llamaindex` | npm `ai` 7.0.173, type declarations. npm `@ai-sdk/openai` 4.0.118, `langchain` 1.6.6, `@langchain/core` 1.4.1, and `llamaindex` 0.12.1. PyPI `langchain` 1.5.0 and `llama-index` 0.14.26, READMEs |
 
 A plain HTTP request to one of the hosts is a model call, with or without an SDK.
@@ -59,7 +61,7 @@ The test for check 7 is the number of places that talk to a provider, not the pr
 | Qdrant | `@qdrant/js-client-rest`, `qdrant_client`, `QdrantClient` | npm 1.20.0. PyPI `qdrant-client` 1.20.0, README |
 | Chroma | `chromadb` | npm `chromadb` 3.5.0 and PyPI `chromadb` 1.5.9, READMEs |
 | Milvus | `pymilvus`, `@zilliz/milvus2-sdk-node` | PyPI `pymilvus` 3.0.3 and npm 3.0.6, READMEs |
-| OpenSearch | `opensearch-py`, `@opensearch-project/opensearch` | PyPI `opensearch-py` 3.2.0 and npm 3.10.0 |
+| OpenSearch | `opensearch-py`, `opensearchpy`, `OpenSearch`, `@opensearch-project/opensearch` | PyPI `opensearch-py` 3.2.0 and npm 3.10.0. The [Python client guide](https://docs.opensearch.org/latest/clients/python-low-level/) uses `from opensearchpy import OpenSearch` |
 | Cloudflare Vectorize | A `vectorize` key in the Wrangler configuration, and `.insert(` and `.query(` on the binding | developers.cloudflare.com, Vectorize, "Get started" |
 | Upstash Vector | `@upstash/vector`, `upstash_vector` | npm 1.2.4 and PyPI `upstash-vector` 0.8.0, READMEs |
 | Embedding calls | `embeddings.create`, `text-embedding`, `embed`, `embedMany`, `embed_content` | PyPI `openai` 3.51.0, source. npm `ai` 7.0.173, type declarations. PyPI `google-genai` 3.3.0, README |
@@ -81,7 +83,8 @@ The test for check 7 is the number of places that talk to a provider, not the pr
 | Sentry, JavaScript | `@sentry/`. `dataCollection` controls what the SDK collects, with a category for the inputs and outputs of generative AI | npm `@sentry/core` 11.12.0, type declarations |
 | Sentry, JavaScript, older | `sendDefaultPii` | docs.sentry.io, the JavaScript options page: deprecated, with `dataCollection` available since version 10.57.0. The name is not in `@sentry/core` 11.12.0 |
 | Sentry, Python | `sentry_sdk`. `send_default_pii`, and `data_collection`, which takes precedence when both are set | PyPI `sentry-sdk` 2.75.0, source |
-| OpenTelemetry | `@opentelemetry/`, `opentelemetry`. `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` set to `true`, `span_only`, `event_only`, or `span_and_event` captures message content. It is off by default | npm `@opentelemetry/api` 1.10.0. The opentelemetry-python-contrib repository on GitHub, README of the OpenAI instrumentation |
+| OpenTelemetry | `@opentelemetry/`, `opentelemetry`, `opentelemetry-instrumentation-genai-openai`. In the current Python instrumentation, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` set to `span_only`, `event_only`, or `span_and_event` captures message content; `no_content` is the default | npm `@opentelemetry/api` 1.10.0. [PyPI `opentelemetry-instrumentation-genai-openai` 1.3b0](https://pypi.org/project/opentelemetry-instrumentation-genai-openai/), README |
+| OpenTelemetry, older | `opentelemetry-instrumentation-openai-v2`, `opentelemetry.instrumentation.openai_v2`. The `true` value enables legacy message events in this package. Other vendors and JavaScript instrumentations can also accept `true`; follow the installed implementation | [The deprecated OpenAI v2 instrumentation README](https://github.com/open-telemetry/opentelemetry-python-contrib/blob/main/instrumentation-genai/opentelemetry-instrumentation-openai-v2/README.rst) names the replacement and the older values |
 | LangSmith | `langsmith`, `traceable`, `LANGSMITH_TRACING` | npm `langsmith` 0.12.0 and PyPI `langsmith` 0.14.17, READMEs and source |
 | LangSmith, older | `LANGSMITH_TRACING_V2`, `LANGCHAIN_TRACING_V2` | PyPI `langsmith` 0.14.17, source: still read |
 | Langfuse | `@langfuse/tracing`, `@langfuse/otel`, `@langfuse/openai`, and in Python `langfuse` with `observe` | The langfuse-js repository on GitHub, README. PyPI `langfuse` 5.2.0, README |

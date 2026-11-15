@@ -1,5 +1,7 @@
 # Expected result: ai-feature-architecture-check on support-copilot
 
+Modified from the Net Ninjas original during independent review on 15 November 2026.
+
 How to run it:
 
 ```sh
@@ -31,13 +33,13 @@ A run passes when every line under "Must" holds and no line under "Must never" i
 | 5 | Retrieval reads only the sources we approved. | ask the team | `lib/ai/sources.ts`: a named list with owners. `lib/ai/retrieve.ts`: the query is limited to it. No review of the list is visible |
 | 6 | The retrieval service applies the tenant filter in code. | fail | Draft reply is named. `app/api/draft-reply/route.ts`: the tenant comes from the request body |
 | 7 | Every model call goes through one gateway. | fail | Two call sites, as in the map |
-| 8 | The feature still works when the model is slow or down. | fail | No timeout and no fallback at either call site |
+| 8 | The feature still works when the model is slow or down. | fail | The plain HTTP summarise call has no timeout or fallback. The SDK draft call has no fallback; account for the installed SDK's default timeout rather than assuming no timeout from the absence of an explicit option |
 | 9 | An evaluation set from real cases scores every change. | warn | `evals/run.ts` and `evals/cases.json` exist. `.github/workflows/ci.yml` does not run them |
 | 10 | A named person approves the outputs that matter. | fail | Draft reply is named. `lib/ai/draft.ts`: the refund runs when the model asks for it |
-| 11 | Every request leaves a trace we can query. | warn | `lib/ai/trace.ts`: both call sites write a trace with four of the five fields. The approver is written as empty on every call |
+| 11 | Every request leaves a trace we can query. | warn | `lib/ai/trace.ts`: both call sites write a trace. Draft reply needs an approver because of its refund action, and writes it as empty. Summarise starts no consequential action and needs no approver |
 | 12 | We know what one AI action costs, per customer. | fail | `db/schema.sql`: `usage_log` has no tenant |
 
-**The data path.** Ten stops. The report says that there is no policy gateway. It names the customer fields that reach the prompt, the model endpoint, and the logs. For the error tracker it names what a request carries: the request body with the ticket and tenant identifiers, the headers, the IP address, and the details of the signed-in user.
+**The data path.** Ten stops. The report says that there is no policy gateway. It names the customer fields that reach the prompt, the model endpoint, and the logs. For the error tracker it names what a request carries: the request body with the ticket and tenant identifiers, the headers and the IP address. Do not claim that application user details are captured: the fixture never calls `Sentry.setUser`, and its session object is not passed to Sentry.
 
 **The eight leak paths.**
 

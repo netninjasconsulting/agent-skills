@@ -7,7 +7,7 @@
 # Usage: sh tests/names-filter.test.sh
 #
 # The handover runbook generator and the AI feature architecture check read env
-# files through one sed command that prints variable names and no values. This
+# files through one awk command that prints variable names and no values. This
 # test takes the command from each SKILL.md and runs it on a file with the
 # shapes that defeat a weaker filter: comments, a value that spans lines, and a
 # line with no equals sign. Every planted value holds the marker FIXTUREVALUE.
@@ -31,6 +31,7 @@ DATABASE_URL=postgres://app:FIXTUREVALUE-url@db.example.com/app
 export API_TOKEN="FIXTUREVALUE-export"
   INDENTED_KEY = FIXTUREVALUE-indented
 PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+FIXTUREVALUE=value-shaped-line
 FIXTUREVALUE-line-two-of-a-key
 FIXTUREVALUE-line-three-of-a-key
 -----END PRIVATE KEY-----"
@@ -41,9 +42,9 @@ ENV
 for skill in handover-runbook-generator ai-feature-architecture-check; do
   file="$root/skills/$skill/SKILL.md"
   [ -f "$file" ] || continue
-  # The command sits in backticks, starts with "sed", and ends with "<file>".
+  # The command sits in backticks, starts with "sed" or "awk", and ends with "<file>".
   # shellcheck disable=SC2016  # the backticks are literal text in the Markdown file
-  filter=$(grep -oE '`sed [^`]*<file>`' "$file" | head -n 1 | sed -e 's/^`//' -e 's/ <file>`$//')
+  filter=$(grep -oE '`(sed|awk) [^`]*<file>`' "$file" | head -n 1 | sed -e 's/^`//' -e 's/ <file>`$//')
   [ -n "$filter" ] || { fail "$skill: no names filter found in SKILL.md"; continue; }
   out=$(eval "$filter \"\$work/.env\"") || { fail "$skill: the filter exited with an error"; continue; }
   if printf '%s\n' "$out" | grep -qF -e FIXTUREVALUE; then

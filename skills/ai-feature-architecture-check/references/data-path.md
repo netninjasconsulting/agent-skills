@@ -1,5 +1,7 @@
 # The data path
 
+Modified from the Net Ninjas original during independent review on 15 November 2026.
+
 The ten stops and the eight leak paths come from https://www.netninjas.us/events/ai-data-path-map and stay as published there, in UK spelling.
 
 ## The ten stops
@@ -46,17 +48,17 @@ Each leak path gets one status and no points. The statuses are the four from [ch
 - "ask the team" also covers what a repository cannot show at all, such as a provider's retention period.
 - A leak path whose stop does not exist passes, and the evidence says what was not found: "no vector store found in the repository".
 
-With several features, the weakest status counts: fail, warn, ask the team, pass.
+With several features, the weakest status counts: fail, warn, ask the team, pass. Within one path, a proved unsafe destination takes precedence over a safe one. A pass requires every applicable destination to meet its Pass rule. An unreadable or unresolved destination is "ask the team" unless another destination already proves fail or warn. The absent-stop rule applies only when the whole relevant stop is absent.
 
 | # | Pass | Fail | Otherwise |
 | --- | --- | --- | --- |
 | 1 | No log call receives a prompt, a message list, or a completion. Log lines carry identifiers and versions | A log call receives one of them. Give each call site | None |
-| 2 | No tracing or error tracking tool is found. Or body capture is off in code, or scrubbing rules in code cover the prompt and the response | An error tracker, a tracer, or a model tracing tool is set in code to capture request bodies, default personal data, or message content | Ask the team when the tool is present and its capture settings are not in the repository |
-| 3 | The client or the gateway sets a region, or a regional host, for every call | A host with no region in its name, a global endpoint, or a cross-region profile | Ask the team when the region comes from an environment variable whose value is not in the repository |
-| 4 | Only when a file in the repository sets the provider's retention, which is rare | Never from code | Ask the team. This is the usual status |
-| 5 | Check 4 passes without tokens, so there is no lookup to keep apart. Or a pseudonymisation step exists, and its lookup lives in a store apart from the prompts and the logs | Check 4 is fail or warn and no pseudonymisation step exists. Or the lookup sits beside the prompts | Ask the team when the step exists and the separation of access is not visible |
+| 2 | No tracing or error tracking tool is found. Or code disables all request-body, default-personal-data, and message-content capture for every tool, or scrubs all those payloads before export | An error tracker, a tracer, or a model tracing tool is set in code to capture request bodies, default personal data, or message content | Ask the team when the tool is present and its capture settings are not in the repository |
+| 3 | The effective client or gateway configuration pins every call to one specific region, through a region setting or a regional host; no global endpoint or cross-region routing applies | An unpinned host, a global endpoint, or a cross-region profile. A regionless host alone is not a fail if the client pins its effective region | Ask the team when the region comes from an environment variable whose value is not in the repository |
+| 4 | Only when code sets a provider-supported retention control for every call and the repository contains evidence of its scope. A README assertion or an arbitrary retention variable is not evidence | Never from code | Ask the team. This is the usual status |
+| 5 | Check 4 passes without tokens, so there is no lookup to keep apart. Or a pseudonymisation step exists, and its lookup lives in a separate store with code-enforced access separation from the prompt and log stores | Check 4 is fail or warn and no pseudonymisation step exists. Or the lookup sits beside the prompts | Ask the team when the step exists and the separation of access is not visible, including a separate store with unknown permissions |
 | 6 | No retrieval and no vector store are found. Or the path that deletes a person or a record also deletes the embeddings, caches, and summaries built from it | A delete path exists and leaves them | Ask the team when no delete path is found |
-| 7 | No evaluation set is found, or its fields hold no personal data. Or the set is marked as synthetic in a field that code reads, or a script in the repository generates it | Never from code | Warn, labelled as an assumption, when the field names are personal data fields and nothing generates the set. Judge by field names. A marker inside a record is a value, and it is not evidence |
-| 8 | Infrastructure code keeps every store and every copy in one region | A copy leaves the regions that a file in the repository names as approved | Ask the team when a copy goes to a second region, naming both regions, or when there is no infrastructure code |
+| 7 | No evaluation set is found, or its fields hold no personal data. Or a generator builds every case solely from synthetic inputs, or an anonymisation pipeline demonstrably removes personal data before the set is used | Never from code | Warn, labelled as an assumption, when personal data field names exist and no safe generation or anonymisation pipeline is shown. Copying records in a generator does not establish synthetic data. Judge by field names and pipeline code. A marker inside a record is a value, and it is not evidence |
+| 8 | Infrastructure code keeps every store and every copy in one region and no configured approved-region restriction excludes it, or keeps them all inside an explicitly configured approved-region set | A copy leaves the regions that a file in the repository names as approved | Ask the team when regional placement is incomplete, when a copy goes to a second region without an approved-region set, naming both regions, or when there is no infrastructure code |
 
 Questions that come from the leak paths are listed in the report under "Questions for the team". The second pass does not ask them, and they are not counted in M.

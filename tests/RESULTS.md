@@ -41,3 +41,9 @@ One row per run. Failures and gaps stay in the table.
 - Line numbers in the evidence. Two of the last five runs gave one line number that was off by one. The statuses were right in every run.
 - `ai-feature-architecture-check` on a real product, on a repository in a language other than TypeScript, and on a feature that passes most checks. The fixture fails most of them on purpose.
 - `ai-feature-architecture-check` where two or more checks end in "ask the team". The fixture has one.
+
+## Branch B independent review, 15 November 2026
+
+Codex reviewed B at 32b65a1 against A at 2c244d9. Original validator, scanner, reader, and names-filter tests passed with macOS BSD tools. A multiline env value containing an assignment-shaped line defeated both documented names filters; the new regression fails against the original filter and passes with quote tracking. Fourteen validator mutations were tried: the original accepted ten and rejected four; the corrected validator rejects all fourteen. The new mutation suite is wired into CI.
+
+The twelve published checks, three bands, ten stops, eight leak-path labels, and cost SQL were checked against the live pages. Twenty-one signal rows were checked against primary package or vendor sources. Independent fixture derivation before EXPECTED.md confirms the aggregate statuses, but corrects two unsupported explanations. See the branch review report for status boundary inputs, exact sources, and untested scope. This was a manual instruction and evidence pass; no model or fixture application was executed.

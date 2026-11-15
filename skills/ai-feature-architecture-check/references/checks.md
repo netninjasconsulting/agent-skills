@@ -1,5 +1,7 @@
 # The twelve checks: evidence rules
 
+Modified from the Net Ninjas original during independent review on 15 November 2026.
+
 The labels are the published ones, as on netninjas.us, in UK spelling. The line under each label is the detail from the published checklist. The detail of check 4 leaves out its first published sentence.
 
 ## Statuses
@@ -18,6 +20,8 @@ Rules that hold for every check:
 - A README, a comment, a document, or a name never passes a check. Only code that runs does.
 - "ask the team" is never a softer fail. When the code part is missing, the status is fail or warn, and the question is not asked.
 - Only checks 5, 10, 11, and 12 can end in "ask the team". Each has one question, given below, for the second pass.
+- Use the specific rules below before the summary status table. A partial control is warn unless a specific Fail rule applies. Where code cannot be read or followed, give fail, name the missing evidence, and do not imply that a vulnerability was proved.
+- Evaluate every applicable part within a feature. A proven bypass or an explicit unsafe path takes precedence over a working control on another path. A rule saying "every" requires evidence for every path.
 
 ## Layer 1: product interface
 
@@ -26,7 +30,7 @@ Rules that hold for every check:
 It calls the same APIs as the rest of the product, so it can't read or change more than the person using it.
 
 - **Look at:** every tool the model can call, and every read the feature makes on the way to the prompt.
-- **Pass:** each one goes through the product's own API or data layer with the signed-in user's identity, and each query carries the user's or the tenant's condition.
+- **Pass:** each one goes through the product's own API or data layer with the signed-in user's identity, and each query enforces all the signed-in user's permissions, including both tenant and record restrictions where the product has them.
 - **Fail:** a tool or a query uses a service key, an admin client, or a database role that ignores the user, or reads a record by ID with no owner or tenant condition.
 - **Warn:** every tool and every write carries the user's identity, every read carries the tenant's condition, and a read on the way to the prompt returns more of that tenant's records than this user may see.
 
@@ -56,8 +60,9 @@ The model sees a token, and our own system swaps the real value back in.
 
 - **Look at:** what the prompt builder receives, field by field, and anything between the request and the prompt builder that drops or replaces fields.
 - **Pass:** a step passes on only the fields the task needs, or replaces identifiers with tokens that the system swaps back afterwards.
-- **Warn:** the step drops or replaces some of the personal fields, and others still reach the prompt.
-- **Fail:** a whole record, or personal fields the task does not need, go into a prompt. Name the fields. Do not quote a value.
+- **Warn:** the step drops or replaces some unnecessary personal fields, and other unnecessary personal fields still reach the prompt. Necessary personal fields alone do not cause a warn.
+- **Fail:** no effective field-selection or replacement step exists, and a whole record or personal fields the task does not need go into a prompt. Name the fields. Do not quote a value.
+- **No personal data:** pass when code constructs prompts solely from non-personal fields, with the evidence that no personal data reaches the prompt. Do not require a lookup table in that case.
 
 ## Layer 3: context retrieval
 
@@ -66,7 +71,7 @@ The model sees a token, and our own system swaps the real value back in.
 A named list of data sources, each with an owner. A new source goes through review like a code change.
 
 - **Look at:** where the list of sources lives, and whether the retrieval query is limited to it.
-- **Pass:** a named list with an owner for each source, a query limited to that list, and a CODEOWNERS entry or another required review that covers the file that holds the list.
+- **Pass:** a named list with an owner for each source, a query limited to that list, and repository-managed enforcement of required owner review that covers the file holding the list. A CODEOWNERS file names reviewers but does not by itself require approval.
 - **Ask the team:** the list, the owners, and the limit are in code, and nothing in the repository shows that a change to the list is reviewed.
 - **Warn:** a list exists, and it has no owners or the query is not limited to it.
 - **Fail:** no list of sources is found, and retrieval reads whatever the store holds.
@@ -80,7 +85,8 @@ The tenant ID comes from the authenticated session. A prompt that says "only thi
 - **Look at:** every retrieval query, and where its tenant value comes from. Follow the value back to the entry point.
 - **Pass:** every query filters by tenant, and the value comes from the session on the server.
 - **Fail:** the value comes from the request body, the query string, a header the client sets, or the prompt. Or there is no tenant filter and the data model has tenants.
-- **Warn:** within one feature, some queries take the tenant from the session and others have no filter.
+- **Warn:** a tenant condition exists but its server-side origin cannot be followed in the available code. A demonstrated unfiltered query in a tenant data model is fail, including when other queries are filtered.
+- **No tenant data model:** pass when the code establishes one tenant, or only public shared data, and no cross-tenant boundary exists. Missing evidence of the data model is fail, with that limitation.
 
 ## Layer 4: model gateway
 
@@ -90,15 +96,15 @@ Our code talks to one interface. The gateway holds the regional endpoints, the q
 
 - **Look at:** every place that builds a provider client or calls a provider's host. Count them.
 - **Pass:** one module talks to a provider, and every feature calls that module.
-- **Fail:** two or more places talk to a provider. A plain HTTP request to a provider's host counts.
-- **Warn:** one module in the product code, and a second call site in a script or a test.
+- **Fail:** two or more places in production code talk to a provider. A plain HTTP request to a provider's host counts.
+- **Warn:** one module in the product code, and any additional call sites occur only in scripts or tests. This specific rule takes precedence over the generic count of call sites.
 
 ### 8. The feature still works when the model is slow or down.
 
 A queue, a timeout, and a rules-based fallback. A failed model call delays a suggestion and never blocks the core product.
 
 - **Look at:** each call site: a timeout or an abort signal, what the caller does when the call fails, and whether the surrounding request can finish without it.
-- **Pass:** a timeout on every call, and a path that returns without the model.
+- **Pass:** a timeout on every call, and a fallback path that completes the core product operation without a model response. Returning only an error does not count as a working fallback.
 - **Warn:** one of the two.
 - **Fail:** neither.
 
@@ -123,6 +129,7 @@ Anything that moves money, changes a record, or reaches a customer waits for a h
 - **Ask the team:** the approval step is in code and records the approver, and who may approve is decided outside the code.
 - **Warn:** an approval step in code holds the action, and it does not record who approved.
 - **Fail:** an action runs on the model's output alone.
+- **No consequential action:** pass when the code shows that the output neither changes a record nor moves money nor reaches a customer. Name the output path as evidence. A displayed draft alone does not prove that any later send action requires approval.
 - **Question:** "Is there a named person, by role, who approves these outputs?"
 
 ## Layer 6: operate safely
@@ -132,9 +139,9 @@ Anything that moves money, changes a record, or reaches a customer waits for a h
 The request ID, the model and prompt version, the retrieved sources, and the approver, in a log the feature can't edit.
 
 - **Look at:** what each call site writes after the call, and where it writes it.
-- **Pass:** every call writes the five fields, to a store that infrastructure code shows the feature cannot change: an append-only table, a write-only role, object lock, or a separate log account.
+- **Pass:** every call writes the five fields, to a store that infrastructure code shows the feature cannot change: an append-only table, a write-only role, object lock, or a separate log account with permissions that prevent edits. A separate account alone is not evidence of immutability.
 - **Ask the team:** every call writes the five fields, and nothing in the repository shows whether the feature can change the store.
-- **Warn:** some of the five fields. A field that every call writes as empty counts as missing.
+- **Warn:** some of the five fields, a required field missing on any path, or a complete trace in a store the feature is shown to be able to edit. A field that every call writes as empty counts as missing. An empty sources list is valid when no sources were retrieved; an empty approver counts as missing only when the feature needs an approver under the rule below.
 - **The approver:** where check 10 passes because a person reads and sends a draft, the approver is that person, written when the draft is sent or accepted. A feature whose output starts no action and reaches no customer has no approver, and the other four fields are enough for it.
 - **Fail:** no trace is written.
 - **Question:** "Is the trace store protected from edits by the feature itself?"
@@ -146,13 +153,13 @@ Tokens, model, and cache hits per request, joined to the tenant. Pricing and pla
 - **Look at:** what is recorded after each call. [cost.md](cost.md) has the seven columns.
 - **Pass:** never in the first pass. Code cannot show that anyone reads the number. So the best status here is "ask the team", and the first headline is 11 out of 12 at most.
 - **Ask the team:** all seven columns are recorded for every call. Code can show that the number can be computed, and it cannot show that anyone reads it.
-- **Warn:** usage is recorded per tenant, and the action or the split into input, cached input, and output tokens is missing.
+- **Warn:** usage is recorded per tenant, and at least one of the other six required columns is missing on at least one call. This includes the model or timestamp as well as the action or token split.
 - **Fail:** usage is not recorded per tenant, or not recorded at all.
 - **Question:** "Does someone look at the cost per action for each customer, at least once a month?"
 
 ## The first three to change
 
-Take the first three whose status is fail or warn, in this order:
+Take up to three whose status is fail or warn, in this order. List fewer when fewer qualify, and state that no code change is identified when none qualify:
 
 1. Check 6, check 4, check 3.
 2. Leak path 1, leak path 2.

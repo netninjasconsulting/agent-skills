@@ -28,6 +28,8 @@ jobs:
           node-version: 24
       - name: Validate the skills
         run: node scripts/validate.mjs
+      - name: Test the published wording guards
+        run: node tests/validate.test.mjs
       - name: Test the secret scanner
         run: sh tests/scan-secrets.test.sh
       - name: Test the agent configuration reader
