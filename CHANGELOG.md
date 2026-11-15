@@ -9,6 +9,7 @@ One new skill. The four skills from 0.1.0 keep their checks.
 ### Added
 
 - `agent-permissions-check`: what the AI coding agents on a repository can do, and what stops them. Part A is the nine rows of the published policy. Part B covers agents at a developer's desk.
+- `ai-feature-architecture-check`: a score out of 12 for an AI feature from what the code shows, the path personal data takes through it, and whether its cost per action can be measured.
 
 ### Changed
 

@@ -176,6 +176,68 @@ if (existsSync(gitops)) {
   });
 }
 
+// The AI feature architecture check keeps the wording of three published takeaways.
+const twelveChecks = [
+  "The AI feature works inside the signed-in user's permissions.",
+  "The interface says it's AI and marks what it generated.",
+  "Every request passes authentication and validation before a prompt exists.",
+  "A policy step removes or pseudonymises the personal data a task doesn't need.",
+  "Retrieval reads only the sources we approved.",
+  "The retrieval service applies the tenant filter in code.",
+  "Every model call goes through one gateway.",
+  "The feature still works when the model is slow or down.",
+  "An evaluation set from real cases scores every change.",
+  "A named person approves the outputs that matter.",
+  "Every request leaves a trace we can query.",
+  "We know what one AI action costs, per customer.",
+];
+const scoreBands = [
+  "Ready for a customer's security review. The work now is keeping the evaluation set and the traces current.",
+  "Close. A layer with two noes is the one I'd expect to break first.",
+  "I'd start with layers 2 and 3. A leak of personal data, or of another customer's data, is the mistake that's hardest to undo.",
+];
+const tenStops = [
+  "Client and API",
+  "Policy gateway",
+  "Prompt builder",
+  "Retrieval and vector store",
+  "Model endpoint",
+  "Response handling",
+  "Application logs",
+  "Tracing and error tracking",
+  "Evaluation sets",
+  "Backups and snapshots",
+];
+const eightLeakPaths = [
+  "Prompts and responses stay out of our application logs.",
+  "Our tracing and error tools don't capture request bodies.",
+  "The model endpoint is pinned to one region.",
+  "We know what the model provider keeps, and for how long.",
+  "The pseudonymisation table sits apart from the prompts.",
+  "A deleted record also leaves the vector store.",
+  "Our evaluation sets hold synthetic or anonymised cases.",
+  "Backups and snapshots stay in the approved regions.",
+];
+const aiSkill = path.join(skillsDir, "ai-feature-architecture-check");
+if (existsSync(aiSkill)) {
+  const skillFile = path.join(aiSkill, "SKILL.md");
+  const skillText = existsSync(skillFile) ? read(skillFile) : "";
+  twelveChecks.forEach((check, index) => {
+    if (!skillText.includes(`${index + 1}. ${check}`)) fail(skillFile, `check ${index + 1} does not match the published wording: ${check}`);
+  });
+  scoreBands.forEach((band) => {
+    if (!skillText.includes(band)) fail(skillFile, `a score band does not match the published wording: ${band}`);
+  });
+  const dataPathFile = path.join(aiSkill, "references", "data-path.md");
+  const dataPathText = existsSync(dataPathFile) ? read(dataPathFile) : "";
+  tenStops.forEach((stop) => {
+    if (!dataPathText.includes(`| ${stop} |`)) fail(dataPathFile, `a stop does not match the published wording: ${stop}`);
+  });
+  eightLeakPaths.forEach((leak, index) => {
+    if (!dataPathText.includes(`${index + 1}. ${leak}`)) fail(dataPathFile, `leak path ${index + 1} does not match the published wording: ${leak}`);
+  });
+}
+
 if (failures.length > 0) {
   console.error(failures.join("\n"));
   console.error(`\n${failures.length} problem(s) in ${skills.length} skill(s).`);
