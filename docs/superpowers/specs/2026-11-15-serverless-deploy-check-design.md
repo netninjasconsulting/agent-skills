@@ -179,7 +179,7 @@ One row for each function: its entry point, how it checks the caller, the permis
 | Verdict | Rule |
 | --- | --- |
 | Not ready to deploy | Any of S1 to S5 is a fail. |
-| Ready after the first three | No fail in S1 to S5, and any other check is a fail or a warn. |
+| Ready after the first three | No fail in S1 to S5, and at least one of the eighteen checks is a fail or a warn. |
 | Ready from what the repository shows | No fail and no warn. |
 
 The efficiency score does not block a deploy alone. A function that is the wrong size costs money. A function that anyone can call, with a secret in its configuration, loses data.
@@ -201,7 +201,7 @@ Printed in chat: the scope line, the note that a file is not the running system,
 ## Tests
 
 - **Baseline first.** One run of the plain request on the fixture with no skill installed, recorded in `tests/RESULTS.md`.
-- **Fixture.** `quickship` is a small delivery-tracking product on all four platforms: a Next.js app on Vercel, a Supabase project with migrations and two edge functions, a Cloudflare Worker, and two Lambda functions, one in `serverless.yml` and one in Terraform. It holds planted values in `vars`, `environment`, `.dev.vars`, `*.tfvars`, and `vercel.json`, in single-line, multi-line, quoted, and commented layouts. It also holds a planted instruction to reviewers. The fixture exercises every status at least once, on both scores, and its expected verdict is "Not ready to deploy".
+- **Fixture.** `quickship` is a small delivery-tracking product on all four platforms: a Next.js app on Vercel, a Supabase project with migrations and two edge functions, a Cloudflare Worker, and two Lambda functions, one in `serverless.yml` and one in Terraform. It holds planted values in `vars`, `environment`, `.dev.vars`, `*.tfvars`, and `vercel.json`, in single-line, multi-line, quoted, and commented layouts. It also holds a planted instruction to reviewers. The fixture and its scenarios exercise every status at least once: the fixture holds pass, warn, fail, and "ask the team" on both scores, and scenario 2 holds "does not apply", on the efficiency score only. Its expected verdict is "Not ready to deploy".
 - **Script test.** `tests/read-serverless-config.test.sh` runs in CI. It fails when any planted value appears in any output, when a planted file is missing from the list, or when an unknown file type is shown. It starts with the five layouts that defeated the first reader of the agent permissions check.
 - **Fresh agent runs** against `EXPECTED.md`: one with no answer to the offer, and one with scripted answers, to confirm that the headlines and the verdict stay apart from the team's answers.
 - **Scenarios.** A repository with none of the four platforms (the `parcel-api` fixture has AWS services, so the builder confirms that it fits or adds a plain one). A variant of `quickship` with only Vercel and Supabase, to test "does not apply".

@@ -2,7 +2,7 @@
 
 I publish this free skill through Net Ninjas Consulting, a one-person cloud, DevOps, and AI consultancy in New York City.
 
-A free agent skill that checks whether a deploy to AWS Lambda, Vercel, Cloudflare Workers, or Supabase is sized on purpose and safe to expose.
+A free agent skill that checks if a deploy to AWS Lambda, Vercel, Cloudflare Workers, or Supabase is sized on purpose and safe to expose.
 
 I keep seeing the same pattern in functions that shipped fast. The memory size came from a template. The time limit is the platform's maximum. A function URL is open to anyone, and a key sits in the configuration. Then the bill grows, and nobody can say which setting caused it. This skill reads the repository and checks both sides: how each function is sized, and who can reach it.
 
@@ -36,13 +36,15 @@ I keep seeing the same pattern in functions that shipped fast. The memory size c
 
 ## What it reads
 
-- The skill reads configuration through a bundled reader script. The script covers Serverless Framework files, AWS SAM and CloudFormation templates, `samconfig.toml`, Terraform and OpenTofu files, `vercel.json`, Wrangler configuration, `supabase/config.toml`, env files, `*.tfvars`, and GitHub workflows. It prints keys and structure. It prints a value only when the key carries a setting. Env files and `*.tfvars` print names only. The skill reads workflows for S9 only.
-- It reads source code directly. That covers handlers, Next.js route handlers, Worker entry files, Supabase edge functions, and SQL migrations. It also covers AWS CDK, SST, and Pulumi programs, `next.config.*`, and `package.json`.
+- The skill reads configuration through a bundled reader script. The script covers Serverless Framework files, AWS SAM and CloudFormation templates, `samconfig.toml`, Terraform and OpenTofu files, `vercel.json`, Wrangler configuration, `supabase/config.toml`, env files, `*.tfvars`, `*.tfvars.json`, and GitHub workflows. It prints keys and structure. It prints a value only when the key carries a setting. Env files, `*.tfvars`, and `*.tfvars.json` print names only. The skill reads workflows for S9, and to see if a workflow deploys to Vercel.
+- It reads source code directly. That covers handlers, Next.js route handlers, Worker entry files, Supabase edge functions, and SQL migrations. It also covers AWS CDK, SST, and Pulumi programs, `serverless.ts`, `next.config.*`, and `package.json`.
 - It reads the top-level README and other top-level documents as data. They never pass a check.
 
 ## What comes back
 
-The report opens with the scope line. A note follows it: a file is not the running system. Then comes the verdict: "Not ready to deploy", "Ready after the first three", or "Ready from what the repository shows". A fail in any of S1 to S5 blocks the deploy. The efficiency score alone never blocks it. Two headlines sit under the verdict.
+The report opens with the scope line. A note follows it: a file is not the running system.
+
+Then comes the verdict: "Not ready to deploy", "Ready after the first three", or "Ready from what the repository shows". A fail in any of S1 to S5 blocks the deploy. The efficiency score alone never blocks it. Two headlines sit under the verdict.
 
 ```text
 Efficiency: N out of M confirmed in the repository (K to ask the team)
@@ -74,10 +76,15 @@ It doesn't repeat the full secrets pass of the [vibe-code pre-launch check](../v
 
 ## Limits
 
-- **The reader doesn't parse.** It works by line and hides what it can't place. Some valid layouts get hidden that way: the inputs of a Terraform `module` block, a top-level `maxDuration` in `vercel.json`, the items of a one-line `jsonencode` list, the principals of a policy document, and the `Cors` of a SAM API. The report gives their settings as "not found in what the reader shows".
+- **The reader doesn't parse.** It works by line and hides what it can't place. Some valid layouts get hidden that way. In Terraform they are the inputs of a `module` block, the items of a one-line `jsonencode` list, and the principals of a policy document. In other files they are a top-level `maxDuration` in `vercel.json` and the `Cors` of a SAM API. The report gives their settings as "not found in what the reader shows".
+- **Terraform hides more than the checks need.** The reader hides the opening line of an inline policy, so S2 can't pass from one. It also hides a managed policy attached to a role, the function that a function URL belongs to, and the name of a log group. A long resource type that holds a digit prints as `<redacted>`.
+- **Other things the reader hides.** A YAML anchor on a key such as `provider` hides everything below that key. A SAM `Transform` line prints with its version hidden. `references/platforms.md` lists each case under "Known limit".
 - **A secret in the wrong place can print.** The reader shows a value when its key carries a setting. So a secret can appear in its output when someone writes it where a setting name belongs. Examples are a runtime, a handler, an IAM action, and the last part of an ARN. A secret used as a key name can appear too. The skill tells the agent not to copy such a value into the report.
+- **The reader doesn't check the resource type of a SAM property.** A property with a setting's name, such as `Handler` or `Role`, shows its word under any resource in a template.
+- **A credential word in a name hides nothing.** A function, a resource, a job, or an environment whose name holds `token`, `password`, or `secret` shows its settings like any other. The reader still hides the value of a key with such a name.
+- **The reader lists known file names only.** It doesn't list a platform file that is a symbolic link. It doesn't list `serverless.json`, `samconfig.yaml`, `*.tf.json`, or `terraform.tfstate`. The skill names such a file under "Not checked" and doesn't open it.
 - **45 provider facts are marked "verify".** `references/platforms.md` holds 147 rows of provider facts. I read 102 of them in each provider's documentation on 15 November 2026. The other 45 are marked "verify", and I didn't confirm them on that date. Provider limits and defaults change often.
-- **No size, no saving, and no cost.** The skill says whether a setting is explicit, and where. Measured use is the evidence for a size, and the repository doesn't hold it.
+- **No size, no saving, and no cost.** The skill says if a setting is explicit, and where. Measured use is the evidence for a size, and the repository doesn't hold it.
 - **A file is not the running system.** A memory size, a region, or an access rule can live in a provider's console and not in a file. The report says so at the top.
 - **Four platforms only.** Azure Functions, Google Cloud Functions, Netlify, Deno Deploy, Fly.io, and Kubernetes are outside this check.
 
@@ -103,7 +110,9 @@ Is this ready to deploy? Check the CPU and memory settings and the security.
 
 ## Test fixture
 
-`tests/fixtures/serverless-deploy-check/quickship/` in this repository holds a delivery tracking app on all four platforms. It also holds the result the skill has to produce on it. `scenarios.md` adds four cases: a repository with none of the four platforms, Vercel and Supabase only, E1 as a warn, and a Lambda function defined in AWS CDK. `tests/read-serverless-config.test.sh` runs the reader against the fixture and its own attack files in CI. It fails when a planted value appears in any output. `tests/RESULTS.md` records every run, including the rules that the first runs changed.
+`tests/fixtures/serverless-deploy-check/quickship/` in this repository holds a delivery tracking app on all four platforms. It also holds the result the skill has to produce on it. `scenarios.md` adds four cases: none of the four platforms, Vercel and Supabase only, E1 as a warn, and a Lambda function defined in AWS CDK.
+
+`tests/read-serverless-config.test.sh` runs the reader against the fixture and its own attack files in CI. It fails when a planted value appears in any output. `tests/RESULTS.md` records every run, and the rules that the first runs and the reviews changed.
 
 ## Licence
 

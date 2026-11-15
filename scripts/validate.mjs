@@ -382,7 +382,7 @@ const serverlessStatuses = [
 ];
 const serverlessVerdicts = [
   "| Not ready to deploy | Any of S1 to S5 is a fail. |",
-  "| Ready after the first three | No fail in S1 to S5, and any other check is a fail or a warn. |",
+  "| Ready after the first three | No fail in S1 to S5, and at least one of the eighteen checks is a fail or a warn. |",
   "| Ready from what the repository shows | No fail and no warn. |",
 ];
 const firstThreeOrder = "Order: S3, S4, S1, S5, S2, S6, S7, E3, S8, S9, S10, E1, E2, E4, E5, E6, E7, E8.";

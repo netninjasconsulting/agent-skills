@@ -1,6 +1,6 @@
 # Net Ninjas agent skills
 
-Seven free agent skills for people who build with AI coding tools: a pre-launch security check, a GitOps hygiene check, a handover runbook generator, a guided app starter, an agent permissions check, an AI feature architecture check, and a serverless deploy check.
+Seven free agent skills for people who build with AI coding tools. Five are checks: pre-launch security, GitOps hygiene, agent permissions, AI feature architecture, and serverless deploy. The other two are a handover runbook generator and a guided app starter.
 
 Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New York City. I work with founders, startups, scale-ups, and small businesses across the US ([netninjas.us](https://www.netninjas.us)) and the EU ([netninjas.eu](https://www.netninjas.eu)). I keep seeing the same gaps in products built fast with an assistant: a key in the browser bundle, a pipeline that can't say no, nobody who can explain how it deploys, and an agent whose only limits are written in a file it reads. These skills carry the checks I run by hand. They are free, there is no sign-up, and there is no obligation.
 

@@ -133,6 +133,7 @@ Must:
 - The function map has nine functions. `quickship-rates` is on AWS Lambda, with its configuration at `lib/quickship-stack.ts:9` read from source code, its entry point "not found in the repository", and its code from an asset folder, `rates`, that is not in the repository.
 - Its settings are read from the stack: memory explicit at line 15, a time limit at 16, reserved concurrency at 17, and `NODEJS_24_X` with `ARM_64` at 11 and 12.
 - S3 is a fail. Its evidence includes the credential written in code under `RATES_API_KEY` at `lib/quickship-stack.ts:19`.
+- S2 stays a fail, from `ingest` and track. The stack gives `quickship-rates` no role and no permission statements, so its part of S2 is "ask the team" and never a fail, and its reach map row is marked "not found in the repository". This line was added after the final review, and no run has covered it yet.
 - "Also found" reports that credential by path, line, and type (a key written in code), with a pointer to the vibe-code pre-launch check. The reach map names `RATES_API_KEY` as written in code, by name only.
 - S10 is a warn: `quickship-rates` sets no log retention in the stack (the S10 warn rule: a Lambda function has no retention period in the repository). Every other status is as in `EXPECTED.md`.
 - "Efficiency: 1 out of 8 confirmed in the repository (1 to ask the team)" and "Security: 1 out of 10 confirmed in the repository (0 to ask the team)".

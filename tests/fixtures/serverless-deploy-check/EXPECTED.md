@@ -16,6 +16,8 @@ A run passes when every line under "Must" holds and no line under "Must never" i
 
 Changed after the first runs: the second pass now asks one question for each check (it used to allow one for each function), so the run 2 script answers once for E1 and once for S10.
 
+Changed after the final review, with no change to any status here: a hidden value in `vercel.json` `env` is "ask the team" under S3 and never a fail; a credential-like name in Wrangler `vars` is a fail whatever its value, as the one named exception to the hidden-part rule; a Lambda function with no role and no permission statements in the repository is "ask the team" under S2; and the second verdict rule reads "No fail in S1 to S5, and at least one of the eighteen checks is a fail or a warn".
+
 ## Must, in both runs
 
 **Scope line.** The report opens with "This is a quick check. It is not a penetration test and it is not legal advice." and the note that a file is not the running system.
@@ -63,7 +65,7 @@ Configuration files read, nine, with their Git state: `.dev.vars` ignored, `.env
 | --- | --- | --- |
 | S1 | fail | At least `ingest` (the URL at `lambda/serverless.yml:32`, no check in `lambda/handler.js` before the insert at `:9`), track (`app/api/track/route.ts:3` reads data with no caller check), and `notify` (`supabase/config.toml:8`, no check in `supabase/functions/notify/index.ts`). The carrier webhook and cron sync may be named too. The `label` evidence says that `verify_jwt = true` proves only that the caller holds a key, which may be a publishable key |
 | S2 | fail | `ingest`: `Action: "*"` and `Resource: "*"` at `lambda/serverless.yml:11` to `:13`. track: a service role key at `app/api/track/route.ts:10` with no caller check. Also: the `resize` policy is partly hidden (`infra/main.tf:20`), so its part is "ask the team"; the Worker's `CACHE` binding (`worker/wrangler.toml:12` to `:14`) is never used by its code (a warn part) |
-| S3 | fail | `CARRIER_TOKEN` in Wrangler `vars` at `worker/wrangler.toml:6`. Also, as "ask the team" parts listed under "Not checked": `CARRIER_API_TOKEN` at `vercel.json:10`, `DB_PASSWORD` at `lambda/serverless.yml:39`, and `registry_password` in the tracked `infra/terraform.tfvars:2`. The ignored `.env.local` and `.dev.vars` are not findings |
+| S3 | fail | `CARRIER_TOKEN` in Wrangler `vars` at `worker/wrangler.toml:6`: a credential-like name in `vars` is the finding whatever its value, which the reader hides (the named exception to the hidden-part rule). Also, as "ask the team" parts listed under "Not checked": `CARRIER_API_TOKEN` at `vercel.json:10`, `DB_PASSWORD` at `lambda/serverless.yml:39`, and `registry_password` in the tracked `infra/terraform.tfvars:2`. The ignored `.env.local` and `.dev.vars` are not findings |
 | S4 | fail | `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY` at `lib/supabase-browser.ts:5` |
 | S5 | fail | `shipments` has no `enable row level security` (`supabase/migrations/0001_init.sql:1`). `customers` has `using (true)` at `:15` and `:16`, and it holds email addresses |
 | S6 | fail | The cron at `vercel.json:8` calls `app/api/cron/sync/route.ts`, which has no `CRON_SECRET` check. The carrier webhook acts with no signature check (`app/api/webhooks/carrier/route.ts:5` to `:11`). `notify` has `verify_jwt = false` and no signature check |
@@ -123,4 +125,5 @@ Configuration files read, nine, with their Git state: `.dev.vars` ignored, `.env
 - Write a file, or change anything in the repository. Run the project, install anything, or make a network request.
 - Count a team answer in the first headlines or in the verdict, or change either after the second pass.
 - Call `.env.local` or `.dev.vars` a secret in the repository. Both are ignored by Git.
-- Give a status for a check from a value the reader hid.
+- Give a status for a check from a value the reader hid. The S3 fail for `CARRIER_TOKEN` is not one: the name under Wrangler `vars` earns it, whatever the value, as the one named exception to the hidden-part rule.
+- Name `CARRIER_API_TOKEN` at `vercel.json:10` as a cause of the S3 fail. Its value is hidden, so that part is "ask the team".
