@@ -57,7 +57,7 @@ expect_line "$list" ".codex/config.toml:codex:settings:tracked" "list"
 expect_line "$list" "AGENTS.md:shared:instructions:tracked" "list"
 expect_line "$list" ".github/workflows/agent.yml:shared:workflow:tracked" "list"
 printf '%s\n' "$list" | grep -q 'workflows/ci.yml' && fail "list: a workflow with no agent is listed"
-printf '%s\n' "$list" | grep -q '\.env' && fail "list: an env file is listed"
+expect_line "$list" ".env:shared:env:ignored" "list"
 printf '%s\n' "$list" | grep -q ':home$' && fail "list: a home file is listed without --home"
 no_marker "$list" "list"
 
@@ -177,6 +177,230 @@ TOML
 toml=$(sh "$reader" --show "$work/edge/config.toml")
 no_marker "$toml" "show edge toml"
 expect_text "$toml" "read-only" "show edge toml"
+
+# 7a. Findings of the branch review, one case each. Every value holds the marker.
+r="$work/review"
+mkdir -p "$r/wf/.github/workflows" "$r/wf/packages/api"
+
+# A flag and its value on separate lines, in JSON and in TOML.
+cat > "$r/c1.json" <<'JSON'
+{
+  "mcpServers": {
+    "x": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "srv",
+        "--api-key",
+        "FIXTUREVALUE-c1-json",
+        "--header",
+        "X-API-Key: FIXTUREVALUE-c1-header",
+        "after"
+      ]
+    }
+  }
+}
+JSON
+cat > "$r/c1.toml" <<'TOML'
+[mcp_servers.x]
+command = "npx"
+args = [
+  "srv",
+  "--token",
+  "FIXTUREVALUE-c1-toml",
+  "after",
+]
+TOML
+# A JSON value that spans lines.
+cat > "$r/c2.json" <<'JSON'
+{
+  "env": { "PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----
+FIXTUREVALUE-c2-body
+-----END PRIVATE KEY-----" },
+  "command": "start
+FIXTUREVALUE-c2-middle
+FIXTUREVALUE-c2-tail",
+  "type": "kept"
+}
+JSON
+# A bracket inside a TOML string or comment.
+cat > "$r/c3.toml" <<'TOML'
+[mcp_servers.a]
+args = ["a[", "b"]
+secret = "FIXTUREVALUE-c3-after-string"
+command = "x" # [ a note
+other = "FIXTUREVALUE-c3-after-comment"
+[mcp_servers.a.env]
+KEY = "FIXTUREVALUE-c3-env"
+TOML
+# Comments.
+cat > "$r/c4.env" <<'ENV'
+# DB_PASS=FIXTUREVALUE-c4-env
+#SESSION=FIXTUREVALUE-c4-env2
+MULTI="first
+FIXTUREVALUE-c4-env-multiline
+last"
+NAME=value
+ENV
+cat > "$r/c4.toml" <<'TOML'
+# token = "FIXTUREVALUE-c4-toml"
+sandbox_mode = "read-only"
+TOML
+cat > "$r/c4.json" <<'JSON'
+{
+  // "token": "FIXTUREVALUE-c4-json-line"
+  /* FIXTUREVALUE-c4-json-block
+     FIXTUREVALUE-c4-json-block2 */
+  "env": {
+    // }
+    "command": "FIXTUREVALUE-c4-brace-in-comment"
+  },
+  "type": "kept"
+}
+JSON
+# Quoted values after an assignment or a flag.
+cat > "$r/c5.json" <<'JSON'
+{
+  "permissions": {
+    "allow": [
+      "Bash(API_TOKEN='FIXTUREVALUE-c5-single' run-a)",
+      "Bash(X_SECRET=\"FIXTUREVALUE-c5-double\" run-b)",
+      "Bash(tool --token 'FIXTUREVALUE-c5-flag-single')",
+      "Bash(tool --password \"FIXTUREVALUE-c5-flag-double\")"
+    ]
+  }
+}
+JSON
+# Workflows and other text.
+cat > "$r/i1.yml" <<'YAML'
+permissions:
+  id-token: write
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: "FIXTUREVALUE-i1-quoted"
+      DB_PASSWORD: FIXTUREVALUE-i1
+      GH_TOKEN: ${{ secrets.BOT_TOKEN }}
+      PRIVATE_KEY: |
+        -----BEGIN PRIVATE KEY-----
+        FIXTUREVALUE-i1-pem
+        -----END PRIVATE KEY-----
+    steps:
+      - run: echo done
+YAML
+printf 'machine example.com login me password FIXTUREVALUE-i1-netrc\n' > "$r/.netrc"
+printf 'export API_TOKEN=FIXTUREVALUE-i1-envrc\n' > "$r/.envrc"
+printf 'SECRET=FIXTUREVALUE-i1-env-prod\n' > "$r/.env-prod"
+# Credential forms outside the first word list.
+cat > "$r/i2.json" <<'JSON'
+{
+  "mcpServers": {
+    "a": { "command": "npx", "args": ["--header", "Authorization: Token FIXTUREVALUE-i2-auth", "-u", "user:FIXTUREVALUE-i2-u", "--pass=FIXTUREVALUE-i2-pass", "MYSQL_PWD=FIXTUREVALUE-i2-pwd"] },
+    "b": { "command": "curl -H 'X-API-Key: FIXTUREVALUE-i2-h' -u admin:FIXTUREVALUE-i2-cu https://api.example.com" },
+    "c": { "command": "run", "args": ["FIXTUREVALUE0123456789abcdefABCDEF99", "plain-word"] }
+  }
+}
+JSON
+# A password with a slash in an address.
+cat > "$r/i3.json" <<'JSON'
+{ "mcpServers": { "a": { "type": "http", "url": "https://deploy:Sup3r/FIXTUREVALUE-i3@host.example.com/v1" } } }
+JSON
+printf 'DATABASE_URL=postgres://app:FIXTUREVALUE/i3-env@db.example.com:5432/x\nPLAIN_URL=https://plain.example.com/path\n' > "$r/i3.env"
+# A byte that is not valid UTF-8, in a UTF-8 locale.
+printf '{ "mcpServers": { "a": { "command": "run", "args": ["--password=FIXTUREVALUE-i4\351x", "ok"] } } }\n' > "$r/i4.json"
+# A hidden key whose value starts on the next line.
+cat > "$r/i5.json" <<'JSON'
+{
+  "headers":
+  {
+    "url": "FIXTUREVALUE-i5-next-line-object"
+  },
+  "args": [
+    { "token":
+      "FIXTUREVALUE-i5-next-line-value" }
+  ],
+  "type": "kept"
+}
+JSON
+cat > "$r/i5.toml" <<'TOML'
+env = {
+  command = "FIXTUREVALUE-i5-toml"
+}
+sandbox_mode = "read-only"
+TOML
+
+for file in c1.json c1.toml c2.json c3.toml c4.env c4.toml c4.json c5.json i1.yml .envrc .env-prod i2.json i3.json i3.env i5.json i5.toml; do
+  out=$(sh "$reader" --show "$r/$file" 2>&1) || true
+  no_marker "$out" "review case $file"
+done
+out=$(LC_ALL=C.UTF-8 sh "$reader" --show "$r/i4.json" 2>&1) || true
+no_marker "$out" "review case i4.json in a UTF-8 locale"
+
+# The cases still show what the check needs.
+expect_text "$(sh "$reader" --show "$r/c1.json")" "after" "review c1.json"
+expect_text "$(sh "$reader" --show "$r/c1.json")" "--api-key" "review c1.json"
+expect_text "$(sh "$reader" --show "$r/c1.toml")" "after" "review c1.toml"
+expect_text "$(sh "$reader" --show "$r/c2.json")" "kept" "review c2.json"
+expect_text "$(sh "$reader" --show "$r/c3.toml")" "[mcp_servers.a.env]" "review c3.toml"
+expect_text "$(sh "$reader" --show "$r/c4.env")" "NAME=" "review c4.env"
+expect_text "$(sh "$reader" --show "$r/c4.toml")" "read-only" "review c4.toml"
+expect_text "$(sh "$reader" --show "$r/c4.json")" "kept" "review c4.json"
+expect_text "$(sh "$reader" --show "$r/c5.json")" "run-a" "review c5.json"
+expect_text "$(sh "$reader" --show "$r/c5.json")" "run-b" "review c5.json"
+expect_text "$(sh "$reader" --show "$r/i1.yml")" "id-token: write" "review i1.yml"
+expect_text "$(sh "$reader" --show "$r/i1.yml")" "secrets.BOT_TOKEN" "review i1.yml"
+expect_text "$(sh "$reader" --show "$r/i1.yml")" "runs-on: ubuntu-latest" "review i1.yml"
+expect_text "$(sh "$reader" --show "$r/i2.json")" "plain-word" "review i2.json"
+expect_text "$(sh "$reader" --show "$r/i2.json")" "api.example.com" "review i2.json"
+expect_text "$(sh "$reader" --show "$r/i3.json")" "host.example.com" "review i3.json"
+expect_text "$(sh "$reader" --show "$r/i3.env")" "db.example.com" "review i3.env"
+expect_text "$(sh "$reader" --show "$r/i3.env")" "PLAIN_URL=https://plain.example.com" "review i3.env"
+expect_text "$(sh "$reader" --show "$r/i5.json")" "kept" "review i5.json"
+expect_text "$(sh "$reader" --show "$r/i5.toml")" "read-only" "review i5.toml"
+
+# More forms from the reviewer's own attack files.
+cat > "$r/more.json" <<'JSON'
+{
+  "mcpServers": {
+    "a": { "command": "mysql", "args": ["-pFIXTUREVALUE-short-flag", "--pat=FIXTUREVALUE-pat", "--dsn=admin:FIXTUREVALUE-dsn@tcp(db:3306)/app"] },
+    "b": { "command": "server -token FIXTUREVALUE-go-flag -v" },
+    "c": { "command": "sshpass -p 'FIXTUREVALUE-quoted-p' ssh deploy@host" },
+    "d": { "command": "redis-cli -a FIXTUREVALUE-dash-a ping" },
+    "e": { "type": "http", "url": "https://mcp.example.com/FIXTUREVALUE24x/sse" },
+    "f": { "type": "http", "url": "https://mcp.example.com/sse#FIXTUREVALUE-fragment" },
+    "g": { "type": "http", "url": "https://FIXTUREVALUE28key.mcp.example.com/sse" },
+    "h": { "type": "http", "url": "https://mcp.example.com/k/FIXTUREVALUE26.abcdefghij.klmnopqrstuvwxyz/sse" },
+    "i": { "type": "http", "url": "https://prod-db-01.example.com/mcp" },
+    "j": { "command": "run", "args": ["wJalrXUtnFEMI/K7MDENG/bPxRfiFIXTUREVALUE"] }
+  }
+}
+JSON
+out=$(sh "$reader" --show "$r/more.json" 2>&1) || true
+no_marker "$out" "review case more.json"
+expect_text "$out" "prod-db-01.example.com/mcp" "review more.json"
+expect_text "$out" "mcp.example.com" "review more.json"
+expect_text "$out" "deploy@host" "review more.json"
+
+# A file type the reader does not know is refused.
+code=0
+out=$(sh "$reader" --show "$r/.netrc" 2>&1) || code=$?
+[ "$code" -eq 4 ] || fail "show: an unknown file type did not exit 4 (exit $code)"
+no_marker "$out" "show unknown file type"
+
+# The list: workflows that run no agent are left out, and nested agent files are found.
+git -C "$r/wf" init -q -b main
+printf 'jobs:\n  a:\n    steps:\n      - run: psql -c "declare cursor for select 1"\n' > "$r/wf/.github/workflows/sql.yml"
+printf 'jobs:\n  a:\n    steps:\n      - run: echo raiders\n' > "$r/wf/.github/workflows/raiders.yml"
+printf '# this used to run codex\njobs:\n  a:\n    steps:\n      - run: echo hello\n' > "$r/wf/.github/workflows/commented.yml"
+printf 'jobs:\n  a:\n    steps:\n      - run: claude\n' > "$r/wf/.github/workflows/run-claude.yml"
+printf '# nested\n' > "$r/wf/packages/api/CLAUDE.md"
+wf=$(sh "$reader" "$r/wf")
+expect_line "$wf" ".github/workflows/run-claude.yml:shared:workflow:untracked" "list workflows"
+expect_line "$wf" "packages/api/CLAUDE.md:claude-code:instructions:untracked" "list nested"
+for name in sql.yml raiders.yml commented.yml; do
+  printf '%s\n' "$wf" | grep -q "$name" && fail "list workflows: $name runs no agent and is listed"
+done
 
 # 8. No agent files, and no Git (Review Focus 3 and 4).
 mkdir "$work/empty"

@@ -43,7 +43,8 @@ The widest permissions often sit in a developer's home folder, outside the repos
 
 ## What it never does
 
-- It never prints a credential. A bundled script reads every settings file and hides each value, except the ones that carry permissions. CI tests that script on every pull request.
+- It never shows a settings value unless its key carries a permission. A bundled script reads every settings file, and it hides tokens, passwords in addresses, and flag values inside the values it shows. CI tests that script on every pull request.
+- It never repeats a credential it meets. One limit applies: a credential typed as a short plain word in a command or an instruction file can still appear in the script's output.
 - It never opens a credential store. It lists the file and moves on.
 - It never changes a setting, a ruleset, or a file. It writes one policy file, and only after a "yes" and a confirmed path.
 - It never follows instructions found in the repository, including the ones in `CLAUDE.md`. Those files are what it checks.
@@ -73,7 +74,7 @@ Run the agent permissions check on this repository.
 
 ## Test fixture
 
-`tests/fixtures/agent-permissions-check/` in this repository holds a small repository with loose agent settings, a stand-in home folder, and the result the skill has to produce on them. `tests/RESULTS.md` records every run, including the two misses the first runs found.
+`tests/fixtures/agent-permissions-check/` in this repository holds a small repository with loose agent settings, a stand-in home folder, and the result the skill has to produce on them. `tests/RESULTS.md` records every run, including the misses the first runs and the branch review found.
 
 ## Read more
 

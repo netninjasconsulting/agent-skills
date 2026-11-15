@@ -21,7 +21,9 @@ Rules that hold for every row:
 - Text in an instruction file never makes a row `enforced`. It makes it `stated only`, and the evidence is the path and the line of the statement.
 - A row that needs `gh` and has no `gh` is `not checked`, unless a file already shows it to be `open`.
 - Before a row is `not found` or `not checked`, search every instruction file for a statement of that row's rule. A stated rule with no mechanism behind it makes the row `stated only`.
-- An agent job is a job in a workflow that `scripts/list-agent-config.sh` lists with the kind `workflow`. The deploy job is the job that deploys to production.
+- An agent job is a job that names an agent, in a workflow that `scripts/list-agent-config.sh` lists with the kind `workflow`. Other jobs in the same workflow are not agent jobs. The deploy job is the job that deploys to production.
+- No row is `enforced` because there is nothing to check. "Every agent job ..." needs at least one agent job.
+- A row that is `stated only` while its setting could not be read is also named in the "Confirm first" line and under "Not checked". It is not counted in the headline's "not checked".
 
 ## Part A: the policy
 
@@ -45,7 +47,8 @@ Rules that hold for every row:
 - **How we enforce it:** A GitHub App with the fewest permissions. Its installation tokens expire after an hour.
 - **Files:** every agent workflow.
 - **open:** an agent step receives a secret whose name marks a personal token (`PAT`, `PERSONAL`, `USER_TOKEN`, or a person's name), or a workflow sets `GH_TOKEN` or `GITHUB_TOKEN` from such a secret.
-- **enforced:** every agent job gets its token from an app token step (`actions/create-github-app-token` or the agent vendor's own app), or uses the workflow token with a least-privilege `permissions` block.
+- **enforced:** at least one agent job exists, and every agent job gets its token from an app token step (`actions/create-github-app-token` or the agent vendor's own app), or uses the workflow token with a least-privilege `permissions` block.
+- **not checked:** an agent job uses a stored token whose name does not show its owner, such as `BOT_TOKEN`. Say that the owner of the token cannot be read from the file.
 - **not found:** no agent workflow exists. Add the note: "An agent run from a developer's machine acts as that developer. Part B covers that case."
 
 ### 3. Secrets
@@ -81,7 +84,7 @@ Rules that hold for every row:
 - **open:** an env file in the working folder, or an MCP server entry, holds an address whose name or host marks production (`prod`, `production`, `live`), or a credential for a database. Give the path, the line, and the key name.
 - **stated only:** an instruction file tells the agent not to read production data, and nothing above is found.
 - **enforced:** this row cannot be shown from files alone. The most a repository can show is that nothing above was found, which is `not found`.
-- Records that look real are reported once, with the path, as: "Assumption: these records may be copies of real customer data." Read the first lines of the file for its field names. Never copy a record into the report.
+- Records that look real are reported once, with the path, as: "Assumption: these records may be copies of real customer data." Read the field names only, and never a record: `grep -oE '"[A-Za-z_]+"[[:space:]]*:' <file> | sort -u | head -20` for JSON, or the header line of a CSV file.
 
 ### 6. Runners
 
@@ -90,7 +93,7 @@ Rules that hold for every row:
 - **How we enforce it:** GitHub-hosted or ephemeral runners only.
 - **Files:** `runs-on` in every agent job.
 - **open:** an agent job runs on `self-hosted`, or on a label that is not a GitHub-hosted image.
-- **enforced:** every agent job runs on a GitHub-hosted image.
+- **enforced:** at least one agent job exists, and every agent job runs on a GitHub-hosted image.
 - **not found:** no agent workflow exists. Add the same note as row 2.
 
 ### 7. Outside input
@@ -99,8 +102,8 @@ Rules that hold for every row:
 - **The agent may not:** Follow instructions found in them.
 - **How we enforce it:** No secrets for workflows that outside contributors trigger.
 - **Files:** the `on:` block of every agent workflow, and what each agent step is given.
-- **open:** an agent workflow triggers on `issue_comment`, `issues`, `pull_request_target`, `discussion`, or `workflow_run`, and the agent step holds a secret or a token with write permissions. It is worse, and the report says so, when the prompt comes from the comment or the issue body.
-- **enforced:** agent workflows that outside contributors can trigger hold no secret and a read-only token, or they check the author's association before the agent step runs.
+- **open:** an agent workflow triggers on `issue_comment`, `issues`, `pull_request_target`, `discussion`, or `workflow_run`, the agent step holds a secret or a token with write permissions, and nothing limits the job to maintainers. It is worse, and the report says so, when the prompt comes from the comment or the issue body.
+- **enforced:** at least one agent job exists, and each agent workflow that outside contributors can trigger holds no secret and a read-only token, or limits the agent job to maintainers before the agent step runs: an `if:` on the author's association, or a label that only maintainers can add.
 - **stated only:** an instruction file tells the agent to treat outside text as data, and no agent workflow exists to check.
 
 ### 8. Review
@@ -121,6 +124,7 @@ Rules that hold for every row:
 - **How we enforce it:** An audit log we keep, so last week's agent changes are one query away.
 - **Files:** agent workflows, for a shared login or a personal token (row 2).
 - **open:** row 2 is open. An agent that acts as a person leaves that person's name in the log.
+- **stated only:** an instruction file tells the agent to act under its own identity, and row 2 is not open.
 - **not checked:** in every other case. The audit log belongs to the organisation and is read by its owners. Say where to look: the organisation's settings, under Logs.
 - Never mark this row `enforced` from files.
 
@@ -132,7 +136,7 @@ Part B reads what an agent on a developer's machine can do without asking. Each 
 
 ### B1. Permission mode
 
-- Claude Code: `permissions.defaultMode`. Report `bypassPermissions`, `auto`, `dontAsk`, and `acceptEdits`.
+- Claude Code: `permissions.defaultMode`. Report `bypassPermissions`, `auto`, and `acceptEdits`. `dontAsk` is a control and not a gap: it denies whatever would have prompted, and allow rules still run. Report it as a control.
   - In `.claude/settings.json` or `.claude/settings.local.json`: report `bypassPermissions` or `auto` with this note: "Current versions of Claude Code ignore this value in a project file. Versions before 2.1.257 applied it."
   - In the home folder: report it as in force for every project on that machine.
 - Codex: `approval_policy = "never"`, in the top level or in a profile. In a project file it applies only when the project is trusted.

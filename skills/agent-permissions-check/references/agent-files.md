@@ -28,7 +28,7 @@ Sources:
 Keys that carry permissions:
 
 - `permissions.allow`, `permissions.ask`, and `permissions.deny` hold rule strings such as `Bash(npm run test *)`, `Read(./.env)`, `WebFetch`, and `mcp__<server>__<tool>`. Rules are evaluated in the order deny, ask, allow, and the first match decides. checked
-- `permissions.defaultMode` sets the permission mode. The modes that remove prompts are `bypassPermissions`, `auto`, `dontAsk`, and, for file edits, `acceptEdits`. checked
+- `permissions.defaultMode` sets the permission mode. The modes that remove prompts are `bypassPermissions` and `auto`, and `acceptEdits` for file edits. `dontAsk` does the opposite: it denies whatever would have prompted, and allow rules still run. checked
 - `permissions.additionalDirectories` adds folders outside the working folder. checked
 - `permissions.disableBypassPermissionsMode` and `permissions.disableAutoMode`, set to `"disable"`, turn those modes off from any settings file. checked
 - `enableAllProjectMcpServers`, `enabledMcpjsonServers`, and `disabledMcpjsonServers` approve or reject the servers in `.mcp.json`. checked
@@ -81,8 +81,11 @@ For every other agent, version 1 reads three things and no tool-specific setting
 | `.cursor/mcp.json` | Home | mcp | Cursor | verify |
 | `.gemini/settings.json` | Home | mcp | Gemini CLI | verify |
 | `.github/workflows/*` that run an agent | Repository | workflow | Any | checked |
+| `.env`, `.env.*`, `.envrc` in the top folder | Repository | env | Any. Read for names, and for the host of an address | checked |
 
-A workflow "runs an agent" when it uses an action whose name contains `claude-code`, `codex`, `copilot`, `cursor`, `gemini-cli`, `aider`, or `opencode`, or when a step runs the `claude` or `codex` command.
+A workflow "runs an agent" when a line that is not a comment holds one of these as a word: `claude-code`, `claude_code`, `codex`, `copilot`, `cursor-agent`, `gemini-cli`, `aider`, `opencode`, or `claude`.
+
+In a Git repository the script also lists `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `GEMINI.md`, `.mcp.json`, `.claude/settings.json`, `.claude/settings.local.json`, and `.codex/config.toml` in subfolders, when Git tracks them or does not ignore them.
 
 ## Not checked in version 1
 
@@ -93,4 +96,7 @@ Name each of these under "Not checked" in the report.
 - A home folder moved with `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
 - Flags on the command line, such as `--permission-mode`, `--settings`, `--dangerously-skip-permissions`, and Codex `--sandbox`. Scripts and workflows in the repository that pass them are read. A person's shell history is not.
 - Tool-specific settings of agents other than Claude Code and Codex.
+- Agent files in subfolders of a folder that is not in Git, and ignored agent files in subfolders.
+- `.claude/agents/`, `.claude/commands/`, and subfolders of `.claude/rules/`.
+- Env files below the top folder.
 - Cloud sessions, which read only some of these files.

@@ -4,7 +4,7 @@ All four skills share one version number. Dates are in day, month, year order.
 
 ## 0.2.0 (15 November 2026)
 
-Two new skills. The four existing skills are unchanged apart from the version number.
+One new skill. The four skills from 0.1.0 keep their checks.
 
 ### Added
 
@@ -23,14 +23,16 @@ Two new skills. The four existing skills are unchanged apart from the version nu
 
 ### Tested
 
-See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. `tests/list-agent-config.test.sh` runs in CI.
+See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs against its fixture and one scenario with Claude Code, after a first pair of runs found two misses that are now fixed. A review of the branch then found five ways to make the reader print a credential, and ten other problems. All fifteen are fixed, each with a test that failed first, and the fixture was run again. `tests/list-agent-config.test.sh` runs in CI.
 
 ### Known limits
 
 - `agent-permissions-check` has not been run with `gh` access, against a real home folder, or with a yes to the policy file.
 - The fixture runs gave the user's answers in advance, so the order "ask, then read" was not observed.
 - The reader script is tested on Linux. It is written for POSIX `sh` and `awk`, and it has not been run with BSD tools.
-- The masked view works line by line. A file on one line prints as one long masked line. A token inside the path of an address is hidden only when the path segment is 20 characters or longer.
+- The masked view works line by line. A file on one line prints as one long masked line.
+- The reader hides a credential that it can recognise by its key, its shape, its flag, or its place in an address. It cannot recognise a credential typed as a short plain word: a positional argument, a word in a command, a host name of fewer than 8 characters, or prose in an instruction file. The skill tells the agent not to repeat such a value.
+- The reader hides some harmless text: a word of 20 or more characters that mixes letters and digits, and comments in settings and env files.
 - Tool-specific settings of agents other than Claude Code and Codex are not read.
 
 ## 0.1.0 (14 November 2026)
