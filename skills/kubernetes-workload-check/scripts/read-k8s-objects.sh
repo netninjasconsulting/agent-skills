@@ -188,9 +188,23 @@ function balanced(t,    i, n, c, d, q) {
   return d == 0 && q == ""
 }
 
+# The allow shape of a flow-list item: an unquoted token of letters,
+# digits, and _ . / @ + - that starts with a letter, a digit, ".", or "/",
+# or one single-quoted or double-quoted string with no quote, backslash, or
+# control character inside, with nothing but spaces around it. Such an item
+# is the same plain scalar to Kubernetes; nothing else is.
+function allowed(t,    q, inner) {
+  if (t ~ /^[A-Za-z0-9.\/][A-Za-z0-9_.\/@+-]*$/) return 1
+  q = substr(t, 1, 1)
+  if (length(t) < 2 || (q != "\"" && q != "\047") || substr(t, length(t), 1) != q) return 0
+  inner = substr(t, 2, length(t) - 2)
+  if (index(inner, "\"") || index(inner, "\047") || index(inner, "\\")) return 0
+  return inner !~ /[\001-\037\177]/
+}
+
 # The items of a one-line flow list, each cleaned on its own: FIV, FIQ, FIT.
-# A list that holds a map or a list gives items of type flow, never read.
-function flowitems(t,    inner, n, i, c, q, d, cur) {
+# An item outside the allow shape gives the type flow, never read.
+function flowitems(t,    inner, n, i, c, q, d, cur, ok) {
   NFI = 0
   if (substr(t, 1, 1) != "[") return 0
   inner = substr(t, 2, length(t) - 2)
@@ -208,10 +222,10 @@ function flowitems(t,    inner, n, i, c, q, d, cur) {
     if (c == "{" || c == "[") d++
     if (c == "}" || c == "]") d--
     if (c == "," && d == 0) {
-      sub(/^ +/, "", cur)
+      sub(/^ +/, "", cur); sub(/ +$/, "", cur)
+      ok = allowed(cur)  # the allow shape of a flow item
       cleanv(cur)
-      NFI++; FIV[NFI] = CV; FIQ[NFI] = CQ; FIT[NFI] = CT
-      if (CT == "flow" || CT == "none" || CT == "err") FIT[NFI] = "flow"
+      NFI++; FIV[NFI] = CV; FIQ[NFI] = CQ; FIT[NFI] = ok ? CT : "flow"
       cur = ""; continue
     }
     cur = cur c
@@ -219,10 +233,8 @@ function flowitems(t,    inner, n, i, c, q, d, cur) {
   return NFI
 }
 
-# A flow map that is not empty, or a flow list with an item that is not a
-# plain scalar (a map, a list, an implicit single-pair map such as
-# [hostPort: 22], a key with no value, or anything else the reader cannot
-# classify): what it holds is not read, so the file is not read.
+# A flow map that is not empty, or a flow list with an item outside the
+# allow shape: what it holds is not read, so the file is not read.
 function flowmap(t, v,    n, i, sv, sq, st, r) {
   if (t != "flow" || v == "{}" || v == "[]") return 0
   if (substr(v, 1, 1) == "{") return 1
@@ -1272,13 +1284,28 @@ plain_path() {
 }
 
 # The physical path of an existing file or directory.
+has_ctl() {
+  case "$1" in *[[:cntrl:]]*) return 0 ;; esac
+  return 1
+}
+
+# Every path argument passes here before any other work.
+no_ctl() {  # a control character in a path argument
+  if has_ctl "$1"; then die2 "a path with a control character"; fi
+}
+
+# The physical path of an existing file or directory. A resolved path with a
+# control character (for example a repository under a directory whose name
+# holds a line break) is not given.
 phys() {
   if [ -d "$1" ]; then
-    (cd -P -- "$1" 2>/dev/null && pwd -P)
+    r=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
   else
     d=$(cd -P -- "$(dirname -- "$1")" 2>/dev/null && pwd -P) || return 1
-    printf '%s/%s\n' "${d%/}" "$(basename -- "$1")"
+    r="${d%/}/$(basename -- "$1")"
   fi
+  if has_ctl "$r"; then return 1; fi  # a control character in a resolved path
+  printf '%s\n' "$r"
 }
 
 # A file or directory in the tree $1 has a line break in its name, which
@@ -1383,7 +1410,7 @@ list_mode() {
   fi
   cd -- "$LROOT" || exit 2
   LROOT=.
-  ROOTP=$(pwd -P)
+  ROOTP=$(phys .) || { echo "$me: not read, a control character in the resolved path" >&2; exit 4; }
   # Only paths of letters, digits, and . _ / @ + - are listed, so no path
   # in a list line can split, expand, or hide a line break. Any other path
   # is counted and reported, and the run ends with exit code 4.
@@ -1500,7 +1527,7 @@ refuse() {
 
 set_root() {
   top=$(git rev-parse --show-toplevel 2>/dev/null) || top=$(pwd)
-  ROOTP=$(cd -P -- "$top" && pwd -P)
+  ROOTP=$(phys "$top") || refuse "not a local file"
 }
 
 local_ok() {
@@ -1595,11 +1622,12 @@ render_kustomize() {
   set_root
   local_ok "$dir" d || refuse "not a local file"
   [ -n "$(kfile_in "$dir")" ] || refuse "not a local file"
-  queue=$(phys "$dir")
+  queue=$(phys "$dir") || refuse "not a local file"
   seen=
   while [ -n "$queue" ]; do
     d=$(printf '%s\n' "$queue" | sed -n 1p)
     queue=$(printf '%s\n' "$queue" | sed 1d)
+    [ -d "$d" ] || refuse "not a local file"  # a queue entry that does not exist
     if printf '%s\n' "$seen" | grep -qxF -e "$d"; then continue; fi
     seen="$seen
 $d"
@@ -1664,6 +1692,8 @@ emit_render() {
 }
 
 # ---- Arguments ----
+
+for arg in "$@"; do no_ctl "$arg"; done
 
 [ $# -gt 0 ] || { list_mode .; exit 0; }
 case "$1" in

@@ -1969,7 +1969,7 @@ pins() {
   pin "names only for Secret values" '# names only: secret' 's/sv = key  # names only: secret/sv = LVAL[0, k]/' fields "a planted value leaked"
   pin "other for a key seen and not read" '# a key seen and not read' 's/^\( *\)else out(ln, cont, f, "other")  # a key seen and not read$/\1else return/' attacks "missing line yaml11.yaml:6:Pod/-/yaml11:-:host-network=other"
   pin "a flow collection that holds a map" '# a flow collection that holds a map' 's/if (flowmap(CT, CV))/if (0)/' attacks "attack flow-map-sc: expected exit 4, got 0"
-  pin "a flow item that is not a plain scalar" '# a flow item that is not a plain scalar' 's/if (FIT\[i\] != "scalar") r = 1  # a flow item that is not a plain scalar/if (FIT[i] == "flow") r = 1/' attacks "attack flow-implicit: expected exit 4, got 0"
+  pin "a flow item that is not a plain scalar" '# a flow item that is not a plain scalar' 's/if (FIT\[i\] != "scalar") r = 1  # a flow item that is not a plain scalar/r = r/' attacks "flow form table: [hostPort: 22] expected exit 4, got 0"
   pin "a file that is not text" '# not text' 's/^\(not_text() {\)  # not text$/\1 return 1/' attacks "attack nul: expected exit 4, got 0"
   pin "a credential-like parent" '# a credential-like key or parent' 's/for (i = 1; i <= n; i++) if (credlike(s\[i\])) return  # a credential-like key or parent/if (credlike(last)) return/' attacks "a line matches :values\.(passwordPolicy|auth|apiToken)\."
   pin "a credential-like parent of a capability list" '# a credential-like parent of a capability list' 's/for (j = 1; j < n; j++) if (credlike(s\[j\])) return  # a credential-like parent of a capability list//' attacks "a line matches :values\.(passwordPolicy|auth|apiToken)\."
