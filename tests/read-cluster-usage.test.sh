@@ -137,7 +137,7 @@ log_only() {  # $1 = label; the rest are the namespaces given
   while IFS= read -r line; do
     grep -qxF -e "$line" "$work/allowed" || fail "$ll: the log holds a command outside the fixed list: $line"
     case " $line " in
-      *' -A '* | *[Ss]ecret* | *' describe '* | *' logs '* | *' exec '* | *' -o yaml '* | *' -o json '* | *'-o=json'* | *'-o=yaml'* | *--output*)
+      *' -A '* | *[Ss]ecret* | *' describe '* | *' logs '* | *' exec '* | *' -o yaml '* | *' -o json '* | *'-o=json'* | *'-o=yaml'* | *' --output='* | *' --output '*)
         fail "$ll: the log holds a forbidden word: $line" ;;
     esac
     for w in $line; do
@@ -506,10 +506,14 @@ pins() {
   pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a row with a control character" '# a row with a control character' 's/ -e "\/\[\[:cntrl:\]\]\/s\/^$1 \/$1X \/"  # a row with a control character//' "a row with a carriage return: printed: crlf-1"
-  pin "an empty selector on top" "CMD_TOP='kubectl top pod" 's/^\(CMD_TOP=.*\) --selector= /\1 /' "a command lacks the neutral flag --selector="
-  pin "an empty field selector on get pods" "CMD_PODS='kubectl get pods" 's/^\(CMD_PODS=.*\) --field-selector= /\1 /' "a command lacks the neutral flag --field-selector="
-  pin "no watch-only on get vpa" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --watch-only=false /\1 /' "a command lacks the neutral flag --watch-only=false"
-  pin "no ignore-not-found on get hpa" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --ignore-not-found=false /\1 /' "a command lacks the neutral flag --ignore-not-found=false"
+  # The neutral flags. A copy without one on the top or the get pods line
+  # gets no answer from the stand-in, so its control run fails before the
+  # check; the VPA and HPA lines carry the same flags, and the control run
+  # does not need them.
+  pin "an empty selector on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --selector= /\1 /' "a command lacks the neutral flag --selector="
+  pin "an empty field selector on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --field-selector= /\1 /' "a command lacks the neutral flag --field-selector="
+  pin "no watch-only on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --watch-only=false /\1 /' "a command lacks the neutral flag --watch-only=false"
+  pin "no ignore-not-found on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --ignore-not-found=false /\1 /' "a command lacks the neutral flag --ignore-not-found=false"
   pin "the fixed command list" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^CMD_VPA=.kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> /CMD_VPA='"'"'kubectl get secrets --all-namespaces /' "the fixed command list of the script differs from fields.md"
 }
 copy_works "$real_script" || { echo "FAIL: the control case fails on the script itself"; total=$((total + 1)); }
