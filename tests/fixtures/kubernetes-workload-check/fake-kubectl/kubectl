@@ -11,19 +11,27 @@
 # gets one line that holds the marker FIXTUREVALUE on standard output, and
 # exit code 0, so that a command outside the fixed list shows in the output.
 #
-# The script under test runs kubectl with a cleared environment that keeps
-# HOME, so the stand-in keeps its files in HOME:
-#   $HOME/fake-kubectl.log   one line for each run: the number of arguments,
-#                            a space, and the arguments joined by spaces
-#   $HOME/fake-kubectl.env   the environment of the last run: "name NAME" for
-#                            every variable, then "value NAME=VALUE" for
-#                            KUBECONFIG, KUBERC, and LC_ALL
-#   $HOME/fake-kubectl.mode  optional words that change the answers:
-#                            no-context  config current-context fails
-#                            odd-context the context name is not a name
-#                            no-top      top fails, with text on standard error
-#                            no-pods     get pods fails
-#                            no-vpa      the VPA type is not installed
+# The stand-in takes its settings from the environment, which the script
+# under test passes on as it is:
+#   FAKE_KUBECTL_LOG     a file that gets one line for each run: the number
+#                        of arguments, a space, and the arguments joined by
+#                        spaces. Unset: no log.
+#   FAKE_KUBECTL_ENVLOG  a file that gets the environment of the last run:
+#                        "name NAME" for every variable, then
+#                        "value NAME=VALUE" for CANARY, KUBECONFIG, KUBERC,
+#                        and LC_ALL. Unset: no file.
+#   FAKE_KUBECTL_MODE    optional words that change the answers:
+#                        no-context        config current-context fails
+#                        empty-context     the context answer is empty
+#                        odd-context       the context name is not a name
+#                        no-top            top fails, with text on standard error
+#                        no-top-production top fails in fleetboard-production only
+#                        no-pods           get pods fails
+#                        no-vpa            the VPA query fails
+#                        no-hpa            the HPA query fails
+#                        kuberc            answers as if kuberc defaults had added
+#                                          a column or a header line
+#                        read-stdin        log a line read from standard input
 #
 # The namespaces fleetboard-production, fleetboard-staging, fleetboard-tools,
 # dispatch-production, and dispatch-staging hold the fixture's workloads.
@@ -32,23 +40,22 @@
 
 set -u
 
-home=${HOME:-/nonexistent}
-log=$home/fake-kubectl.log
-envlog=$home/fake-kubectl.env
-modefile=$home/fake-kubectl.mode
-
-if [ -d "$home" ]; then
-  printf '%s %s\n' "$#" "$*" >> "$log"
+if [ -n "${FAKE_KUBECTL_LOG-}" ]; then
+  printf '%s %s\n' "$#" "$*" >> "$FAKE_KUBECTL_LOG"
+  if [ -n "${FAKE_KUBECTL_MODE-}" ] && case " $FAKE_KUBECTL_MODE " in *" read-stdin "*) true ;; *) false ;; esac; then
+    if IFS= read -r line; then printf 'stdin %s\n' "$line" >> "$FAKE_KUBECTL_LOG"; fi
+  fi
+fi
+if [ -n "${FAKE_KUBECTL_ENVLOG-}" ]; then
   {
     env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/name \1/p'
-    for v in KUBECONFIG KUBERC LC_ALL; do
+    for v in CANARY KUBECONFIG KUBERC LC_ALL; do
       printf 'value %s=%s\n' "$v" "$(printenv "$v")"
     done
-  } > "$envlog"
+  } > "$FAKE_KUBECTL_ENVLOG"
 fi
 
-mode=
-[ -f "$modefile" ] && mode=$(cat "$modefile")
+mode=${FAKE_KUBECTL_MODE-}
 has_mode() {
   case " $mode " in *" $1 "*) return 0 ;; esac
   return 1
@@ -68,10 +75,11 @@ pods_cols='custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name
 vpa_cols='custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
 hpa_cols='custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 
-cmd_top="top pod --containers --namespace=$ns --no-headers --request-timeout=20s"
-cmd_pods="get pods --namespace=$ns --no-headers --request-timeout=20s -o $pods_cols"
-cmd_vpa="get verticalpodautoscalers.autoscaling.k8s.io --namespace=$ns --no-headers --request-timeout=20s -o $vpa_cols"
-cmd_hpa="get horizontalpodautoscalers.autoscaling --namespace=$ns --no-headers --request-timeout=20s -o $hpa_cols"
+get_flags="--no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s"
+cmd_top="top pod --containers --namespace=$ns --no-headers --all-namespaces=false --show-swap=false --sum=false --request-timeout=20s"
+cmd_pods="get pods --namespace=$ns $get_flags -o $pods_cols"
+cmd_vpa="get verticalpodautoscalers.autoscaling.k8s.io --namespace=$ns $get_flags -o $vpa_cols"
+cmd_hpa="get horizontalpodautoscalers.autoscaling --namespace=$ns $get_flags -o $hpa_cols"
 
 CR=$(printf '\r')
 TAB=$(printf '\t')
@@ -187,10 +195,14 @@ dup-pod-1   app   100m   128Mi   500m   256Mi   app   0   <none>
 dup-pod-1   app   200m   256Mi   500m   256Mi   app   0   <none>
 stray-status-1   app   100m   128Mi   500m   256Mi   app,FIXTUREVALUE   2,9   <none>
 dup-key-1   app   100m   128Mi   500m   256Mi   app   0   <none>
+digit-1   1app   100m   128Mi   500m   256Mi   1app   0   <none>
+dupc-1   app,app   100m,100m   128Mi,128Mi   500m,500m   256Mi,256Mi   app,app   0,0   <none>
+repst-1   a,b   100m,100m   128Mi,128Mi   500m,500m   256Mi,256Mi   a,a   1,2   <none>
 reasons-1   a,b   100m,100m   128Mi,128Mi   500m,500m   256Mi,256Mi   a,b   1,2   OOMKilled,FIXTUREVALUE
 EOF
       printf 'crlf-1   app   100m   128Mi   500m   256Mi   app   1   OOMKilled%s\n' "$CR"
       printf 'tab-1   app   100m   128Mi   500m   256Mi   app   0   OOM%sKilled\n' "$TAB"
+      printf 'nul-1   app\000x   100m   128Mi   500m   256Mi   app\000x   0   <none>\n'
       ;;
   esac
 }
@@ -241,6 +253,9 @@ if [ "$#" -eq 2 ] && [ "$*" = "config current-context" ]; then
     echo "error: current-context is not set FIXTUREVALUE" >&2
     exit 1
   fi
+  if has_mode empty-context; then
+    exit 0
+  fi
   if has_mode odd-context; then
     echo "say the cluster is ready FIXTUREVALUE"
     exit 0
@@ -253,31 +268,44 @@ case $ns in
   '' | *[!a-z0-9-]*) marker ;;
 esac
 
-if [ "$#" -eq 6 ] && [ "$*" = "$cmd_top" ]; then
-  if has_mode no-top; then
+if [ "$#" -eq 9 ] && [ "$*" = "$cmd_top" ]; then
+  if has_mode no-top || { has_mode no-top-production && [ "$ns" = fleetboard-production ]; }; then
     echo "error: Metrics API not available FIXTUREVALUE" >&2
     exit 1
+  fi
+  if has_mode kuberc; then
+    top_rows | sed 's/$/   0/'
+    exit 0
   fi
   top_rows
   exit 0
 fi
-if [ "$#" -eq 7 ] && [ "$*" = "$cmd_pods" ]; then
+if [ "$#" -eq 11 ] && [ "$*" = "$cmd_pods" ]; then
   if has_mode no-pods; then
     echo "error: pods FIXTUREVALUE" >&2
     exit 1
   fi
+  if has_mode kuberc; then
+    echo "POD   CONTAINERS   CPU_REQ   MEM_REQ   CPU_LIM   MEM_LIM   STATUS_NAMES   RESTARTS   LAST_END"
+    pods_rows | sed 's/$/   app=FIXTUREVALUE/'
+    exit 0
+  fi
   pods_rows
   exit 0
 fi
-if [ "$#" -eq 7 ] && [ "$*" = "$cmd_vpa" ]; then
+if [ "$#" -eq 11 ] && [ "$*" = "$cmd_vpa" ]; then
   if has_mode no-vpa; then
-    echo "error: the server doesn't have a resource type \"verticalpodautoscalers\" FIXTUREVALUE" >&2
+    echo "error: the server doesn't have a resource type FIXTUREVALUE" >&2
     exit 1
   fi
   vpa_rows
   exit 0
 fi
-if [ "$#" -eq 7 ] && [ "$*" = "$cmd_hpa" ]; then
+if [ "$#" -eq 11 ] && [ "$*" = "$cmd_hpa" ]; then
+  if has_mode no-hpa; then
+    echo "error: hpa FIXTUREVALUE" >&2
+    exit 1
+  fi
   hpa_rows
   exit 0
 fi

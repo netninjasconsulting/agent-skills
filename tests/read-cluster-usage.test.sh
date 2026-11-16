@@ -19,7 +19,8 @@
 # holds the marker; the tables print the canned rows in their shapes, with
 # "other", "not-read", or a count where a value cannot be read or placed;
 # a failed top exits 6, a missing context or kubectl exits 5; kubectl runs
-# with a cleared environment.
+# with the caller's environment as it is, in the C locale, with no input,
+# and kuberc is never switched off.
 #
 # The pins at the end make a copy of the script with one safeguard switched
 # off and expect this test to fail on the check named for that safeguard.
@@ -48,10 +49,10 @@ CR=$(printf '\r')
 # The fixed command list of references/fields.md, held here on its own. The
 # test checks that fields.md and the script carry the same list.
 T_CMDS='kubectl config current-context
-kubectl top pod --containers --namespace=<name> --no-headers --request-timeout=20s
-kubectl get pods --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
-kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
-kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
+kubectl top pod --containers --namespace=<name> --no-headers --all-namespaces=false --show-swap=false --sum=false --request-timeout=20s
+kubectl get pods --namespace=<name> --no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
+kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
+kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 
 # The shape block of the cluster script in references/fields.md. A shape
 # that the reader's block holds as well must be the same line there.
@@ -64,6 +65,7 @@ kind-name 63 ^[A-Z][A-Za-z0-9]*$
 update-mode 17 ^(Off|Initial|Recreate|Auto|InPlaceOrRecreate|InPlace)$
 metric-type 18 ^(ContainerResource|External|Object|Pods|Resource)$
 metric-resource 6 ^(cpu|memory)$
+container-name 63 ^([a-z0-9]|[a-z0-9][-a-z0-9]*[a-z0-9])$
 context-name 253 ^[A-Za-z0-9][A-Za-z0-9_.:@/+-]*$
 end-reason 22 ^(OOMKilled|Error|Completed|ContainerCannotRun|DeadlineExceeded|StartError|ContainerStatusUnknown)$'
 
@@ -72,25 +74,27 @@ FIXTURE_NS='fleetboard-production fleetboard-staging fleetboard-tools dispatch-p
 # ---- Running the script ----
 
 # run SCRIPT MODE ARG...: run the script with the stand-in first on PATH, a
-# KUBECONFIG, and two variables the script must not pass on. Sets rc, and
-# leaves standard output in $work/out and standard error in $work/err.
+# KUBECONFIG, a KUBERC, a canary variable, and a locale that the script
+# must set to C. Sets rc, and leaves standard output in $work/out and
+# standard error in $work/err. Standard input holds a line that kubectl
+# must never read.
 run() {
   rs=$1; rm_=$2; shift 2
-  rm -f "$home/fake-kubectl.log" "$home/fake-kubectl.env"
-  printf '%s\n' "$rm_" > "$home/fake-kubectl.mode"
+  rm -f "$home/log" "$home/env"
   rc=0
-  env -i PATH="$fake:$PATH" HOME="$home" KUBECONFIG="$work/kubeconfig" CANARY=canary-value KUBERC=on \
+  printf 'typed-answer\n' | env -i PATH="$fake:$PATH" HOME="$home" KUBECONFIG="$work/kubeconfig" KUBERC="$work/kuberc" \
+    CANARY=canary-value LC_ALL=C.UTF-8 FAKE_KUBECTL_LOG="$home/log" FAKE_KUBECTL_ENVLOG="$home/env" FAKE_KUBECTL_MODE="$rm_" \
     sh "$rs" "$@" > "$work/out" 2> "$work/err" || rc=$?
 }
-# The same with no KUBECONFIG in the environment.
-run_no_kubeconfig() {
+# The same with no KUBECONFIG and no KUBERC in the environment.
+run_bare() {
   rs=$1; shift
-  rm -f "$home/fake-kubectl.log" "$home/fake-kubectl.env"
-  : > "$home/fake-kubectl.mode"
+  rm -f "$home/log" "$home/env"
   rc=0
-  env -i PATH="$fake:$PATH" HOME="$home" sh "$rs" "$@" > "$work/out" 2> "$work/err" || rc=$?
+  env -i PATH="$fake:$PATH" HOME="$home" FAKE_KUBECTL_LOG="$home/log" FAKE_KUBECTL_ENVLOG="$home/env" \
+    sh "$rs" "$@" > "$work/out" 2> "$work/err" < /dev/null || rc=$?
 }
-log_text() { cat "$home/fake-kubectl.log" 2>/dev/null; }
+log_text() { cat "$home/log" 2>/dev/null; }
 
 # The allowed log lines for the namespaces given: each command of the fixed
 # list, with <name> replaced, after the number of its arguments.
@@ -129,17 +133,20 @@ no_marker() {  # $1 = label
 log_only() {  # $1 = label; the rest are the namespaces given
   ll=$1; shift
   allowed_lines "$@" > "$work/allowed"
-  if [ ! -s "$home/fake-kubectl.log" ]; then fail "$ll: the stand-in logged nothing"; return; fi
+  if [ ! -s "$home/log" ]; then fail "$ll: the stand-in logged nothing"; return; fi
   while IFS= read -r line; do
     grep -qxF -e "$line" "$work/allowed" || fail "$ll: the log holds a command outside the fixed list: $line"
     case " $line " in
-      *' -A '* | *--all-namespaces* | *[Ss]ecret* | *' describe '* | *' logs '* | *' exec '* | *' -o yaml '* | *' -o json '* | *'-o=json'* | *'-o=yaml'* | *--output*)
+      *' -A '* | *[Ss]ecret* | *' describe '* | *' logs '* | *' exec '* | *' -o yaml '* | *' -o json '* | *'-o=json'* | *'-o=yaml'* | *--output*)
         fail "$ll: the log holds a forbidden word: $line" ;;
     esac
+    for w in $line; do
+      case $w in --all-namespaces=false) ;; --all-namespaces*) fail "$ll: the log holds $w: $line" ;; esac
+    done
     for v in apply create delete patch replace edit scale rollout label annotate set drain cordon taint port-forward cp attach; do
       case "$line" in "2 $v "* | *" $v "*) fail "$ll: the log holds the writing verb $v: $line" ;; esac
     done
-  done < "$home/fake-kubectl.log"
+  done < "$home/log"
 }
 
 bad_args() {
@@ -198,6 +205,10 @@ suite() {
   [ "$rc" -eq 0 ] || fail "help: expected exit 0, got $rc"
   [ -z "$(log_text)" ] || fail "help: logged a command"
 
+  run "$s" "" --help fleetboard-production
+  [ "$rc" -eq 2 ] || fail "help with an argument: expected exit 2, got $rc"
+  [ -z "$(log_text)" ] || fail "help with an argument: logged a command"
+
   # --context logs only config current-context.
   run "$s" "" --context
   [ "$rc" -eq 0 ] || fail "context: expected exit 0, got $rc"
@@ -211,6 +222,8 @@ suite() {
   [ "$rc" -eq 5 ] || fail "no context: expected exit 5, got $rc"
   [ "$(log_text)" = "2 config current-context" ] || fail "no context: the log holds more than config current-context"
   no_marker "no context"
+  run "$s" "empty-context" --context
+  [ "$rc" -eq 5 ] || fail "an empty context answer: expected exit 5, got $rc"
   run "$s" "no-context" fleetboard-production
   [ "$rc" -eq 5 ] || fail "no context, namespace mode: expected exit 5, got $rc"
   [ "$(log_text)" = "2 config current-context" ] || fail "no context, namespace mode: a command ran after the context failed"
@@ -219,7 +232,7 @@ suite() {
   # kubectl missing: exit 5.
   mkdir -p "$work/nokube"
   rc=0
-  env -i PATH="$work/nokube" HOME="$home" /bin/sh "$s" fleetboard-production > "$work/out" 2> "$work/err" || rc=$?
+  env -i PATH="$work/nokube" HOME="$home" FAKE_KUBECTL_LOG="$home/log" /bin/sh "$s" fleetboard-production > "$work/out" 2> "$work/err" || rc=$?
   [ "$rc" -eq 5 ] || fail "kubectl missing: expected exit 5, got $rc"
   grep -q "kubectl is not installed" "$work/err" || fail "kubectl missing: the message does not say kubectl is not installed"
 
@@ -229,7 +242,7 @@ suite() {
   [ "$rc" -eq 0 ] || fail "fixture: expected exit 0, got $rc"
   # shellcheck disable=SC2086 # the namespace list
   log_only "fixture" $FIXTURE_NS
-  [ "$(grep -c . "$home/fake-kubectl.log")" -eq 21 ] || fail "fixture: expected 21 commands in the log, got $(grep -c . "$home/fake-kubectl.log")"
+  [ "$(grep -c . "$home/log")" -eq 21 ] || fail "fixture: expected 21 commands in the log, got $(grep -c . "$home/log")"
   no_marker "fixture"
   [ ! -s "$work/err" ] || fail "fixture: standard error is not empty"
   expect_line "fixture" "# context fleetboard-stand-in"
@@ -308,36 +321,69 @@ EOF
   expect_line "an hpa with two metrics" "hpa two-hpa Deployment two 1 3 1 2 Resource memory 80"
   expect_line "an hpa with values out of shape" "hpa odd-hpa Deployment other other 3 1 1 Resource other 70"
   expect_line "an hpa with no metrics" "hpa none-hpa Deployment none - 3 - - - - -"
-  expect_line "rows not placed are counted" "# rows not placed: top=4 pods=8 vpa=1 hpa=0"
+  expect_line "a container name that starts with a digit" "container digit-1 1app 100m 500m 128Mi 256Mi - - 0 -"
+  no_line "two containers with one name" "dupc-1"
+  expect_line "a status name twice" "container repst-1 a 100m 500m 128Mi 256Mi - - not-read -"
+  expect_line "a status name twice" "container repst-1 b 100m 500m 128Mi 256Mi - - not-read -"
+  no_line "a row with a NUL" "nul-1"
+  expect_line "rows not placed are counted" "# rows not placed: top=4 pods=10 vpa=1 hpa=0"
 
   # top fails: exit 6 with a plain message, and nothing kubectl wrote.
   run "$s" "no-top" fleetboard-production
   [ "$rc" -eq 6 ] || fail "no metrics: expected exit 6, got $rc"
-  grep -q "no metrics" "$work/err" || fail "no metrics: the message does not say no metrics"
+  grep -q "kubectl top pod failed for namespace fleetboard-production" "$work/err" || fail "no metrics: the message does not name the failed command"
   no_marker "no metrics"
-  # The VPA type is not installed: a trace, never the same as none.
+  # top fails in the second of three: the first table stays, and the
+  # message names the namespaces not read. No command runs for the third.
+  run "$s" "no-top-production" fleetboard-staging fleetboard-production dispatch-staging
+  [ "$rc" -eq 6 ] || fail "no metrics in the second namespace: expected exit 6, got $rc"
+  expect_line "no metrics in the second namespace" "# namespace fleetboard-staging"
+  no_line "no metrics in the second namespace" "# namespace fleetboard-production"
+  grep -q "Namespaces not read: fleetboard-production dispatch-staging$" "$work/err" || fail "no metrics in the second namespace: the message does not name the namespaces not read"
+  if grep -q "dispatch-staging" "$home/log"; then fail "no metrics in the second namespace: a command ran for a later namespace"; fi
+  # The VPA query fails: a trace, never the same as none.
   run "$s" "no-vpa" fleetboard-production
-  [ "$rc" -eq 0 ] || fail "no vpa type: expected exit 0, got $rc"
-  expect_line "no vpa type" "# vpa: not read, the command failed (the type may not be installed)"
-  no_line "no vpa type" "# vpa: none in this namespace"
-  no_marker "no vpa type"
+  [ "$rc" -eq 0 ] || fail "vpa query fails: expected exit 0, got $rc"
+  expect_line "vpa query fails" "# vpa: not read, the query failed or the server has no such type"
+  no_line "vpa query fails" "# vpa: none in this namespace"
+  no_marker "vpa query fails"
+  # The HPA query fails: the same.
+  run "$s" "no-hpa" dispatch-staging
+  [ "$rc" -eq 0 ] || fail "hpa query fails: expected exit 0, got $rc"
+  expect_line "hpa query fails" "# hpa: not read, the query failed or the server has no such type"
+  no_line "hpa query fails" "hpa dispatch"
+  no_marker "hpa query fails"
   # get pods fails: measured use still prints, the rest is not-read.
   run "$s" "no-pods" fleetboard-staging
   [ "$rc" -eq 0 ] || fail "no pods: expected exit 0, got $rc"
-  expect_line "get pods fails" "# pods: not read, the command failed"
+  expect_line "get pods fails" "# pods: not read, the query failed"
   expect_line "get pods fails" "container api-6b8c7d9e5-p3lmk api not-read not-read not-read not-read 2m 48Mi not-read not-read"
   no_marker "get pods fails"
 
-  # The environment kubectl sees. The shell that runs the stand-in may add
-  # PWD, OLDPWD, SHLVL, or _ itself.
+  # Output as a kuberc default would change it: a column added to top and
+  # to every pod row, and a header line. A trace, and no value printed.
+  run "$s" "kuberc" fleetboard-staging
+  [ "$rc" -eq 0 ] || fail "output changed by kuberc: expected exit 0, got $rc"
+  no_marker "output changed by kuberc"
+  no_line "output changed by kuberc: a value printed" "api-6b8c7d9e5-p3lmk"
+  no_line "output changed by kuberc: a value printed" "web-7d4f5a6b8-q9wzx"
+  expect_line "output changed by kuberc" "# rows not placed: top=2 pods=2 vpa=0 hpa=0"
+
+  # Standard input never reaches kubectl.
+  run "$s" "read-stdin" fleetboard-staging
+  if grep -q '^stdin ' "$home/log"; then fail "standard input reached kubectl"; fi
+
+  # The environment kubectl sees: the caller's, with LC_ALL set to C, and
+  # KUBERC as the caller had it.
   run "$s" "" fleetboard-staging
-  envs=$(sed -n 's/^name //p' "$home/fake-kubectl.env" | grep -vxE 'PWD|OLDPWD|SHLVL|_' | sort | tr '\n' ' ')
-  [ "$envs" = "HOME KUBECONFIG KUBERC LC_ALL PATH " ] || fail "environment: kubectl saw the variables: $envs"
-  grep -qxF -e "value KUBECONFIG=$work/kubeconfig" "$home/fake-kubectl.env" || fail "environment: KUBECONFIG did not reach kubectl"
-  grep -qxF -e "value KUBERC=off" "$home/fake-kubectl.env" || fail "environment: KUBERC is not off"
-  run_no_kubeconfig "$s" fleetboard-staging
-  envs=$(sed -n 's/^name //p' "$home/fake-kubectl.env" | grep -vxE 'PWD|OLDPWD|SHLVL|_' | sort | tr '\n' ' ')
-  [ "$envs" = "HOME KUBERC LC_ALL PATH " ] || fail "environment, no KUBECONFIG: kubectl saw the variables: $envs"
+  grep -qxF -e "value CANARY=canary-value" "$home/env" || fail "environment: the caller's variable did not reach kubectl"
+  grep -qxF -e "value KUBECONFIG=$work/kubeconfig" "$home/env" || fail "environment: KUBECONFIG did not reach kubectl"
+  grep -qxF -e "value KUBERC=$work/kuberc" "$home/env" || fail "environment: KUBERC changed"
+  grep -qxF -e "value LC_ALL=C" "$home/env" || fail "environment: LC_ALL is not C"
+  run_bare "$s" fleetboard-staging
+  [ "$rc" -eq 0 ] || fail "environment, bare: expected exit 0, got $rc"
+  grep -qxF -e "value KUBERC=" "$home/env" || fail "environment, bare: KUBERC changed"
+  if grep -qxF -e "name KUBERC" "$home/env"; then fail "environment, bare: KUBERC changed"; fi
 
   [ "$sf" -eq 0 ]
 }
@@ -407,25 +453,36 @@ pins() {
   pin "a namespace starts with no dash" '# no dash at either end' 's/  '"''"' | -\* | \*- | \*\[!a-z0-9-\]\*) return 1 ;;  # no dash at either end/  '"''"' | *[!a-z0-9-]*) return 1 ;;/' "front door: argument 3 expected exit 2"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a namespace has at most 63 characters" '# at most 63 characters' 's/\[ "\${#1}" -le 63 \]  # at most 63 characters/true/' "front door: argument 22 expected exit 2"
-  pin "a cleared environment" '# kubectl: a cleared environment' 's/env -i PATH=/env PATH=/' "environment: kubectl saw the variables"
-  pin "kuberc off" '# kubectl: a cleared environment' 's/ KUBERC=off / /' "environment: KUBERC is not off"
-  pin "the standard error of kubectl is dropped" '# kubectl: a cleared environment' 's| 2>/dev/null  # kubectl: a cleared environment|  # kubectl: a cleared environment|' "no metrics: the marker is in standard error"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "kubectl keeps the caller environment" '# kubectl: the caller environment' 's/{ "\$@" <\/dev\/null/{ env -i PATH="$PATH" "$@" <\/dev\/null/' "environment: the caller's variable did not reach kubectl"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "kuberc is left as it is" '# kubectl: the caller environment' 's/{ "\$@" <\/dev\/null/{ KUBERC=off "$@" <\/dev\/null/' "environment: KUBERC changed"
+  pin "the C locale" '# kubectl and awk run in the C locale' 's/^LC_ALL=C  # kubectl and awk run in the C locale$/:/' "environment: LC_ALL is not C"
+  pin "no input for kubectl" '# kubectl: the caller environment' 's/ <\/dev\/null 2>\/dev\/null;/ 2>\/dev\/null;/' "standard input reached kubectl"
+  pin "the standard error of kubectl is dropped" '# kubectl: the caller environment' 's/ 2>\/dev\/null; printf/; printf/' "no metrics: the marker is in standard error"
+  pin "a NUL becomes visible" '# a NUL in kubectl output' 's/^\( *\)tr .*)  # a NUL in kubectl output.*$/\1cat)/' "a row with a NUL: printed: nul-1"
   pin "the shape check" 'function fits(v, id) {' 's/^function fits(v, id) {$/function fits(v, id) { return 1/' "hostile rows: the marker is in standard output"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "the context name shape" '# the context name has its shape' 's/^ctx=\$(context_name "\$raw")  # the context name has its shape$/ctx=$raw/' "context: a context name that is not a name printed as it came"
   pin "a pod row with another number of columns" '# a pod row with another number of columns' 's/if (NF != 10) { NP_BAD++; next }  # a pod row with another number of columns//' "a row with an extra column: printed: extra-col-1"
   pin "a top row with another number of columns" '# a top row with another number of columns' 's/if (NF != 5) { NT_BAD++; next }  # a top row with another number of columns//' "a top row with an extra column: printed: top-extra-1"
-  pin "one value for each container" '# one value for each container' 's/if (n == nc)  # one value for each container/if (n >= 1)/' "misaligned columns: the request of app went to sidecar"
+  pin "one value for each container" '# one value for each container' 's/spread(PF\[i, col\], nc, id)  # one value for each container/split(PF[i, col], OUT, ",")/' "misaligned columns: the request of app went to sidecar"
+  pin "vpa columns that differ in count" '# one value for each recommendation' 's/spread(VF\[i, col\], nc, id)  # one value for each recommendation/split(VF[i, col], OUT, ",")/' "vpa columns that differ in count: missing line"
+  pin "hpa metric columns that differ in count" '# one value for each metric' 's/spread(HF\[i, col\], nc, id)  # one value for each metric/split(HF[i, col], OUT, ",")/' "hpa metric columns that differ in count: missing line"
   pin "restarts by status name" '# restarts by status name' 's/if (sn\[m\] == c\[j\]) { hit++; at = m }  # restarts by status name/if (m == j) { hit++; at = m }/' "restarts by status name: printed"
   pin "a status name that matches no container" '# a status name that matches no container' 's/if (!(sn\[m\] in CN)) ok = 0  # a status name that matches no container//' "a status name that matches no container: missing line"
+  pin "a status name twice" '# a status name twice' 's/if (sn\[m\] in SEEN) ok = 0  # a status name twice//' "a status name twice: missing line"
+  pin "two containers with one name" '# two containers with one name' 's/if (nc == 0 || dup) { NP_BAD++; continue }  # two containers with one name//' "two containers with one name: printed: dupc-1"
   pin "a pod row twice" '# a pod row twice' 's/if (PODS\[PF\[i, 2\]\] > 1) { NP_BAD++; continue }  # a pod row twice//' "a pod row twice: printed: dup-pod-1"
   pin "a top row twice" '# a top row twice' 's/if (k in TD) mc = mm = "not-read"  # a top row twice//' "a top row twice: missing line"
   pin "a top row with no pod row" '# a top row with no pod row' 's/^\( *\)print "container", .*  # a top row with no pod row$/\1continue/' "a top row with no pod row: missing line"
-  pin "vpa columns that differ in count" '# one value for each recommendation' 's/if (n == nc)  # one value for each recommendation/if (n >= 1)/' "vpa columns that differ in count: missing line"
-  pin "hpa metric columns that differ in count" '# one value for each metric' 's/if (n == nc)  # one value for each metric/if (n >= 1)/' "hpa metric columns that differ in count: missing line"
-  pin "a failed vpa command leaves a trace" '# a failed command leaves a trace' 's/^\( *\)if (vpa == "failed") .*  # a failed command leaves a trace$/\1if (0) print/' "no vpa type: missing line"
-  pin "no metrics exits 6" '# no metrics: exit 6' 's/|| die 6 .*  # no metrics: exit 6$/|| top=/' "no metrics: expected exit 6"
-  pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| raw=x/' "no context: expected exit 5"
+  pin "a failed vpa query leaves a trace" '# a failed vpa query leaves a trace' 's/^\( *\)if (vpa == "failed") .*  # a failed vpa query leaves a trace$/\1if (0) print/' "vpa query fails: missing line"
+  pin "a failed hpa query leaves a trace" '# a failed hpa query leaves a trace' 's/^\( *\)if (hpa == "failed") .*  # a failed hpa query leaves a trace$/\1if (0) print/' "hpa query fails: missing line"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "no metrics exits 6" '# no metrics: exit 6' 's/^\[ -z "\$failed" \] || die 6 .*  # no metrics: exit 6$/:/' "no metrics: expected exit 6"
+  pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| :/' "no context: expected exit 5"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "an empty context answer exits 5" '# an empty context answer: exit 5' 's/^\[ -n "\$raw" \] || die 5 .*  # an empty context answer: exit 5$/:/' "an empty context answer: expected exit 5"
   pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a row with a control character" '# a row with a control character' 's/ -e "\/\[\[:cntrl:\]\]\/s\/^$1 \/$1X \/"  # a row with a control character//' "a row with a carriage return: printed: crlf-1"
