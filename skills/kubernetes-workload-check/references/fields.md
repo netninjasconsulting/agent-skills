@@ -37,28 +37,28 @@ The skill never states a size, a saving, or a cost in the first pass. The defaul
 <file>:<line>:<object kind>/<namespace>/<name>:<container or ->:<field>=<value>
 ```
 
-`<namespace>` is `metadata.namespace`, or `-` when the object has none. `<name>` is `metadata.name`, or `-` when it is missing or does not fit `dns-subdomain`. `<container>` is the container name, or `-` for a field of the pod, the object, or a rule. `<line>` is the line of the key in the file. The reader writes `<container>` only for fields in the "Fields of a pod template" tables.
+`<namespace>` is `metadata.namespace`, or `-` when the object has none or the value does not fit `dns-label`. An unrendered `{{ .Values.ns }}` therefore prints `-`, never the raw text. `<name>` is `metadata.name`, or `-` when it is missing or does not fit `dns-subdomain`. `<container>` is the container name when it fits `dns-label`, or `-` for a field of the pod, the object, or a rule and for a name that does not fit. `<line>` is the line of the key in the file. The reader writes `<container>` only for fields in the "Fields of a pod template" tables.
 
 **Nothing prints by default.** A field prints only when its name is in a table below and its value passes the field's shape. A field the reader cannot read, or whose value fails its shape, prints no line. That is "not found", and it can neither pass nor fail a check.
 
 **Testing a value.** The reader cleans the text after the colon, then tests it, in this order:
 
 1. Drop trailing spaces and a carriage return.
-2. If the text starts with a single or double quote, it must end with the same quote. Remove that one pair. Anything else after the closing quote means "not found".
+2. If the text starts with a single or double quote, it must end with the same quote. Remove that one pair, and remember that the text was quoted. Anything else after the closing quote means "not found".
 3. For unquoted text, drop everything from the first space followed by `#`.
-4. Text that is empty, or starts with one of `{`, `[` (except in a list field), `|`, `>`, `&`, `*`, `!`, `$`, or `%`, is not a scalar value. The one exception is a `$` at the start of a `rel-path` value, which is the `$ref/path` form of Argo CD (G2). A block scalar, an alias, an anchor, a tag, and a Helm template (`{{`) all end here. The text after `|` or `>` is never read.
+4. Unquoted text that is empty, or starts with one of `{`, `[` (except in a list field), `|`, `>`, `&`, `*`, `!`, `$`, or `%`, is not a scalar value. The leading-character test is for unquoted text only. Quoted text is a plain string, so `"*"` is the text `*`, and it goes on to steps 5 and 6. A quoted empty string (`""` or `''`) is the empty text, and for `rule.<n>.api-group` it is read as `core` before the empty-text test. For every other field, quoted empty text prints no line. The one exception is a `$` at the start of a `rel-path` value, which is the `$ref/path` form of Argo CD (G2). An unquoted block scalar, alias, anchor, tag, and Helm template (`{{`) all end here. The text after `|` or `>` is never read, with one exception: the lines of a `helm.values` block scalar are read as a nested values file (see "The values-file rule"). Every other block scalar is never read.
 5. The length must be at most the "Max" in the shape table. The reader tests this with `length()`, because the patterns hold no `{m,n}` interval, so no copy of awk has to support one.
 6. The value must match the pattern. The reader uses the pattern as written in the shape block, in an awk `~` test.
 
-A one-line flow list (`[ALL, NET_ADMIN]`) is read item by item, and each item has to pass the shape on its own. A block list is read the same way. A list item that holds a map is not read.
+A one-line flow list (`[ALL, NET_ADMIN]` or `["*"]`) is read item by item. Each item is cleaned by steps 1 to 4 with its own quotes, and has to pass the shape on its own. A block list is read the same way. A list item that holds a map is not read.
 
 **On a miss.** A shape marked "other" in the shape table prints the fixed word `other` when the key is present and the value fails the shape, so the report can say that a setting exists and was not read. A shape marked "nothing" prints no line. The word `other` is written by the reader. It is never the value.
 
-**Credential-like names.** The reader removes `-`, `_`, and `.` from a key or variable name, makes it lower case, and tests it against this list: `pass`, `pwd`, `secret`, `token`, `apikey`, `accesskey`, `privatekey`, `signingkey`, `encryptionkey`, `credential`, `connectionstring`, `connstr`, `dsn`, `auth`, `salt`, `bearer`, `jwt`, `hmac`. A name that contains any of them is "credential-like". The list is the skill's own, and it is wider than needed on purpose. The value of a credential-like key never prints, even when it fits a shape. The evidence rule for K7 reads the same list.
+**Credential-like names.** The reader removes `-`, `_`, and `.` from a key or variable name, makes it lower case, and tests it against this list: `pass`, `pwd`, `secret`, `token`, `apikey`, `accesskey`, `privatekey`, `signingkey`, `encryptionkey`, `credential`, `connectionstring`, `connstr`, `dsn`, `auth`, `salt`, `bearer`, `jwt`, `hmac`. A name that contains any of them is "credential-like". Six more terms were added on review: `license`, `cert`, `cookie`, and `session` match as a part of the name, and `pw` and `pat` match only as a whole word. A match is made like this: split the original name into words at `-`, `_`, `.`, and before a capital letter that follows a lower case letter or a digit, then make each word lower case. `pw` and `pat` match when a word is equal to them (`adminPw`, `github_pat`), so that `path` and `patch` do not match. Every other term matches when it is inside the name with the separators removed. A name written in one case with no separator (`ADMINPW`) is not split, so `pw` misses it. That is a stated limit. The list is the skill's own, and it is wider than needed on purpose. The value of a credential-like key never prints, even when it fits a shape. The evidence rule for K7 reads the same list.
 
 **Counts and `present`.** A field with free text has no value row. It has a row whose printed value is a count (shape `int`), the word `present`, or a state word. The reader never prints the text itself.
 
-**Refusals.** A symbolic link is refused in every mode, and the reader reports the file as "not read", with exit code 4. A file the reader cannot place is reported the same way.
+**Refusals.** A symbolic link is refused in every mode, and the reader reports the file as "not read", with exit code 4. A file the reader cannot place is reported the same way. The reader also tests for symbolic links inside a chart or an overlay tree before it renders (section 2).
 
 **Objects with several documents.** A file with `---` separators is read one object at a time. A `List` kind and a YAML anchor or alias are not followed. A field that depends on either is "not found".
 
@@ -115,6 +115,8 @@ element-key 32 ^[A-Za-z][A-Za-z0-9_-]*$
 values-path 200 ^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$
 image-ref 255 ^(([a-z0-9]|[a-z0-9][-a-z0-9.]*[a-z0-9])(:[0-9]+)?/)?[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*(:[A-Za-z0-9_][A-Za-z0-9._-]*)?(@sha256:[a-f0-9]+)?$
 image-digest 71 ^sha256:[a-f0-9]+$
+image-registry 260 ^(default|([a-z0-9]|[a-z0-9][-a-z0-9.]*[a-z0-9])(:[0-9]+)?)$
+image-repository 255 ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$
 medium 6 ^Memory$
 policy-type 7 ^(Ingress|Egress)$
 ```
@@ -136,7 +138,7 @@ What each shape holds, with two values that match and two that must not. A value
 | `env-name` | An environment variable name | the skill's own limit. The API allows any printable ASCII except = | 64 | nothing | `DATABASE_URL`, `LOG_LEVEL` | `9LIVES`, `A=B` | K1 | 15 Nov 2026 | checked |
 | `key-name` | A Secret or ConfigMap key | letters, digits, -, _, and . only. The length limit of 64 is the skill's own | 64 | nothing | `password`, `.dockerconfigjson` | `a b`, `k=v` | K20, K21 | 15 Nov 2026 | checked |
 | `label-value` | A label value, for a key on the label key list | at most 63 characters, starts and ends with a letter or digit, and holds -, _, and . between | 63 | nothing | `fleetboard-api`, `v1.2.3` | `-lead`, `has space` | K23 | 15 Nov 2026 | checked |
-| `image-tag` | An image tag in a values file | letters, digits, _, ., and -, not starting with . or -. The page allows 128 characters and the skill's own limit is 64 | 64 | nothing | `1.25-alpine`, `v2.0.1` | `-x`, `a:b` | K26 | 15 Nov 2026 | checked |
+| `image-tag` | An image tag in a values file, tested and never printed | letters, digits, _, ., and -, not starting with . or -. The page allows 128 characters and the skill's own limit is 64 | 64 | nothing | `1.25-alpine`, `v2.0.1` | `-x`, `a:b` | K26 | 15 Nov 2026 | checked |
 | `pull-policy` | An imagePullPolicy | one of Always, IfNotPresent, or Never | 12 | other | `Always`, `IfNotPresent` | `always`, `Sometimes` | K1 | 15 Nov 2026 | checked |
 | `cap-name` | A Linux capability name | upper case words with underscores, as in NET_ADMIN and SYS_TIME in the page's example. The rule for the name is not stated | 32 | other | `ALL`, `NET_ADMIN` | `all`, `net admin` | K3 | 15 Nov 2026 | verify |
 | `rbac-verb` | An RBAC verb | get, list, watch, create, update, patch, delete, deletecollection, escalate, bind, impersonate, or * | 16 | other | `get`, `*` | `GET`, `exec` | K16, K17 | 15 Nov 2026 | checked |
@@ -165,14 +167,23 @@ What each shape holds, with two values that match and two that must not. A value
 | `host-path` | A hostPath path on the node | the skill's own limit: an absolute path of safe characters | 128 | nothing | `/var/run/docker.sock`, `/data` | `var/log`, `/tmp/$X` | K15 | 15 Nov 2026 | checked |
 | `element-key` | A generator element key or a source ref name | the skill's own limit of 32 characters | 32 | nothing | `cluster`, `envName` | `9x`, `a.b` | G2, G3 | 15 Nov 2026 | checked |
 | `values-path` | A dotted path of key names in a values file | the skill's own limit, with at most 8 keys | 200 | nothing | `resources.requests.cpu`, `image.tag` | `a..b`, `a b.c` | H7 | 15 Nov 2026 | checked |
-| `image-ref` | An image reference | [registry-host[:port]/]name[:tag][@digest], with no user part, no query string, and no second @ (the path rules are the skill's own) | 255 | other | `registry.example.com/fleetboard/api:1.4.2`, `nginx@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07` | `deploy:hunter2@registry.example.com/app:1.0`, `registry.example.com/app?token=abc` | K26 | 15 Nov 2026 | checked |
-| `image-digest` | An image digest in a values file | the algorithm sha256 and hexadecimal digits, with the 64 digit rule below | 71 | nothing | `sha256:1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f`, `sha256:abababababababababababababababababababababababababababababababab` | `md5:abc`, `sha256:ABCDEF` | K26 | 15 Nov 2026 | checked |
-| `medium` | An emptyDir medium | the page allows an empty string or Memory only | 6 | nothing | `Memory` (the only value) | `memory`, `Disk` | K1 | 15 Nov 2026 | checked |
+| `image-ref` | An image reference, tested and never printed | [registry-host[:port]/]name[:tag][@digest], with no user part, no query string, and no second @ (the path rules are the skill's own) | 255 | other | `registry.example.com/fleetboard/api:1.4.2`, `nginx@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07` | `deploy:hunter2@registry.example.com/app:1.0`, `registry.example.com/app?token=abc` | K26 | 15 Nov 2026 | checked |
+| `image-digest` | An image digest in a values file, tested and never printed | the algorithm sha256 and hexadecimal digits, with the 64 digit rule below | 71 | nothing | `sha256:1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f`, `sha256:abababababababababababababababababababababababababababababababab` | `md5:abc`, `sha256:ABCDEF` | K26 | 15 Nov 2026 | checked |
+| `image-registry` | An image registry word, derived from an image | a host with an optional port, or the word default when the image names no host (the host-or-path rule is the skill's own) | 260 | other | `default`, `registry.example.com:5000` | `Registry.io`, `user@host` | K26 | 15 Nov 2026 | verify |
+| `image-repository` | An image repository path, derived from an image | path segments of lower case letters and digits joined by ., _, or -, as in the page examples, with no registry, tag, or digest | 255 | other | `nginx`, `team/app-api` | `Team/App`, `a//b` | K26 | 15 Nov 2026 | checked |
+| `medium` | An emptyDir medium | the page allows an empty string or Memory only. An empty string is never printed, so only the one value `Memory` can match, and the table lists one example | 6 | nothing | `Memory` (the only value) | `memory`, `Disk` | K1 | 15 Nov 2026 | checked |
 | `policy-type` | A NetworkPolicy policy type | Ingress or Egress | 7 | other | `Ingress`, `Egress` | `ingress`, `Both` | K18 | 15 Nov 2026 | checked |
+
+Stated limits of the shapes:
+
+- A name shape does not stop a secret. A lower case password such as `hunter2`, a 32 digit hexadecimal string, or `changeme` fits `short-name` and `dns-label`. The examples that "must not match" are examples of other kinds of text. The control is that the reader prints a value only for a named key in a known place, and that a credential-like name never prints a value. The shapes alone are not the control.
+- A value that a key cannot hold by its meaning, such as a token placed under `image.tag`, is not stopped by its shape. For that reason the reader never prints an image tag. It prints `image-pin` words instead.
+- A repository path of an image fits `image-repository` whatever it spells, because the path rules allow the lower case letters and digits of a token. The reader prints it as written.
 
 Two more rules live outside the patterns:
 
 - `port` also needs a numeric value of 65535 or less. The documentation range is greater than 0 and less than 65536 (K1, checked).
+- A key segment of a values path (`values-path`) that is 20 or more characters long and holds both a letter and a digit prints as the word `other` in its place (tested with `length()` and two range matches). Token shapes would otherwise pass as key names.
 - `image-ref` and `image-digest` also need the text after `sha256:` to be exactly 64 characters. The page's example digest has 64 (K26, checked as an example). The rule that every sha256 digest has 64 hexadecimal digits is not stated on the page (verify).
 
 Derived words, written by the reader and never copied from a file:
@@ -268,9 +279,9 @@ The volume field row for `volume-type` lists only the six source keys the pages 
 | Field | Kinds | Path | Shape | Source | Read | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `container-kind` | pod template kinds | `P.containers[]` is `main`, `P.initContainers[]` is `init` | `container-kind` | K1 | 15 Nov 2026 | checked |
-| `image` | pod template kinds | `C.image` | `image-ref` (on a miss: other) | K1, K26 | 15 Nov 2026 | checked |
+| `image-repository` | pod template kinds | derived from `C.image`: the text after the registry and before the tag or digest, as written. If `C.image` does not fit `image-ref`, the field prints `other` | `image-repository` (on a miss: other) | K1, K26 | 15 Nov 2026 | checked |
 | `image-pin` | pod template kinds | derived from `C.image` | `image-pin` | K26 | 15 Nov 2026 | checked |
-| `image-registry` | pod template kinds | derived from `C.image`: the host before the first `/` when it holds a `.` or a `:` or is `localhost`, or the word `default`. The page says only that a missing registry means the Docker public registry, so the rule that tells a host from a path is not read | `dns-subdomain`, or the word `default` | K26 | 15 Nov 2026 | verify |
+| `image-registry` | pod template kinds | derived from `C.image`: the host before the first `/` when it holds a `.` or a `:` or is `localhost`, or the word `default` when no host is written. The page says only that a missing registry means the Docker public registry, so the rule that tells a host from a path is not read | `image-registry` (on a miss: other) | K26 | 15 Nov 2026 | verify |
 | `image-pull-policy` | pod template kinds | `C.imagePullPolicy` | `pull-policy` (on a miss: other) | K1, K26 | 15 Nov 2026 | checked |
 | `cpu-request` | pod template kinds | `C.resources.requests.cpu` | `qty-cpu` | K2 | 15 Nov 2026 | checked |
 | `memory-request` | pod template kinds | `C.resources.requests.memory` | `qty-mem` | K2 | 15 Nov 2026 | checked |
@@ -469,20 +480,20 @@ An `Application` has `spec.source` (one source) or `spec.sources` (a list). When
 | `source.<n>.chart` | Application, ApplicationSet | `chart` (a chart name) | the word `present` | G1, G2 | 15 Nov 2026 | checked |
 | `source.<n>.ref` | Application, ApplicationSet | `ref`, the name another source uses as `$ref` (G2) | `element-key` | G2 | 15 Nov 2026 | checked |
 | `source.<n>.value-file.<m>` | Application, ApplicationSet | `helm.valueFiles[<m>]`, which may start with `$ref/` (G2) | `rel-path` | G1, G2 | 15 Nov 2026 | checked |
-| `source.<n>.helm-values` | Application, ApplicationSet | `helm.values` (a YAML text) | the word `present` | G1, G5 | 15 Nov 2026 | checked |
+| `source.<n>.helm-values` | Application, ApplicationSet | `helm.values` (a YAML text) | the word `present`, and its block lines are read as a nested values file | G1, G5 | 15 Nov 2026 | checked |
 | `source.<n>.helm-values-object` | Application, ApplicationSet | `helm.valuesObject` | the word `present` | G1, G5 | 15 Nov 2026 | checked |
 | `source.<n>.helm-parameter-count` | Application, ApplicationSet | `helm.parameters[]` | `int` | G1, G5 | 15 Nov 2026 | checked |
 | `source.<n>.kustomize` | Application, ApplicationSet | `kustomize` | the word `present` | G1 | 15 Nov 2026 | checked |
 | `go-template` | ApplicationSet | `spec.goTemplate` | `bool` | G3 | 15 Nov 2026 | checked |
 | `generator.<i>` | ApplicationSet | the key of `spec.generators[<i>]` | `generator-word` | G3, G4 | 15 Nov 2026 | checked |
-| `list-element.<i>.<j>.<key>` | ApplicationSet | `spec.generators[<i>].list.elements[<j>]`, the key and value | `<key>` fits `element-key`, value fits `short-name`, and a credential-like key prints no value | G3 | 15 Nov 2026 | checked |
+| `list-element.<i>.<j>.<key>` | ApplicationSet | `spec.generators[<i>].list.elements[<j>]`, the key and value | `<key>` fits `element-key`. The value fits `short-name` and prints only when the key is one the template uses in `path`, `destination.namespace`, `project`, or `valueFiles`. Every other key prints `present`. A credential-like key prints `present` too | G3 | 15 Nov 2026 | checked |
 
 Notes:
 
 - Values written inside an `Application` (`helm.values`, `valuesObject`, `parameters`) are read like a values file: key names, and the sizing and security values that pass a shape. The next section gives the rule, and the lines use the same field names with the kind `Application`.
 - Argo CD gives these values this order, from lowest to highest: the chart's own `values.yaml`, `valueFiles`, `values`, `valuesObject`, `parameters` (G5). When both `valuesObject` and `values` are set, `valuesObject` wins and `values` is ignored (G5).
 - Argo CD uses `helm template` to inflate charts, and it handles the lifecycle itself (G5). Argo CD's own sync policy is not read.
-- A path in an `ApplicationSet` template can hold a parameter such as `{{.cluster}}` (G3). The `rel-path` shape lets `{`, `}`, `.`, and a space through for that reason. The agent fills the parameter in from the `list-element` lines.
+- A path in an `ApplicationSet` template can hold a parameter such as `{{.cluster}}` (G3). The `rel-path` shape lets `{`, `}`, `.`, and a space through for that reason. The agent fills the parameter in from the `list-element` lines. A key counts as used by the template when one of those four fields holds `{{`, optional spaces, an optional `.`, the key, optional spaces, and `}}`.
 - The List generator makes parameters from a list of key and value pairs written in the file (G3). A generator that is not `list` is `other`. The generator types Argo CD names are List, Cluster, Git, Matrix, Merge, SCM Provider, Pull Request, Cluster Decision Resource, and Plugin (G4). The YAML key for each one other than `list` is not on the pages read (verify).
 - A `Matrix` generator can feed a list generator through `elementsYaml` (G3). That is a generator the files cannot resolve, so it is `other`.
 - The destination `server` or `name` is not read, because an environment is named by its namespace.
@@ -491,6 +502,8 @@ Notes:
 ## The values-file rule
 
 A values file is a Helm chart's `values.yaml` or any other file the Application or the team passes with `-f`. The same rule covers `helm.values`, `helm.valuesObject`, and `helm.parameters` inside an Argo CD object.
+
+**A `helm.values` block.** The text of `helm.values` is nearly always a block scalar (`|`). The reader reads its lines as a nested values file: it takes the lines after the key, removes the indent of the first one from each line, and applies this section to them as if they were a file. The keys print as `values-key.<dotted path>` lines with the kind of the outer object and the line numbers of the outer file. The sizing and security values pass the same shapes, and a credential-like key never prints a value. Every other block scalar is never read. A `helm.values` that is quoted on one line, or is a template, is not read.
 
 **Key names always.** For every key at every depth, the reader prints one line:
 
@@ -511,10 +524,10 @@ The dotted path joins the keys with `.` and fits `values-path`, with at most 8 k
 | list items under `drop` or `add` that sit under `capabilities` | `cap-name` | A capability name | K1, K3 | 15 Nov 2026 | checked |
 | `replicaCount` | `int` | A replica count. The key is the name Helm's own example output shows | H6 | 15 Nov 2026 | checked |
 | `replicas`, `minReplicas`, `maxReplicas` | `int` | A replica count under another common name. These names are chart conventions, and Helm's pages read do not define them | H6, H7 | 15 Nov 2026 | verify |
-| `tag` under a key named `image` | `image-tag` | An image tag. The `image.tag` key is a chart convention, and the Helm page read does not show it | H6 | 15 Nov 2026 | verify |
-| `digest` under a key named `image` | `image-digest`, the `sha256:` form | An image digest | K26 | 15 Nov 2026 | checked |
+| `tag` under a key named `image` | the pin word only: `latest` when the value is `latest`, `tag` for any other scalar. The text is never printed | An image tag. The `image.tag` key is a chart convention, and the Helm page read does not show it | H6 | 15 Nov 2026 | verify |
+| `digest` under a key named `image` | the pin word only: `digest` when the value fits `image-digest`. The text is never printed | An image digest | K26 | 15 Nov 2026 | checked |
 
-The value of a key outside this table never prints. A chart can name its keys as it likes. Helm asks for keys that start with a lower case letter and use camel case (H7), and it leaves the names to the chart. An image tag fits the `image-tag` shape and so does a short secret placed under `image.tag`. The key restriction and the credential-like rule are what keep that case out. The shape alone cannot.
+The value of a key outside this table never prints. A chart can name its keys as it likes. Helm asks for keys that start with a lower case letter and use camel case (H7), and it leaves the names to the chart. The shapes `image-tag` and `image-digest` only test that a value looks like a tag or a digest. They are never printed, because a token fits the tag shape. A secret placed under `image.tag` is shown as the word `tag`.
 
 A value in a values file with a credential-like key and a `scalar` state counts for K7.
 
@@ -540,7 +553,7 @@ For each of the eighteen checks and each column of the reach map, the fields tha
 | K6 RBAC rules name their verbs and their resources | `rule.<n>.verb`, `rule.<n>.resource`, `rule.<n>.api-group`, `rule.<n>.resource-names-count`, `rule.<n>.non-resource-urls-count`, `aggregation-rule`, `role-ref-*`, `subject.<n>.*` | The rules of an aggregated ClusterRole are filled in by a controller in the cluster (K16) and have no field. A role set only in the cluster has no field |
 | K7 Secrets stay out of manifests and values files | `object` of kind Secret, `secret-type`, `secret-key.*`, `env.<NAME>` with `literal`, `env-other-count`, `args-credential-like-count`, `annotation-credential-like-count`, `configmap-data.<key>` with `scalar`, `values-key.*` with `scalar`, `source.<n>.url-has-user-part`, `list-element` lines | The value itself is never printed, so the report names a file, a line, and a type, and cannot say how strong a secret is. A sealed or external secret kind is not read. A secret inside a Helm template that is not rendered is "not found" |
 | K8 A NetworkPolicy covers every workload | `np-pod-selector`, `np-pod-label.<key>`, `np-policy-type`, and the workload's `pod-label.<key>` and `<namespace>` | A label with a key outside the list has no value, and a selector that uses one cannot be matched. The network plugin has no field |
-| K9 Images are pinned and come from a named registry | `image`, `image-pin`, `image-registry`, `image-pull-policy`. In values files: the `values.<dotted path>` lines whose path ends in `image.tag` or `image.digest` | What a tag points to at the registry has no field. Image scanning is not in scope |
+| K9 Images are pinned and come from a named registry | `image-registry`, `image-repository`, `image-pin`, `image-pull-policy`. In values files: the `values.<dotted path>` lines whose path ends in `image.tag` or `image.digest` | What a tag points to at the registry has no field. Image scanning is not in scope |
 | K10 Namespaces enforce a Pod Security level | `psa-enforce`, `psa-enforce-version`, `psa-warn`, `psa-warn-version`, on Namespace objects | A level set in the API server's own configuration instead of a label has no field. Whether that route exists was not read (verify) |
 | Reach map: ServiceAccount | `service-account`, `automount-sa-token` | A default ServiceAccount has no object in the repository |
 | Reach map: roles bound and what they allow | `subject.<n>.*`, `role-ref-*`, `rule.<n>.*` | A binding in another repository has no field |
@@ -555,14 +568,14 @@ The reader renders only after a yes, and it pipes the output of the render tool 
 **Helm.** The form is `helm template NAME CHART [flags]` (H1). The reader runs:
 
 ```text
-helm template <release name> <chart directory> --values <values file> [--values <values file>] --namespace <namespace>
+helm template <release name> <chart directory> --skip-schema-validation --values <values file> [--values <values file>] --namespace <namespace>
 ```
 
-The release name and the namespace have to fit `dns-label`. The chart is a directory in this repository that holds `Chart.yaml`, and each values file is an existing file in this repository. `--values` and `-f` are the same flag, and the page says the value may be a YAML file or a URL (H1), so the reader passes only a path that exists on disk.
+`--skip-schema-validation` is in the fixed command because a render with only the other flags can fetch a remote JSON-schema `$ref` from `values.schema.json`, in the chart or in a vendored subchart (checked, T1, helm v4.3.2, `unshare -n helm template r s1`: DNS connect attempts and `HTTP request failed` with the flag missing, and exit 0 with no connect call with the flag set). A `file://` `$ref` is loaded and applied. The release name and the namespace have to fit `dns-label`. The chart is a directory in this repository that holds `Chart.yaml`, and each values file is an existing file in this repository. `--values` and `-f` are the same flag, and the page says the value may be a YAML file or a URL (H1), so the reader passes only a path that exists on disk.
 
 What the page says `helm template` does with no cluster (checked, H1):
 
-- It renders chart templates locally. Values that the chart would look up in a cluster are faked locally.
+- It renders chart templates locally. Values that the chart would look up in a cluster are faked locally. The page does not say that a render makes no request at all, and it can: see the schema `$ref` run above, which is why the fixed command carries `--skip-schema-validation`.
 - It does no server-side chart validity check, such as API support.
 - Its `--dry-run` flag takes `client` or `server`. The default is `client`, which avoids cluster connections. `server` needs cluster connectivity (H1, H2).
 
@@ -575,7 +588,7 @@ What the page says about dependencies (H1, H3, H4, H5):
 - `lookup` in a template, with no cluster and no kubeconfig, returns an empty map and the render succeeds (checked, T1, helm v4.3.2, 15 Nov 2026, `helm template r chart2` where the template calls `lookup "v1" "Namespace" "" "kube-system"`). Exit status 0, the output holds `{}`, `empty` is true, and standard error is empty. This matches the page's statement that looked-up values are faked locally (H1).
 - Helm v4.3.2 accepts a `--validate` flag that its help does not list. It prints `Flag --validate has been deprecated, use '--dry-run=server' instead`, then tries to reach a cluster at `http://localhost:8080/version`, and exits 1 with nothing rendered (checked, T1, helm v4.3.2, 15 Nov 2026, `helm template r chart2 --validate`). `--dry-run=server` fails the same way (`helm template r chart2 --dry-run=server`).
 
-Flags the reader must never pass. Each one can reach a cluster, a registry, a chart repository, a URL, or a file write:
+Flags the reader must never pass. Each one can reach a cluster, a registry, a chart repository, a URL, or a file write. This table is not exhaustive. The command written above governs: the reader passes the arguments in it and no other, whether or not a flag is listed here.
 
 | Flag | Why it is never passed | Source | Read | Status |
 | --- | --- | --- | --- | --- |
@@ -633,6 +646,7 @@ What the local tools showed (checked, T2, kubectl v1.37.2 with Kustomize v5.8.1,
 - An overlay with a `helmCharts` entry and no flag fails with exit status 1, nothing on standard output, and `must specify --enable-helm` on standard error (`kubectl kustomize ov2`).
 - An overlay with a generator that carries an exec function annotation and no flag fails with exit status 1 and `external plugins disabled; unable to load external plugin` on standard error (`kubectl kustomize ov3`). The plugin did not run.
 - An overlay whose `resources` entry is `file:///` plus the path of a local Git repository builds with exit status 0 and no flag, so a remote-form base is cloned and read without any switch (`kubectl kustomize ov1`). That is the reason the reader refuses on the file text. The run used a local repository, so it made no network request. A real remote base was not run.
+- An overlay whose `resources` entry is a symbolic link to a directory outside the overlay builds that directory with exit status 0 (`unshare -n kubectl kustomize repo2/ov`, T2, kubectl v1.37.2). `helm template` on a chart whose `templates/cm.yaml` is a link to an outside file logs `found symbolic link in path. Contents of linked file included and used` and renders it (T1, helm v4.3.2). Both are the reason for the `symbolic link inside` refusal. `find <directory> -type l` listed each link and listed nothing for a clean chart.
 
 ## Command section 2: when the reader refuses to render
 
@@ -642,6 +656,8 @@ The reader refuses before it runs a render tool. Each refusal prints a line `<pa
 | --- | --- | --- | --- | --- | --- |
 | `tool not installed` | `helm`, `kustomize`, and `kubectl` are not on the path | There is nothing to run | not applicable | 15 Nov 2026 | checked |
 | `not a local file` | The chart, the overlay, or a values file is a symbolic link, is missing, or is not inside the repository | A symbolic link is refused in every mode. A path outside the repository is not read | not applicable | 15 Nov 2026 | checked |
+| `symbolic link inside` | `find <chart directory> -type l` prints anything. The same test for every directory an overlay reaches through `resources`, `bases`, or `components`. Also when any of those directories resolves, after links are followed, to a place outside the repository | A link inside a chart or overlay tree is followed by the render tool, so a template, a `.Files.Get` read, a vendored dependency or a resource can be an outside file | T1 (`helm template r c1`, helm v4.3.2), T2 | 15 Nov 2026 | checked |
+| `remote schema ref` | A file named `values.schema.json` in the chart or under `charts/` holds a `$ref` whose value has `://`, with any scheme, `file://` included | A remote `$ref` is fetched while the schema is validated, and a `file://` one reads any file. Only a second guard: the fixed command passes `--skip-schema-validation`. A `.tgz` dependency cannot be read line by line, so it relies on the flag | T1 (`helm template r s1` inside `unshare -n`, helm v4.3.2) | 15 Nov 2026 | checked |
 | `dependencies not vendored` | `Chart.yaml` has a `dependencies` list, and for any `name` in it, `charts/` holds neither a directory named `<name>` nor an archive that starts `<name>-` and ends `.tgz` | The charts would have to be fetched. `--dependency-update` is the flag that fetches, and the reader never passes it | H3, H4 | 15 Nov 2026 | checked |
 | `remote base` | A `resources`, `bases`, `components`, `generators`, `transformers`, `validators`, or `crds` entry in the overlay, or in any kustomization it reaches through a local path, is not an existing local file or directory in the repository | A remote entry makes kustomize clone or download. The entries include an address with `://`, a `git@` or `ssh://` address, a `file:///` address, a legacy address with no scheme, and a raw file address | Z3, Z5 | 15 Nov 2026 | checked |
 | `remote base` (other fields) | The same test for the other kustomization fields that name a path | Whether URLs work in every such field is not on the pages read, so the test is wider than the pages (verify) | Z4, Z5 | 15 Nov 2026 | verify |
@@ -680,11 +696,12 @@ CPU_REQ:.spec.containers[*].resources.requests.cpu
 MEM_REQ:.spec.containers[*].resources.requests.memory
 CPU_LIM:.spec.containers[*].resources.limits.cpu
 MEM_LIM:.spec.containers[*].resources.limits.memory
+STATUS_NAMES:.status.containerStatuses[*].name
 RESTARTS:.status.containerStatuses[*].restartCount
 LAST_END:.status.containerStatuses[*].lastState.terminated.reason
 ```
 
-The paths are the field paths in K1, K2, and K32. `restartCount` counts the restarts of the container, and `lastState` is not filled in while the container is still running with a restart count of 0 (K32). `reason` is a brief reason from the last termination (K1). The reason a container was killed for memory is shown on the Kubernetes pages as `OOMKilled` (K2). The page read for custom columns shows only an index such as `[0]` (K30, K31), and the help text of kubectl v1.37.2 shows only `[0]` as well (`kubectl get --help`, T2). A trial with `kubectl create --dry-run=client -o custom-columns` was refused, because that command does not print custom columns, and `kubectl get` needs a cluster. So the use of `[*]` is "verify". It is the reason the status is "verify" for this step. The `-o custom-columns` form and the type form `TYPE[.VERSION][.GROUP]` are in the help text of kubectl v1.37.2 (checked, T2).
+`CONTAINERS` comes from the spec and `STATUS_NAMES` from the status, and the two lists are not guaranteed to be in the same order, so the script matches `RESTARTS` to a container through `STATUS_NAMES` and never through `CONTAINERS`. `restartCount` is always set, so `RESTARTS` lines up with `STATUS_NAMES`. `LAST_END` shows a value only for a container that has terminated before, and it is not known whether a blank is kept for the others when the column is printed (verify). So the script reports `LAST_END` for the pod as a whole and does not assign it to a container. The paths are the field paths in K1, K2, and K32. `restartCount` counts the restarts of the container, and `lastState` is not filled in while the container is still running with a restart count of 0 (K32). `reason` is a brief reason from the last termination (K1). The reason a container was killed for memory is shown on the Kubernetes pages as `OOMKilled` (K2). The page read for custom columns shows only an index such as `[0]` (K30, K31), and the help text of kubectl v1.37.2 shows only `[0]` as well (`kubectl get --help`, T2). A trial with `kubectl create --dry-run=client -o custom-columns` was refused, because that command does not print custom columns, and `kubectl get` needs a cluster. So the use of `[*]` is "verify". It is the reason the status is "verify" for this step. The `-o custom-columns` form and the type form `TYPE[.VERSION][.GROUP]` are in the help text of kubectl v1.37.2 (checked, T2).
 
 - **Step 4, columns.** The fixed list for VerticalPodAutoscalers, from the project's types file (V1):
 
