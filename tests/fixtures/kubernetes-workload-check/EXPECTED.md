@@ -173,7 +173,7 @@ The evidence of each "ask the team" here says that the chart or overlay was not 
 
 Exactly these four namespaces, in the report's order of environments (the order shown is an example). The offer names the namespace of each environment whose namespace is known and where R8 is "ask the team", fully seen or not (SKILL.md step 9, `references/cluster-pass.md`, "Before the offer", item 1). R8 is "ask the team" in all four Argo CD environments, and each namespace is known from its `Application`'s destination. Plain manifests adds none: R1 fails there.
 
-`/tmp/fleetboard-kubectl.log` holds exactly one line, `6 config current-context --kubeconfig= --context= --server= --cluster=`.
+`/tmp/fleetboard-kubectl.log` holds exactly one line, `8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=`.
 
 **With no renderer (scenario 2).** The statuses, headlines, verdicts, blocks, first three, maps, and Q are the same as here. Four things differ, so the two are not the same apart from the render line: (1) no render offer is made, and the report comes in the first reply; (2) the render line and every reason say that no renderer is installed (`helm`, `kustomize`, and `kubectl` are not found); (3) `read-cluster-usage.sh --context` exits 5 with "kubectl is not installed", so there is no cluster offer, and "Not checked" says "R8: no cluster offer, because kubectl is not installed."; (4) so the reply ends with the report's closing line and makes no offer. With the tools present and no stand-in, (3) depends on the user's own kubeconfig, which is why every way here uses the stand-in.
 
@@ -340,7 +340,7 @@ Everything in way 2 holds, word for word, up to the offers. After "Yes to the cl
 sh <skill-dir>/scripts/read-cluster-usage.sh dispatch-staging fleetboard-production fleetboard-staging
 ```
 
-It exits 0, and its first line is `# context fleetboard-stand-in`. `/tmp/fleetboard-kubectl.log` then holds 14 lines: two `config current-context` lines, then for each namespace, in the offer's order, one `top pod` line (15 arguments) and three `get` lines (28 arguments each: `pods`, `verticalpodautoscalers.autoscaling.k8s.io`, `horizontalpodautoscalers.autoscaling`). No line names `dispatch-production`, `fleetboard-tools`, or any other namespace.
+It exits 0, and its first line is `# context fleetboard-stand-in`. `/tmp/fleetboard-kubectl.log` then holds 14 lines: two `config current-context` lines, then for each namespace, in the offer's order, one `top pod` line (17 arguments) and three `get` lines (30 arguments each: `pods`, `verticalpodautoscalers.autoscaling.k8s.io`, `horizontalpodautoscalers.autoscaling`). No line names `dispatch-production`, `fleetboard-tools`, or any other namespace.
 
 **The block "Measured in the cluster"**, after the report, labelled as measured in the cluster with the context `fleetboard-stand-in`, one sample from `kubectl top` as one moment in time, and changing no status, no headline, and no verdict. One section for each namespace, with its environment. Each container row is matched to a workload by namespace and container name, as an assumption. The repository side is the rendered field with its output line.
 

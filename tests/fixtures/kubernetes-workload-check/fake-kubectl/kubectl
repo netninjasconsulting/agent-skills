@@ -274,7 +274,7 @@ case $ns in
   '' | *[!a-z0-9-]*) marker ;;
 esac
 
-if [ "$#" -eq 15 ] && [ "$*" = "$cmd_top" ]; then
+if [ "$#" -eq 17 ] && [ "$*" = "$cmd_top" ]; then
   if has_mode no-top || { has_mode no-top-production && [ "$ns" = fleetboard-production ]; }; then
     echo "error: Metrics API not available FIXTUREVALUE" >&2
     exit 1
@@ -286,7 +286,7 @@ if [ "$#" -eq 15 ] && [ "$*" = "$cmd_top" ]; then
   top_rows
   exit 0
 fi
-if [ "$#" -eq 28 ] && [ "$*" = "$cmd_pods" ]; then
+if [ "$#" -eq 30 ] && [ "$*" = "$cmd_pods" ]; then
   if has_mode no-pods; then
     echo "error: pods FIXTUREVALUE" >&2
     exit 1
@@ -299,7 +299,7 @@ if [ "$#" -eq 28 ] && [ "$*" = "$cmd_pods" ]; then
   pods_rows
   exit 0
 fi
-if [ "$#" -eq 28 ] && [ "$*" = "$cmd_vpa" ]; then
+if [ "$#" -eq 30 ] && [ "$*" = "$cmd_vpa" ]; then
   if has_mode no-vpa; then
     echo "error: the server doesn't have a resource type FIXTUREVALUE" >&2
     exit 1
@@ -307,7 +307,7 @@ if [ "$#" -eq 28 ] && [ "$*" = "$cmd_vpa" ]; then
   vpa_rows
   exit 0
 fi
-if [ "$#" -eq 28 ] && [ "$*" = "$cmd_hpa" ]; then
+if [ "$#" -eq 30 ] && [ "$*" = "$cmd_hpa" ]; then
   if has_mode no-hpa; then
     echo "error: hpa FIXTUREVALUE" >&2
     exit 1

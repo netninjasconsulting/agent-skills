@@ -584,6 +584,8 @@ pins() {
   pin "an empty field selector on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --field-selector= /\1 /' "a command lacks the neutral flag --field-selector="
   pin "no watch-only on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --watch-only=false /\1 /' "a command lacks the neutral flag --watch-only=false"
   pin "no ignore-not-found on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --ignore-not-found=false /\1 /' "a command lacks the neutral flag --ignore-not-found=false"
+  pin "kubectl writes no profile file" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --profile=none /\1 /' "a command lacks the neutral flag --profile=none"
+  pin "kubectl keeps no cache in the working directory" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --cache-dir= /\1 /' "a command lacks the neutral flag --cache-dir="
   pin "the context read is passed on" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --context=<context> /\1 /' "a command lacks the neutral flag --context=fleetboard-stand-in"
   pin "an empty kubeconfig on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --kubeconfig= /\1 /' "a command lacks the neutral flag --kubeconfig="
   pin "an empty template on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --template= /\1 /' "a command lacks the neutral flag --template="
