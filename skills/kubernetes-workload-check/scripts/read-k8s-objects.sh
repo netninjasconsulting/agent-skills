@@ -44,6 +44,8 @@ export LC_ALL
 
 me=read-k8s-objects
 REMOTES=
+NL='
+'
 
 usage() {
   sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
@@ -160,6 +162,7 @@ function cleanv(t,    q, i, n, c, qend) {
   if (q == "|" || q == ">") { CT = (t ~ /^[|>][-+]?$/) ? "block" : "err"; return }
   if (q == "&" || q == "*" || q == "!") { CT = "err"; return }
   if (q == "%" || q == "@" || q == "`") { CT = "bad"; return }
+  if (q == "?" && (length(t) == 1 || substr(t, 2, 1) == " ")) { CT = "bad"; return }
   if (index(t, ": ") || substr(t, length(t), 1) == ":" || index(t, "\t")) { CT = "bad"; return }
   CT = "scalar"
 }
@@ -216,14 +219,16 @@ function flowitems(t,    inner, n, i, c, q, d, cur) {
   return NFI
 }
 
-# A flow map that is not empty, or a flow list that holds a map or a list:
-# what it holds is not read, so the file is not read.
+# A flow map that is not empty, or a flow list with an item that is not a
+# plain scalar (a map, a list, an implicit single-pair map such as
+# [hostPort: 22], a key with no value, or anything else the reader cannot
+# classify): what it holds is not read, so the file is not read.
 function flowmap(t, v,    n, i, sv, sq, st, r) {
   if (t != "flow" || v == "{}" || v == "[]") return 0
   if (substr(v, 1, 1) == "{") return 1
   sv = CV; sq = CQ; st = CT; r = 0
   n = flowitems(v)
-  for (i = 1; i <= n; i++) if (FIT[i] == "flow") r = 1
+  for (i = 1; i <= n; i++) if (FIT[i] != "scalar") r = 1  # a flow item that is not a plain scalar
   CV = sv; CQ = sq; CT = st
   return r
 }
@@ -934,7 +939,7 @@ function vleaf(I, k, p,    n, s, i, last, prev, pp, j) {
     n = split(p, s, ">")
     if (substr(s[n], 1, 1) == "#" && n >= 3 && s[n - 2] == "capabilities" && (s[n - 1] == "drop" || s[n - 1] == "add") && index(substr(p, 1, length(p) - length(s[n])), "#") == 0) {
       pp = s[1]; for (j = 2; j < n; j++) pp = pp "." s[j]
-      for (j = 1; j < n; j++) if (credlike(s[j])) return
+      for (j = 1; j < n; j++) if (credlike(s[j])) return  # a credential-like parent of a capability list
       if (vpathok(pp)) field(LLN[I, k], "-", "values." vprint(pp), LVAL[I, k], LQ[I, k], LT[I, k], "cap-name")
       return
     }
@@ -1276,6 +1281,12 @@ phys() {
   fi
 }
 
+# A file or directory in the tree $1 has a line break in its name, which
+# no line-by-line test can read with certainty.
+nl_inside() {  # a line break in a name
+  [ -n "$(find "$1" -name "*$NL*" -print | sed -n 1p)" ]
+}
+
 inside_root() {
   # $1 = a physical path
   case "$1" in "$ROOTP" | "$ROOTP"/*) return 0 ;; esac
@@ -1314,6 +1325,7 @@ kust_entries() {
     $2 ~ /^(helmCharts|helmGlobals|helmChartInflationGenerator|generators|transformers|validators)(>|$)/ { print "plugin -"; next }
     $2 ~ /^((resources|bases|components|crds|configurations|patchesStrategicMerge)>#[0-9]+|(patches|patchesJson6902|replacements)>#[0-9]+>path|openapi>path|(configMapGenerator|secretGenerator)>#[0-9]+>((files|envs)>#[0-9]+|env))$/ && $1 != "scalar" { print "bad -"; next }  # an entry that is not a plain scalar
     $2 ~ /^(resources|bases|components|crds|configurations|patchesStrategicMerge)$/ && $1 != "none" && $1 != "flow" { print "bad -"; next }
+    $2 ~ /^(patches|patchesJson6902|replacements|configMapGenerator|secretGenerator)>#[0-9]+$/ && $1 != "none" { print "bad -"; next }  # an item that is not a map
     $1 != "scalar" { next }
     $2 ~ /^(resources|bases|components)>#[0-9]+$/ { print "res " $3; next }
     $2 ~ /^(crds|configurations|patchesStrategicMerge)>#[0-9]+$/ { print "path " $3; next }
@@ -1376,21 +1388,9 @@ list_mode() {
   # in a list line can split, expand, or hide a line break. Any other path
   # is counted and reported, and the run ends with exit code 4.
   set -f
-  unsafe=0
-  files=
-  raw=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) -print)
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    case "$line" in
-      ./*[!A-Za-z0-9._/@+-]* | [!.]* | .[!/]*) unsafe=$((unsafe + 1)); continue ;;  # a path the list cannot carry
-    esac
-    [ -f "$line" ] || { unsafe=$((unsafe + 1)); continue; }
-    files="$files
-${line#./}"
-  done <<EOF
-$raw
-EOF
-  files=$(printf '%s\n' "$files" | sed '/^$/d' | sort)
+  unsafe_path='*[!A-Za-z0-9._/@+-]*'
+  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)
+  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
   charts=
   for f in $files; do
     case "$f" in Chart.yaml) charts="$charts ." ;; */Chart.yaml) charts="$charts ${f%/Chart.yaml}" ;; esac
@@ -1544,6 +1544,7 @@ $1" ;;
   done
   [ "$nv" -le 2 ] || die2 "--render helm takes one or two values files"
   cp_=$(phys "$chart")
+  if nl_inside "$cp_"; then refuse "not a local file"; fi
   [ -z "$(find "$cp_" -type l -print | sed -n 1p)" ] || refuse "symbolic link inside"
   # shellcheck disable=SC2016 # the text $ref and $id, not expansions
   if [ -n "$(find "$cp_" -type f -name values.schema.json -exec grep -lF -e '$ref' -e '$id' {} + | sed -n 1p)" ]; then
@@ -1602,6 +1603,7 @@ render_kustomize() {
     if printf '%s\n' "$seen" | grep -qxF -e "$d"; then continue; fi
     seen="$seen
 $d"
+    if nl_inside "$d"; then refuse "not a local file"; fi
     [ -z "$(find "$d" -type l -print | sed -n 1p)" ] || refuse "symbolic link inside"
     kf=$(kfile_in "$d")
     [ -n "$kf" ] || continue

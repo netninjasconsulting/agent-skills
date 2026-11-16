@@ -1755,6 +1755,8 @@ copy_works() {
 # PIN_BREAK set to awk or sh breaks every copy on purpose, after the pin's
 # own change: each pin must then report a broken copy and run nothing.
 PIN_BREAK=
+PIN_HELD=0
+PIN_CAUGHT=0
 pin() {
   # $1 = label, $2 = a fixed string that marks the safeguard's line,
   # $3 = a sed command, $4 = the sections to run, $5 = text of the failing
@@ -1779,6 +1781,8 @@ pin() {
     if [ -z "$PIN_BREAK" ]; then
       echo "FAIL: pin $1: broken copy"
       total=$((total + 1))
+    else
+      PIN_CAUGHT=$((PIN_CAUGHT + 1))
     fi
     return
   fi
@@ -1794,6 +1798,8 @@ pin() {
     echo "FAIL: pin $1: the test failed, but not on: $5"
     sed -n 1,5p "$work/pin.out"
     total=$((total + 1))
+  else
+    PIN_HELD=$((PIN_HELD + 1))
   fi
 }
 pins() {
@@ -1815,10 +1821,10 @@ pins() {
   pin "a kustomization entry that looks like a repository" '# an entry kustomize can take for a repository' 's/refuse "remote base"  # an entry kustomize can take for a repository/:/' refusals "render an overlay with a local directory named like a host: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L: the render tool ran before the refusal"
-  pin "a line break in a chart or overlay tree" '# a line break in a name' 's/refuse "not a local file"  # a line break in a name/:/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
+  pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a path the list cannot carry" '# a path the list cannot carry' 's/ ! -path "$unsafe_path"  # a path the list cannot carry//' listx "list with a line break that repeats a name: printed"
+  pin "a path the list cannot carry" '! -path "$unsafe_path" -print' 's/ ! -path "$unsafe_path" -print/ -print/' listx "list with a line break that repeats a name: printed"
   if [ "$have_helm" -eq 1 ]; then
     # shellcheck disable=SC2016 # literal text, not an expansion
     pin "the pipe from the renderer" '# the pipe' 's/ | extract render "$label"  # the pipe//' render "a planted value leaked"
@@ -1842,6 +1848,7 @@ pins
 PIN_BREAK='sh'
 pins
 PIN_BREAK=
+echo "pins: $PIN_HELD held on their own check; $PIN_CAUGHT copies broken in awk or in shell were reported as broken"
 
 if [ "$total" -gt 0 ]; then
   echo "$total check(s) failed"
