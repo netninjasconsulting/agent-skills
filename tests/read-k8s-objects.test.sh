@@ -22,6 +22,9 @@
 # fail on the copy.
 #
 # Render cases need helm and kubectl. Without them they print "skipped".
+# The generation against kubectl (tests/read-k8s-objects.gen.sh) compares
+# what the reader accepts with what kubectl decodes. It needs kubectl, and
+# prints "skipped" without it.
 # Every run of the reader goes through "unshare -n" where that works, so a
 # render that tried to reach a network would fail.
 
@@ -1148,6 +1151,57 @@ spec:
     - name: app
       args: [--ok, "--quoted", key:]
 EOF
+  # The common unquoted forms: "=" inside an item, and a dash that starts
+  # one. The Application and the ApplicationSet must still give their
+  # environment list.
+  cat > "$a/flow-argo.yaml" <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: flow-argo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/example-fleetboard/fleetboard.git
+    path: kustomize/overlays/production
+  destination:
+    namespace: fleetboard
+  syncPolicy:
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: flow-argo-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: [missingkey=error]
+  generators:
+    - list:
+        elements:
+          - env: staging
+  template:
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/example-fleetboard/fleetboard.git
+        path: kustomize/overlays/{{.env}}
+      destination:
+        namespace: fleetboard
+EOF
+  cat > "$a/flow-args.yaml" <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flow-args
+spec:
+  containers:
+    - name: app
+      command: [sh, -c, run]
+      args: [--token=FIXTUREVALUE-flow-args, -v, --listen=0.0.0.0, run]
+EOF
   cat > "$a/flow-question.yaml" <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -1296,8 +1350,12 @@ x:y
 [a]
 []
 {{ .Values.x }}
---ok
--x
+-
+-, a
+a, -
+- a
+-:a
+-?a
 *alias
 &anchor x
 !tag x
@@ -1316,6 +1374,11 @@ a b
 @x
 `x`
 =x
+=
+a, =b
+a\b
+-a\b
+\
 ~
 _x
 "FIXTUREVALUE	tab"
@@ -1337,8 +1400,29 @@ ALL
 "--url=https://user:x@db.example.com"
 NET_ADMIN, SYS_TIME
 a.b_c/d@e+f-g
+--ok
+-x
+-c, run
+--
+-1
+--token=abc
+CreateNamespace=true
+missingkey=error
+a=
+a=b=c
+-a=-b
 EOF
   cwd=$a
+
+  att flow-argo.yaml
+  [ "$code" -eq 0 ] || fail "attack flow lists of Argo CD options: expected to be read, got exit $code"
+  expect_line "$out" "flow-argo.yaml:10:Application/argocd/flow-argo:-:source.1.path=kustomize/overlays/production" "attack flow lists of Argo CD options"
+  expect_line "$out" "flow-argo.yaml:12:Application/argocd/flow-argo:-:destination-namespace=fleetboard" "attack flow lists of Argo CD options"
+  expect_line "$out" "flow-argo.yaml:27:ApplicationSet/argocd/flow-argo-set:-:list-element.1.1.env=staging" "attack flow lists of Argo CD options"
+  expect_line "$out" "flow-argo.yaml:33:ApplicationSet/argocd/flow-argo-set:-:source.1.path=kustomize/overlays/{{.env}}" "attack flow lists of Argo CD options"
+  att flow-args.yaml
+  [ "$code" -eq 0 ] || fail "attack flow list of flags: expected to be read, got exit $code"
+  expect_line "$out" "flow-args.yaml:8:Pod/-/flow-args:app:args-credential-like-count=1" "attack flow list of flags"
 
   att block.yaml
   [ "$code" -eq 0 ] || fail "attack block scalars: exit $code"
@@ -1695,6 +1779,16 @@ EOF
   mkdir -p "$rr/k11"
   printf 'resources:\n  - ../kustomize/base\npatches: [?"path":https://attacker.invalid/FIXTUREVALUE-k11.yaml]\n' > "$rr/k11/kustomization.yaml"
   unread "k11:overlay:not read" "render an overlay with a ? key in a flow list" --render kustomize k11
+  # The unquoted forms a flow list may hold, "=" inside an item and a dash
+  # that starts one, under the keys that carry a path: the remote test
+  # still refuses before the tool runs.
+  mkdir -p "$rr/k12" "$rr/k13" "$rr/k14"
+  printf 'resources: [../kustomize/base, -x=github.com/example-fleetboard/FIXTUREVALUE-k12]\n' > "$rr/k12/kustomization.yaml"
+  refuse "k12:overlay:remote base" "render an overlay with a remote base behind a dash and an equals sign" --render kustomize k12
+  printf 'resources:\n  - ../kustomize/base\nconfigMapGenerator:\n  - name: k13\n    files: [app.conf=github.com/example-fleetboard/FIXTUREVALUE-k13/app.conf]\n' > "$rr/k13/kustomization.yaml"
+  refuse "k13:overlay:remote base" "render an overlay with a remote generator file behind an equals sign" --render kustomize k13
+  printf 'resources: [../kustomize/base, --enable-helm]\n' > "$rr/k14/kustomization.yaml"
+  refuse "k14:overlay:remote base" "render an overlay with an entry that starts with dashes" --render kustomize k14
   # A line break in a name anywhere in a chart or overlay tree.
   cp -R "$rr/chart" "$rr/nlchart"
   mkdir "$rr/nlchart/templates/a
@@ -1777,6 +1871,67 @@ x"
     fail "render a chart from a repository under a path with a line break: exit $code, printed $out"
   rd .
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list a repository under a path with a line break: exit $code"
+  # A directory whose name ends in a line break, beside a clean one of the
+  # same name without it. A command substitution drops the line break, so
+  # a path resolved that way is the path of the other directory. The
+  # arguments are clean, so the front door does not see it.
+  tl="$work/tl"
+  mkdir -p "$tl/repo/ovx" "$tl/repo/ovx
+"
+  git -C "$tl/repo" init -q 2>/dev/null
+  printf 'resources:\n  - cm.yaml\n' > "$tl/repo/ovx/kustomization.yaml"
+  printf %b "$cm" > "$tl/repo/ovx/cm.yaml"
+  printf %b "$remote_patch" > "$tl/repo/ovx
+/kustomization.yaml"
+  printf %b "$cm" > "$tl/repo/ovx
+/cm.yaml"
+  cp -R "$rr/chart" "$tl/repo/ch"
+  cp -R "$rr/chart" "$tl/repo/ch
+"
+  cwd="$tl/repo/ovx
+"
+  refuse ".:overlay:not a local file" "render an overlay from a directory whose name ends in a line break" --render kustomize .
+  rd
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list from a directory whose name ends in a line break: exit $code"
+  rd .
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list a directory whose name ends in a line break: exit $code"
+  cwd="$tl/repo/ch
+"
+  refuse ".:chart:not a local file" "render a chart from a directory whose name ends in a line break" --render helm . values.yaml
+  # The same for the top of the repository: from a repository whose path
+  # ends in a line break, a path into the directory beside it is outside
+  # the repository. Once with Git and once without.
+  mkdir -p "$tl/w/ov" "$tl/w
+" "$tl/n/ov" "$tl/n
+"
+  git -C "$tl/w
+" init -q 2>/dev/null
+  for d in w n; do
+    printf 'resources:\n  - cm.yaml\n' > "$tl/$d/ov/kustomization.yaml"
+    printf %b "$cm" > "$tl/$d/ov/cm.yaml"
+  done
+  cwd="$tl/w
+"
+  refuse "$tl/w/ov:overlay:not a local file" "render an overlay beside a repository whose path ends in a line break" --render kustomize "$tl/w/ov"
+  cwd="$tl/n
+"
+  refuse "$tl/n/ov:overlay:not a local file" "render an overlay beside a directory whose path ends in a line break" --render kustomize "$tl/n/ov"
+  # A file under such a directory is refused at the front door. Behind
+  # it, the remotes are those of the file's own directory.
+  mkdir -p "$tl/g" "$tl/g
+"
+  git -C "$tl/g" init -q 2>/dev/null
+  git -C "$tl/g" remote add origin https://git.example.com/fleetboard/beside.git
+  git -C "$tl/g
+" init -q 2>/dev/null
+  git -C "$tl/g
+" remote add origin https://git.example.com/fleetboard/own.git
+  printf 'apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: beside\nspec:\n  source:\n    repoURL: https://git.example.com/fleetboard/beside.git\n    path: apps\n' > "$tl/g
+/app.yaml"
+  cwd=$tl
+  front "read a file under a directory whose name ends in a line break" --fields "g
+/app.yaml"
+  case "$out" in *source.1.repo=this*) fail "read a file under a directory whose name ends in a line break: the remotes of another directory were read" ;; esac
   cwd=$rr
   RPATH=$PATH
   fi
@@ -1855,6 +2010,18 @@ $out"
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list through a symbolic link with a trailing slash: exit $code"
   rd alink/base
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list through a symbolic link: exit $code"
+  fi
+
+  if want gen; then
+  # The allow shape of a flow item and the reading of a whole value,
+  # against what kubectl decodes, by generation. The script prints its
+  # counts, or "skipped" when kubectl is not installed.
+  if gen=$(sh "$root/tests/read-k8s-objects.gen.sh" "$reader" 2>&1); then
+    [ "$SECTIONS" != all ] || printf '%s\n' "$gen"
+  else
+    fail "the generation against kubectl:
+$(printf '%s\n' "$gen" | sed -n 1,12p)"
+  fi
   fi
 
   # 8. No output of any mode holds a planted value, a part of one, or a
@@ -1962,6 +2129,35 @@ pin() {
     PIN_HELD=$((PIN_HELD + 1))
   fi
 }
+# A safeguard that stands behind others. With the layers in front of it
+# switched off and the safeguard on, its check must hold; with the
+# safeguard off as well, its check must fail. The first run shows the
+# safeguard working on its own, and the second that nothing else does its
+# work.
+PIN_ALONE=0
+pin_behind() {
+  # $1 = label, $2 = a fixed string that marks the safeguard's line,
+  # $3 = a sed command that switches the layers in front off, $4 = a sed
+  # command that switches the safeguard off, $5 = the sections to run,
+  # $6 = text of the failing check
+  if [ -z "$PIN_BREAK" ] && [ "$(grep -cF -e "$2" "$real_reader")" -eq 1 ]; then
+    copy="$work/pin-reader.sh"
+    sed -e "$3" "$real_reader" > "$copy"
+    if cmp -s "$copy" "$real_reader" || ! copy_works "$copy"; then
+      echo "FAIL: pin $1: the copy with the layers in front switched off did not change, or is broken"
+      total=$((total + 1))
+      return
+    fi
+    (SECTIONS=$5; suite "$copy") > "$work/pin.out" 2>&1
+    if grep -qF -e "$6" "$work/pin.out"; then
+      echo "FAIL: pin $1: with the layers in front switched off, the safeguard did not hold on its own: $6"
+      total=$((total + 1))
+      return
+    fi
+    PIN_ALONE=$((PIN_ALONE + 1))
+  fi
+  pin "$1" "$2" "$3;$4" "$5" "$6"
+}
 pins() {
   pin "shape check" 'function fits(v, q, sid,' 's/^\( *function fits(v, q, sid,[^)]*) {\)$/\1 return 1/' attacks "a planted value leaked"
   pin "field list" 'function listed(f,' 's/^\( *function listed(f,[^)]*) {\)$/\1 return 1/' fields "a field that fields.md does not list"
@@ -1983,12 +2179,32 @@ pins() {
   pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L: the render tool ran before the refusal"
   pin "the allow shape of a flow item" '# the allow shape of a flow item' 's/^\( *\)ok = .*  # the allow shape of a flow item$/\1ok = 1/' attacks 'flow form table: [?"hostPort":22] expected exit 4, got 0'
   pin "a control character in a path argument" '# a control character in a path argument' 's/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/' refusals "render an overlay whose path holds a line break: expected exit 2"
-  # The inner layers sit behind the front door, so their pins switch the
-  # layers in front of them off as well.
+  # The resolved path is the only safeguard of the list, so its pin stands
+  # alone. In a render the front door, the resolved path, and the queue
+  # stand one behind another: each inner one is shown working with the
+  # others switched off.
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a control character in a resolved path" '# a control character in a resolved path' 's/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/;s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/' refusals "render from a repository under a path with a line break: the render tool ran before the refusal"
+  pin "a control character in a resolved path" '# a control character in a resolved path' 's/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/' refusals "list a repository under a path with a line break: exit 0"
+  front_off='s/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/'
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a queue entry that does not exist" '# a queue entry that does not exist' 's/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/;s/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/;s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/' refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  phys_off='s/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/'
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  queue_off='s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/'
+  pin_behind "a control character in a resolved path, in a render" '# a control character in a resolved path' "$front_off;$queue_off" "$phys_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  pin_behind "a queue entry that does not exist" '# a queue entry that does not exist' "$front_off;$phys_off" "$queue_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a line break at the end of a resolved path" '# a line break at the end of a resolved path' 's/r=${r%"${NL}x"}  # a line break at the end of a resolved path/r=$(printf %s "${r%x}")/' refusals "render an overlay from a directory whose name ends in a line break: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a line break at the end of the repository root" '# a line break at the end of the repository root' 's/top=${top%"${NL}x"}  # a line break at the end of the repository root/top=$(printf %s "${top%x}")/' refusals "render an overlay beside a repository whose path ends in a line break: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin_behind "the directory of a file, with a line break at its end" '# the directory of the file, with a line break at its end' "$front_off" 's/dir_part "$f"; REMOTES=$(remotes_of "$DIR")  # the directory of the file, with a line break at its end/REMOTES=$(remotes_of "$(dirname -- "$f")")/' refusals "read a file under a directory whose name ends in a line break: the remotes of another directory were read"
+  pin "an equals sign that starts a flow item" '# an equals sign does not start an item' 's|(t ~ "^\[A-Za-z0-9./\]|(t ~ "^[A-Za-z0-9./=]|' attacks 'flow form table: [=x] expected exit 4, got 0'
+  pin "a dash alone as a flow item" '# a dash alone is not an item' 's|@+=-\]+\$") return 1  # a dash alone is not an item|@+=-]*$") return 1|' attacks 'flow form table: [-] expected exit 4, got 0'
+  if command -v kubectl >/dev/null 2>&1; then
+    pin "the allow shape of a flow item, against kubectl" '# the allow shape of a flow item' 's/^\( *\)ok = .*  # the allow shape of a flow item$/\1ok = 1/' gen "generation: kubectl decodes a map or a list where the reader read a plain item"
+  else
+    echo "skipped: the pin on the generation against kubectl (kubectl is not installed)"
+  fi
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
@@ -2016,7 +2232,7 @@ pins
 PIN_BREAK='sh'
 pins
 PIN_BREAK=
-echo "pins: $PIN_HELD held on their own check; $PIN_CAUGHT copies broken in awk or in shell were reported as broken"
+echo "pins: $PIN_HELD held on their own check; $PIN_ALONE inner safeguards held with the layers in front of them switched off; $PIN_CAUGHT copies broken in awk or in shell were reported as broken"
 
 if [ "$total" -gt 0 ]; then
   echo "$total check(s) failed"
