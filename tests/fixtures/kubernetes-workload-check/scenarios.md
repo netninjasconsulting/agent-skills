@@ -132,17 +132,19 @@ The list prints 23 lines: the 29 of `EXPECTED.md` without the six under `argocd/
 
 `chart/values.yaml` is not an environment: it is the base of the two other values files beside it. `kustomize/base` is not an environment: no `Application` names it, and it is a base of both overlays. Every render exits 0, and every environment is fully seen.
 
-**The two chart environments.** With no `Application`, no `--namespace` is passed, so each chart render prints `default` for every object, and every namespace of those renders is unknown. The report writes it as "unknown (no namespace was given to the render)", and R5, K8, and K10 are "ask the team" at best for their workloads. The output lines are those of way 2 of `EXPECTED.md`, with `default` in place of the namespace. There are no inline values and no release name note.
+**The two chart environments.** With no `Application`, no `--namespace` is passed, so each chart render prints `default` for every object, and every namespace of those renders is unknown. The report writes it as "unknown (no namespace was given to the render)", and R5, K8, and K10 are "ask the team" at best for their workloads. The output lines are those of way 2 of `EXPECTED.md`, with `default` in place of the namespace. There are no inline values, and no release name note: SKILL.md step 4 gives that note only when an Argo CD `Application` names the chart.
 
 - `chart/values-production.yaml`: every status as `dispatch-production` in way 2, except that K7 has no inline case (`env.DATABASE_PASSWORD=literal` at out 53 and `chart/values-production.yaml:17` remain). K8 stays a fail: "at best" lets no status rise above "ask the team", and with no NetworkPolicy in the render no workload is covered in any namespace.
   - "Sizing: 2 out of 7 confirmed in the repository (1 to ask the team)"
   - "Security: 2 out of 9 confirmed in the repository (2 to ask the team)"
   - "Not ready for production", K1 and K7. The first three: K7, K1, K8.
+  - The reach map: both rows "broad" (peers in and out with no policy, and `privileged=true`), as in way 2, with the namespace unknown.
   - Three questions: R5, K5, and K10. Where a question would name the namespace, it names the environment (`references/checks.md`, "The questions for the team"), for example: "Do the namespaces of the environment `chart/values-production.yaml` get a LimitRange or a ResourceQuota for CPU and memory from somewhere the repository does not show?"
 - `chart/values-staging.yaml`: as `dispatch-staging` in way 2, except that K8 is "ask the team" (its policies select every workload, and the namespace is unknown).
   - "Sizing: 6 out of 8 confirmed in the repository (2 to ask the team)"
   - "Security: 7 out of 9 confirmed in the repository (2 to ask the team)"
   - "Ready from what the repository shows". The first three: "This check identifies no change."
+  - The reach map: `Job/<unknown>/dispatch-migrate` is "not found in the repository": its account cells are confined, and its peers in and out cannot be decided while the namespace is unknown (as K8). `Rollout/<unknown>/dispatch` with its Deployment is "broad": its peers in cannot be decided either, but no policy of the render selects it for egress in any namespace (`NetworkPolicy/dispatch` is `Ingress` only), so its peers out stay "broad", as K8's fail stays a fail in `chart/values-production.yaml`. Both rows name the namespace as unknown.
   - Three questions: R5, K8, and K10. R5 and K10 name the environment `chart/values-staging.yaml` in place of a namespace. K8 names the NetworkPolicies `dispatch` and `dispatch-migrate` and the two workloads, as its question always does ("Do the NetworkPolicies <list> select the pods of <workloads>?"); it names no namespace, so it reads the same whether the namespace is known or not.
 
 **The two overlay environments and plain manifests.** Every status, headline, verdict, line, and first three as `fleetboard-production`, `fleetboard-staging`, and plain manifests in way 2 of `EXPECTED.md`. The overlays carry their namespaces (`fleetboard-production`, `fleetboard-staging`) in their own renders.
@@ -159,4 +161,5 @@ Must never:
 
 - Name `argocd/` objects, `dispatch-production`, or `dispatch-staging` as an environment or a namespace, or name `default` as a known namespace.
 - Make `chart/values.yaml` or `kustomize/base` an environment.
+- Name an environment other than by its path as the list prints it, for example "chart (dispatch) with values-production.yaml" in place of `chart/values-production.yaml`.
 - Pass `--namespace` to a chart render, or pass `chart/values.yaml` to it.

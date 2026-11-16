@@ -1,6 +1,6 @@
 # Report format
 
-Print the report in chat in this shape. Write no file. The sections come in this order, and none is moved.
+Print the report in chat in this shape, and nothing more: no summary or "short answer" paragraph, and no advice of the agent's own. Write no file. The sections come in this order, and none is moved. A first-three item holds the field line, one sentence on why it comes first, the snippet, and the line on what was adapted, and nothing else. "Also found" holds only text aimed at reviewers or agents and K7 cases (and the other items named in its template), and nothing else about the README. An environment is named as step 3 of SKILL.md names it: an `Application`'s name, a path as the list prints it (`chart/values-production.yaml`, `kustomize/overlays/staging`, never "chart (dispatch) with values-production.yaml"), or "Plain manifests".
 
 ````markdown
 # Kubernetes workload check: <repository>
@@ -40,7 +40,7 @@ Each line is what one file sets, not what the environment gets: another values f
 
 A chart that was not rendered has the "not rendered" row and no workload row. An overlay that was not rendered has the "not rendered" row, then one row for each workload printed by `--fields` in its own directory or in a `kustomize-base` directory, labelled as above. A file that was not read has one row, "not read: `<path>`", with the reason.
 
-Files read:
+Files read, one row for each path the list printed, and no other row:
 
 | Path | Kind | In Git? | Read with | Result |
 | --- | --- | --- | --- | --- |
@@ -73,6 +73,8 @@ Files read:
 | <environment> | <kind>/<namespace>/<name>, path:line | <account, token on, off, or not set> | <binding, role, verbs and resources> | <names, and how each is used> | <sources and ports> | <destinations and ports> | <host fields, or "none printed"> | <confined, broad, or not found in the repository> |
 
 Names only. No value, and no part of one.
+
+In an environment that is not fully seen, a cell that is not "broad" from a decided fact holds "not found in the repository" and the reason, and no fact read from the files, which are inputs to a render. For example: `| fleetboard-staging | Deployment/-/api, read from kustomize/base/api-deployment.yaml:2 | not found in the repository: the overlay was not rendered | ... |`.
 
 ## The first three to change
 
@@ -107,10 +109,10 @@ Names only. No value, and no part of one.
 - <Each manifest that holds only kinds the reader does not read, by path, as "a kind the reader does not read".>
 - <Each field that printed `other`, by file, line, and field.>
 - <Each chart or overlay that was not rendered, and each file that was not read, with its reason, and the checks it leaves at "ask the team" with no question of their own.>
-- <Each inline values path of an Application, by file, line, and path, as a value the render left out. Each `source.<n>.kustomize=present` line.>
+- <Each inline values path of an Application, by file, line, and path, as a value the render left out: every `values-key` line the reader printed for it, a parent printed as `block` included. Each `source.<n>.kustomize=present` line.>
 - <Each Argo CD object that names no environment: another repository, or a generator the files cannot resolve.>
 - <The count of paths the list left out, when its exit code was 4.>
-- <What each check names as "Not checked, always" for the environments it applies to, such as whether a metrics source runs in the cluster, and whether the network plugin enforces NetworkPolicy.>
+- <What each check names as "Not checked, always", for every environment it applies to, even when nothing else is listed for that environment, such as whether a metrics source runs in the cluster, and whether the network plugin enforces NetworkPolicy.>
 - <"R8: no cluster offer, because <reason>.", when R8 is "ask the team" and the offer was not made.>
 - The reader works by line and does not parse: a layout it cannot follow gives "not found", a chart or an overlay that is not rendered shows little, a setting with no field is not seen, and a kind it does not read leaves no line, even in a file with other objects.
 
@@ -127,13 +129,13 @@ The counts still add up in an environment that is not fully seen. Every check th
 
 Leave out "Also found" when there is nothing to put in it, and "Questions for the team" when Q is 0. When fewer than three checks qualify for an environment's first three, list those only. When none qualify, write "This check identifies no change." under an environment that is fully seen, and "No change can be named from what was read." under one that is not. For an environment that is not fully seen, the first three hold K7 when it fails and the fails and warns of a manifest applied as it is, and nothing from the block "Seen in the files, not confirmed by a render". When a check comes up in a second environment, point to its snippet above instead of printing it again.
 
-A line number is the line in one file, read with one command, or the line of one render's output, written as "`<chart>` rendered with `<values file>`, output line N" for a chart and "`<overlay>` rendered, output line N" for an overlay.
+A line number is the line in one file, read with one command, or the line of one render's output, written as "`<chart>` rendered with `<values file>`, output line N" for a chart and "`<overlay>` rendered, output line N" for an overlay. Inside an environment's section whose heading names that render, a cell may cite "output line N" alone. Anywhere else (the first three, "Also found", "Not checked", or a line that names two environments) use the full form.
 
 ## The offers
 
 After the closing line, make each offer that applies, once, as the last lines of the reply, in this order. Nothing follows them.
 
-**1. The questions,** when Q is above 0. Q is the number of questions under "Questions for the team", one for each such check in each environment. A check that is "ask the team" only because its environment is not fully seen has no question, and is not in Q. For several: "Q questions about the checks sit outside the repository. Shall I ask them? (yes or no)". For one: "1 question about a check sits outside the repository. Shall I ask it? (yes or no)".
+**1. The questions,** when Q is above 0. Q is the number of questions under "Questions for the team", one for each such check in each environment. A check that is "ask the team" only because its environment is not fully seen has no question, and is not in Q. Write it word for word, with only Q filled in. For several: "Q questions about the checks sit outside the repository. Shall I ask them? (yes or no)". For one: "1 question about a check sits outside the repository. Shall I ask it? (yes or no)".
 
 **2. The cluster pass,** when R8 is "ask the team" in an environment whose namespace is known, and the context name was read. The words, for one namespace and for several, are in "The offer" in [cluster-pass.md](cluster-pass.md).
 
@@ -198,7 +200,7 @@ Print one section for each namespace that was read. Leave out the VPA or the HPA
 
 ## No workload found
 
-When the workload map finds no workload and nothing that could hold one was left not read or not rendered, print this, and nothing else:
+When the workload map finds no workload and nothing that could hold one was left not read or not rendered, print this, and nothing else: no summary, no advice of the agent's own, and in "Also found" only text aimed at reviewers or agents and K7 cases:
 
 ````markdown
 # Kubernetes workload check: <repository>

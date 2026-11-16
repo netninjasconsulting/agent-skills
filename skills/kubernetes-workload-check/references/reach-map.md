@@ -48,7 +48,7 @@ So the cell is "confined" in two cases only, and in both no binding of the envir
 
 "Secrets and ConfigMaps" carries no mark. The names a workload reads are a fact to show, and a reference by name is how a Secret should be used. A role that can read every Secret is marked under "Roles and what they allow".
 
-**In an environment that is not fully seen** (see "The verdict" in SKILL.md), every column follows one more rule: a cell is "broad" only from a decided fact, a line that decides a check under the verdict rules there (a K7 case, or a fail or a warn of a manifest applied as it is). A cell that would be "confined" is "not found in the repository" instead, with the reason (not rendered, or not read), and so is a cell that would be "broad" from a line that decides nothing. No cell there is "confined".
+**In an environment that is not fully seen** (see "The verdict" in SKILL.md), every column follows one more rule: a cell is "broad" only from a decided fact, a line that decides a check under the verdict rules there (a K7 case, or a fail or a warn of a manifest applied as it is). A cell that would be "confined" is "not found in the repository" instead, with the reason (not rendered, or not read), and so is a cell that would be "broad" from a line that decides nothing. No cell there is "confined". Each such cell holds the mark "not found in the repository" and the reason, and no fact read from the files: they are inputs to a render, not what the environment gets.
 
 A row marked "broad" is not a check result. It points to the checks that judge the same fields: K4 for the host, K5 for the account, K6 for the roles, and K8 for the peers in.
 
