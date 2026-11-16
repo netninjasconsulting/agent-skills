@@ -844,10 +844,16 @@ function roleleaf(k, p,    n, s) {
   return 0
 }
 
-function bindleaf(k, p,    s, kk) {
+function bindleaf(k, p,    s, kk, w) {
   if (p !~ /^subjects>#[0-9]+>name$/) return 0
   split(p, s, ">")
   kk = leaf0("subjects>" s[2] ">kind")
+  # A User subject: the form of its name in three fixed words, never the name.
+  if (kk && LT[0, kk] == "scalar" && LVAL[0, kk] == "User") {
+    w = (LT[0, k] != "scalar" || LVAL[0, k] == "") ? "other" : (substr(LVAL[0, k], 1, 22) == "system:serviceaccount:") ? "service-account" : "plain"  # the form of a User name
+    field(LLN[0, k], "-", "subject." substr(s[2], 2) ".user-form", w, 0, "scalar", "user-form")
+    return 1
+  }
   if (!kk || LT[0, kk] != "scalar" || LVAL[0, kk] != "ServiceAccount") return 0
   field(LLN[0, k], "-", "subject." substr(s[2], 2) ".name", LVAL[0, k], LQ[0, k], LT[0, k], "dns-subdomain")
   return 1
@@ -1091,6 +1097,7 @@ BEGIN {
   SRE["image-pin"] = "^(digest|tag|latest|none)$"; SMAX["image-pin"] = 6
   SRE["mount-mode"] = "^(read-only|read-write)$"; SMAX["mount-mode"] = 10
   SRE["state-word"] = "^(scalar|empty|block|encrypted)$"; SMAX["state-word"] = 9
+  SRE["user-form"] = "^(service-account|plain|other)$"; SMAX["user-form"] = 15
   SRE["selector-word"] = "^(all|labels)$"; SMAX["selector-word"] = 6
   SRE["generator-word"] = "^(list|other)$"; SMAX["generator-word"] = 5
   SRE["repo-word"] = "^(this|other|unknown)$"; SMAX["repo-word"] = 7
@@ -1119,7 +1126,7 @@ BEGIN {
     "quota-hard.ephemeral-storage quota-hard.pods quota-other-count psa-enforce psa-enforce-version " \
     "psa-warn psa-warn-version rule.#.verb rule.#.resource rule.#.api-group rule.#.resource-names-count " \
     "rule.#.non-resource-urls-count aggregation-rule sops sops-clear-count role-ref-kind role-ref-name subject.#.kind " \
-    "subject.#.name subject.#.namespace np-pod-selector np-pod-label. np-pod-label-other-count " \
+    "subject.#.name subject.#.user-form subject.#.namespace np-pod-selector np-pod-label. np-pod-label-other-count " \
     "np-policy-type np-ingress-rules np-egress-rules np-ingress.#.peers np-egress.#.peers " \
     "np-ingress.#.peer.#.pod-selector np-egress.#.peer.#.pod-selector " \
     "np-ingress.#.peer.#.namespace-selector np-egress.#.peer.#.namespace-selector " \
