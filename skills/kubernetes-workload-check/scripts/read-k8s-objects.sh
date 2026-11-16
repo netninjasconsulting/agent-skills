@@ -91,7 +91,7 @@ metric-resource 6 ^(cpu|memory)$
 metric-target-type 13 ^(Utilization|Value|AverageValue)$
 limit-type 21 ^(Container|Pod|PersistentVolumeClaim)$
 protocol 4 ^(TCP|UDP|SCTP)$
-env-source 17 ^(literal|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|fileKeyRef)$
+env-source 17 ^(literal|literal-empty|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|fileKeyRef)$
 scale-down 13 ^(never|onsuccess|progressively)$
 volume-type 14 ^(hostPath|emptyDir|secret|configMap|projected|downwardAPI)$
 container-kind 4 ^(main|init)$
@@ -478,6 +478,40 @@ function listcount(I, k) {
   return LKIDS[I, k]
 }
 
+# SOPS. A document carries a sops block when its top-level sops key is a
+# block map. A value looks encrypted when it is a plain scalar that starts
+# with ENC[ and ends with ]. Only its first four and last characters are
+# tested, and no part of it prints.
+function sopsdoc(I,    k) {
+  k = leaf(I, "sops")
+  return k && LT[I, k] == "none" && LKIDS[I, k] > 0 && listcount(I, k) == -1
+}
+function encval(I, k,    v) {
+  v = LVAL[I, k]
+  return LT[I, k] == "scalar" && substr(v, 1, 4) == "ENC[" && substr(v, length(v), 1) == "]"  # looks encrypted
+}
+# The state of a ConfigMap or values key, with the word encrypted for a
+# value that looks encrypted, in a document with a sops block only.
+function vstate(I, k,    w) {
+  w = stateword(I, k)
+  if (w == "scalar" && sopsdoc(I) && encval(I, k)) w = "encrypted"  # encrypted only in a sops document
+  return w
+}
+# The data and stringData keys of a Secret that are set and do not look
+# encrypted. A block scalar is counted as clear.
+function sopsclear(    i, j, b, c, ch) {
+  c = 0
+  for (i = 1; i <= 2; i++) {
+    b = leaf0(i == 1 ? "data" : "stringData")
+    if (!b) continue
+    for (j = 1; j <= LKIDS[0, b]; j++) {
+      ch = LCH[0, b, j]
+      if (stateword(0, ch) != "empty" && !encval(0, ch)) c++  # a clear value in a sops Secret
+    }
+  }
+  return c
+}
+
 function stateword(I, k,    t, v) {
   t = LT[I, k]; v = LVAL[I, k]
   if (t == "block") return "block"
@@ -530,7 +564,7 @@ function fields_leaf(k, p,    ln, rel) {
   ln = LLN[0, k]
   if (p == "apiVersion") { field(ln, "-", "api-version", LVAL[0, k], LQ[0, k], LT[0, k], "api-version"); return 1 }
   # A top-level sops key that is a block map: its name only, never a line under it.
-  if (p == "sops") { if (LT[0, k] == "none" && listcount(0, k) == -1 && LKIDS[0, k] > 0) out(ln, "-", "sops", "present"); return 1 }  # a sops block map
+  if (p == "sops") { if (sopsdoc(0)) { out(ln, "-", "sops", "present"); if (KIND == "Secret") field(ln, "-", "sops-clear-count", sopsclear() "", 0, "scalar", "int") } return 1 }  # a sops block map
   if ((p == "metadata>annotations" || (POD && p == TM ">annotations")) && !ANNDONE) {
     ANNDONE = 1
     if (ANNCOUNT > 0) field(ln, "-", "annotation-credential-like-count", ANNCOUNT "", 0, "scalar", "int")
@@ -631,6 +665,7 @@ function envname(ip,    k) {
 function envsrc(ip,    vk, fk, src, n) {
   vk = leaf0(ip ">value"); fk = leaf0(ip ">valueFrom"); src = ""
   if (vk && !fk) src = "literal"  # names only: env
+  if (src == "literal" && stateword(0, vk) == "empty") src = "literal-empty"  # an empty literal
   else if (fk && !vk && LT[0, fk] == "none" && LKIDS[0, fk] == 1) src = lastseg(LPATH[0, LCH[0, fk, 1]])
   return src
 }
@@ -824,6 +859,7 @@ function secretleaf(k, p,    ln, key, f, sv) {
   if (p ~ /^(data|stringData)>[^>]+$/) {
     key = lastseg(p)
     f = (substr(p, 1, 1) == "d") ? "secret-key.data" : "secret-key.string-data"
+    if (stateword(0, k) == "empty") f = f "-empty"  # an empty Secret key
     sv = key  # names only: secret
     if (tok20(sv)) sv = "other"
     field(ln, "-", f, sv, 0, "scalar", "key-name")
@@ -836,7 +872,7 @@ function cmleaf(k, p,    key) {
   if (p !~ /^(data|binaryData)>[^>]+$/) return 0
   key = lastseg(p)
   if (!fits(key, 0, "key-name") || tok20(key)) key = "other"
-  if (substr(p, 1, 1) == "d") field(LLN[0, k], "-", "configmap-data." key, stateword(0, k), 0, "scalar", "state-word")
+  if (substr(p, 1, 1) == "d") field(LLN[0, k], "-", "configmap-data." key, vstate(0, k), 0, "scalar", "state-word")
   else field(LLN[0, k], "-", "configmap-binary." key, "", 0, "none", "present")
   return 1
 }
@@ -987,7 +1023,7 @@ function vunread(ln) { VUNR++; if (!VUNRL) VUNRL = ln }
 function vkey(I, ln, p, k,    pp, n, s, last, prev, sid, v, q, t, i, w) {
   pp = p; gsub(/>/, ".", pp)
   if (!vpathok(pp)) { vunread(ln); return }
-  field(ln, "-", "values-key." vprint(pp), stateword(I, k), 0, "scalar", "state-word")
+  field(ln, "-", "values-key." vprint(pp), vstate(I, k), 0, "scalar", "state-word")
   n = split(pp, s, "."); last = s[n]; prev = (n > 1) ? s[n - 1] : ""
   for (i = 1; i <= n; i++) if (credlike(s[i])) return  # a credential-like key or parent
   v = LVAL[I, k]; q = LQ[I, k]; t = LT[I, k]; sid = ""
@@ -1054,7 +1090,7 @@ BEGIN {
   }
   SRE["image-pin"] = "^(digest|tag|latest|none)$"; SMAX["image-pin"] = 6
   SRE["mount-mode"] = "^(read-only|read-write)$"; SMAX["mount-mode"] = 10
-  SRE["state-word"] = "^(scalar|empty|block)$"; SMAX["state-word"] = 6
+  SRE["state-word"] = "^(scalar|empty|block|encrypted)$"; SMAX["state-word"] = 9
   SRE["selector-word"] = "^(all|labels)$"; SMAX["selector-word"] = 6
   SRE["generator-word"] = "^(list|other)$"; SMAX["generator-word"] = 5
   SRE["repo-word"] = "^(this|other|unknown)$"; SMAX["repo-word"] = 7
@@ -1082,7 +1118,7 @@ BEGIN {
     "quota-hard.requests.ephemeral-storage quota-hard.limits.ephemeral-storage " \
     "quota-hard.ephemeral-storage quota-hard.pods quota-other-count psa-enforce psa-enforce-version " \
     "psa-warn psa-warn-version rule.#.verb rule.#.resource rule.#.api-group rule.#.resource-names-count " \
-    "rule.#.non-resource-urls-count aggregation-rule sops role-ref-kind role-ref-name subject.#.kind " \
+    "rule.#.non-resource-urls-count aggregation-rule sops sops-clear-count role-ref-kind role-ref-name subject.#.kind " \
     "subject.#.name subject.#.namespace np-pod-selector np-pod-label. np-pod-label-other-count " \
     "np-policy-type np-ingress-rules np-egress-rules np-ingress.#.peers np-egress.#.peers " \
     "np-ingress.#.peer.#.pod-selector np-egress.#.peer.#.pod-selector " \
@@ -1092,7 +1128,7 @@ BEGIN {
     "np-ingress.#.peer.#.ip-block np-egress.#.peer.#.ip-block " \
     "np-ingress.#.peer.#.ip-block-except-count np-egress.#.peer.#.ip-block-except-count " \
     "np-ingress.#.port np-egress.#.port np-ingress.#.end-port np-egress.#.end-port " \
-    "np-ingress.#.protocol np-egress.#.protocol secret-type secret-key.data secret-key.string-data " \
+    "np-ingress.#.protocol np-egress.#.protocol secret-type secret-key.data secret-key.string-data secret-key.data-empty secret-key.string-data-empty " \
     "secret-immutable configmap-data. configmap-binary. configmap-immutable app-project " \
     "destination-namespace source.#.repo source.#.url-has-user-part source.#.path source.#.chart " \
     "source.#.ref source.#.value-file.# source.#.helm-values source.#.helm-values-object " \

@@ -449,14 +449,27 @@ const kubernetesRules = [
   'With several workloads in an environment, judge each one. The check gets the weakest status: fail, then warn, then "ask the team", then pass. The evidence names the workload that earned it. A workload whose part does not apply leaves the comparison.',
   'R8 cannot pass from the repository. When R1 fails, R8 does not apply. Otherwise R8 is "ask the team", and the cluster pass is how it is answered. R3 uses a line of this skill\'s own, not a Kubernetes rule: a memory limit of more than twice its request is a warn.',
 ];
+// The rulings of the review: the K7 fail list, K4 on any hostPath, K6 on a cluster-admin binding,
+// each once in checks.md, and ground rule 10 with its pointer to the absent-fields table.
+const kubernetesRulings = [
+  "  - **The fail list.** A name whose last word is `password`, `passwd`, `pass`, `pwd`, `pw`, `passphrase`, `secret`, `token`, `apikey`, `privatekey`, `accesskey`, `secretkey`, `credential`, or `credentials`; or whose last two words are `api key`, `private key`, `access key`, or `secret key`; or that is a single word ending in `password` or `passwd` (`PGPASSWORD`). These names are never on it: `existingSecret`, `secretName`, `secretRef`, `secretKeyRef`, `automountServiceAccountToken`, and any name whose word before the last is `existing`. So `DB_PASSWORD`, `smtp.password`, `MAP_TILES_API_KEY`, `partner-api-token`, `PGPASSWORD`, `RABBITMQ_DEFAULT_PASS`, `MYSQL_PWD`, `ADMIN_PW`, and `PASSPHRASE` are on the fail list, and `DB_PASSWORD_FILE`, `TOKEN_TTL`, `tls.secretName`, `existingSecret`, and `auth.enabled` are not.",
+  "- **Fail:** a pod prints `host-network=true`, `host-pid=true`, or `host-ipc=true`; or it has a `hostPath` volume, read-only or not. A read-only mount narrows what the pod can change on the node and still shares the node's files (K15). The evidence names each `mount.<volume-name>` line.",
+  "- **The `cluster-admin` binding.** A binding to `cluster-admin` fails K6 when any subject is a ServiceAccount (`subject.<n>.kind=ServiceAccount`, the `default` account included) or a group (`subject.<n>.kind=Group`). The reader prints no group name, so every group counts. A binding whose only subjects are `User` is not a K6 case: K6 judges what a workload can reach, and a user is not a workload. The same subject rule holds for the `admin` and `edit` warn.",
+];
+const kubernetesRule10 = "10. **A pass needs a field the reader printed.** A README, a comment, or a name never passes a check. A field that is \"not found\" can neither pass nor fail a check: the check is \"ask the team\" at best, and the field is listed under \"Not checked\". The one exception is the table \"Absent fields\" in `references/checks.md`: a key that is absent from an object the reader printed whole means the setting is not made, and the Kubernetes default applies. A field that prints `other`, or sits in a file that was not read, is never the default and never passes.";
 // The K7 table: one status for each case, every row of it.
 const kubernetesK7Rows = [
   "| Case | Fields | Status |",
   "| --- | --- | --- |",
-  "| A Secret with values in the repository | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |",
-  "| A Secret encrypted by SOPS | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and `sops=present` | pass for that object |",
+  "| A Secret with values in the repository | A `Secret` object that prints at least one `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |",
+  "| A Secret with a SOPS block and a value in clear | `sops=present` and `sops-clear-count` above 0 | fail |",
+  "| A Secret encrypted by SOPS | `sops=present` and `sops-clear-count=0` | pass for that object |",
+  "| A Secret with a SOPS block and no count | `sops=present` with `sops-clear-count=other`, or with no `sops-clear-count` line | ask the team |",
+  "| A Secret whose keys are all empty | only `secret-key.data-empty` or `secret-key.string-data-empty` lines | not a K7 case |",
   "| A sealed or external secret kind | A kind the reader does not read, such as `SealedSecret` or `ExternalSecret` | not a K7 case: \"Not checked\" |",
   "| An env var with a written value and a name on the fail list | `env.<NAME>=literal` | fail |",
+  "| An env var with an empty value | `env.<NAME>=literal-empty` | not a K7 case |",
+  "| A ConfigMap key or a values key that looks encrypted | `configmap-data.<key>=encrypted` or `values-key.<path>=encrypted` | not a K7 case |",
   "| A key with a value in a values file, named on the fail list | `values-key.<path>=scalar` with the kind `Values` | fail |",
   "| A key with a value in an `Application`'s inline values, named on the fail list | `values-key.<path>=scalar` with the kind `Application` or `ApplicationSet` | fail |",
   "| A key with a value in a ConfigMap, named on the fail list | `configmap-data.<key>=scalar`. A ConfigMap gives no secrecy (K21) | fail |",
@@ -520,6 +533,8 @@ if (existsSync(kubernetesSkill)) {
   sameLines(skillFile, between(checksSection, "**Security**", null).filter(isCheck), security, "the security checks under Security");
   sameLines(checksFile, sectionLines(checksLines, "## Sizing").filter((line) => /^#+ [RK]\d+\. /.test(line)), sizing.map((check) => `### ${check}`), "the sizing check headings under Sizing");
   sameLines(checksFile, sectionLines(checksLines, "## Security").filter((line) => /^#+ [RK]\d+\. /.test(line)), security.map((check) => `### ${check}`), "the security check headings under Security");
+  kubernetesRulings.forEach((rule) => sameLines(checksFile, checksLines.filter((line) => line === rule), [rule], "a ruled rule of checks.md"));
+  sameLines(skillFile, skillLines.filter((line) => line === kubernetesRule10), [kubernetesRule10], "ground rule 10 with its pointer to the absent-fields table");
   sameLines(checksFile, between(checksLines, `### ${kubernetesChecks[14]}`, `### ${kubernetesChecks[15]}`).filter((line) => /^\| /.test(line)), kubernetesK7Rows, "every row of the K7 table");
   const script = path.join(kubernetesSkill, "scripts", "read-cluster-usage.sh");
   const scriptLines = existsSync(script) ? read(script).split("\n") : [];

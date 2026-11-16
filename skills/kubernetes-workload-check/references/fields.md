@@ -111,7 +111,7 @@ metric-resource 6 ^(cpu|memory)$
 metric-target-type 13 ^(Utilization|Value|AverageValue)$
 limit-type 21 ^(Container|Pod|PersistentVolumeClaim)$
 protocol 4 ^(TCP|UDP|SCTP)$
-env-source 17 ^(literal|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|fileKeyRef)$
+env-source 17 ^(literal|literal-empty|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|fileKeyRef)$
 scale-down 13 ^(never|onsuccess|progressively)$
 volume-type 14 ^(hostPath|emptyDir|secret|configMap|projected|downwardAPI)$
 container-kind 4 ^(main|init)$
@@ -165,7 +165,7 @@ What each shape holds, with two values that match and two that must not. A value
 | `metric-target-type` | A metric target type | Utilization, Value, or AverageValue | 13 | other | `Utilization`, `AverageValue` | `utilization`, `Average` | K9 | 15 Nov 2026 | checked |
 | `limit-type` | A LimitRange item type | Container, Pod, or PersistentVolumeClaim. The API page shows no list of values | 21 | other | `Container`, `Pod` | `container`, `Node` | K11, K12 | 15 Nov 2026 | verify |
 | `protocol` | A network protocol | TCP, UDP, or SCTP | 4 | other | `TCP`, `SCTP` | `tcp`, `HTTP` | K1 | 15 Nov 2026 | checked |
-| `env-source` | Where an env var value comes from | literal, or one of the five valueFrom sources | 17 | other | `literal`, `secretKeyRef` | `secret`, `valueFrom` | K1 | 15 Nov 2026 | checked |
+| `env-source` | Where an env var value comes from | literal, literal-empty (the skill's own word for a `value` that is empty, `null`, or `~`), or one of the five valueFrom sources | 17 | other | `literal`, `secretKeyRef` | `secret`, `valueFrom` | K1 | 15 Nov 2026 | checked |
 | `scale-down` | A Rollout workloadRef scaleDown value | never, onsuccess, or progressively | 13 | other | `never`, `onsuccess` | `Never`, `always` | A1, A2 | 15 Nov 2026 | checked |
 | `volume-type` | The source key of a volume | the six source keys that the pages read show | 14 | other | `hostPath`, `emptyDir` | `nfs`, `HostPath` | K1, K15 | 15 Nov 2026 | checked |
 | `container-kind` | Where a container is listed | main for containers, init for initContainers | 4 | other | `main`, `init` | `sidecar`, `Main` | K1 | 15 Nov 2026 | checked |
@@ -199,7 +199,7 @@ Derived words, written by the reader and never copied from a file:
 | --- | --- | --- |
 | `image-pin` | `digest`, `tag`, `latest`, `none` | `digest` when the image has `@sha256:`. `latest` for the tag `latest`. `none` when the image has neither a tag nor a digest, which Kubernetes treats as `latest` (K26). `tag` for any other tag. |
 | `mount-mode` | `read-only`, `read-write` | `read-only` when `readOnly` is `true`. Otherwise `read-write` (`readOnly` defaults to false, K1). |
-| `state-word` | `scalar`, `empty`, `block` | For a key whose value is never printed: `scalar` when it holds text on its own line, `empty` when it holds nothing or `""`, `null`, or `~`, `block` when the value continues on the next lines. |
+| `state-word` | `scalar`, `empty`, `block`, `encrypted` | For a key whose value is never printed: `scalar` when it holds text on its own line, `empty` when it holds nothing or `""`, `null`, or `~`, `block` when the value continues on the next lines. `encrypted` in place of `scalar` for a ConfigMap `data` key or a values key whose value starts with `ENC[` and ends with `]`, and only in a document or values file with a top-level `sops` block map (see the `sops` row). Only those characters are tested, and no part of the value prints. |
 | `selector-word` | `all`, `labels` | A selector that is `{}` is `all`. A selector with labels is `labels`. |
 | `generator-word` | `list`, `other` | `list` for the key `list` (G3). Every other generator key is `other`. |
 | `repo-word` | `this`, `other`, `unknown` | Whether a repository address names this repository. The reader compares the address with each `git remote` address after removing the scheme, a user part, a trailing `/`, and a trailing `.git`. With no remote, the answer is `unknown`. |
@@ -243,6 +243,7 @@ In the tables below, `P` stands for the pod spec path in the third column above.
 | `api-version` | every kind above | `apiVersion` | `api-version` | K4, K7, K9, K16, K18, A1, G1 | 15 Nov 2026 | checked |
 | `annotation-credential-like-count` | every kind above | `metadata.annotations`, and for a pod template kind also the template's `metadata.annotations` | `int`: how many annotation keys are credential-like and have a value | not applicable, a count of the reader | 15 Nov 2026 | checked |
 | `sops` | every kind above | a top-level `sops` key whose value is a block map, as SOPS writes it into a file it encrypts | the word `present`. Nothing under the key prints: it holds key fingerprints and a MAC. A `sops` key with any other value prints nothing | not applicable, a mark of the reader | 16 Nov 2026 | verify |
+| `sops-clear-count` | Secret, in a document with `sops=present` | the `data` and `stringData` keys whose value is set (not `empty`) and does not look encrypted: it does not start with `ENC[` and end with `]`. A block scalar counts as clear. Printed whenever `sops=present` is printed for a Secret, 0 included | `int` | not applicable, a count of the reader | 16 Nov 2026 | checked |
 
 `object=present` is the first line the reader prints for each object, so an object with no other readable field still shows up. `sops=present` says only that the file carries the metadata block of SOPS. That SOPS writes a top-level `sops` block into each file it encrypts, and leaves key names in clear, was not read in the SOPS documentation on the build date (verify). It does not show that every value is encrypted. Annotation values, label values with keys outside the list below, and every `command`, `args`, and env value have no row of their own.
 
@@ -316,7 +317,7 @@ The volume field row for `volume-type` lists only the six source keys the pages 
 
 Notes on the container rows:
 
-- `env.<NAME>` is `literal` when the entry holds `value`, and the other words when it holds `valueFrom`. `valueFrom` and `value` cannot both be set (K1). The sources are `configMapKeyRef`, `fieldRef`, `fileKeyRef` (which needs the `EnvFiles` feature gate), `resourceFieldRef`, and `secretKeyRef` (K1). The value of an env var is never printed.
+- `env.<NAME>` is `literal` when the entry holds `value`, `literal-empty` when that `value` is empty, `null`, or `~`, and the other words when it holds `valueFrom`. `valueFrom` and `value` cannot both be set (K1). The sources are `configMapKeyRef`, `fieldRef`, `fileKeyRef` (which needs the `EnvFiles` feature gate), `resourceFieldRef`, and `secretKeyRef` (K1). The value of an env var is never printed.
 - A key in `envFrom` follows the rule that the last source wins, and an explicit `env` entry beats `envFrom` (K1). The reader prints each entry as written and does not merge.
 - An env var name can be any printable ASCII text except `=` (K1). The `env-name` shape is tighter.
 - If `allowPrivilegeEscalation` is not set, it defaults to true (K3). It is always true when the container is privileged or has `CAP_SYS_ADMIN` (K1). `readOnlyRootFilesystem` defaults to false, and `privileged` defaults to false (K1).
@@ -460,6 +461,7 @@ Notes:
 | `secret-type` | Secret | `type` (an empty string means `Opaque`, and no `type` line also means `Opaque`). The reader prints `Opaque` for `""` and no line when there is no `type` line | `secret-type` (on a miss: other) | K20 | 15 Nov 2026 | checked |
 | `secret-key.data` | Secret | the keys of `data`, one line for each, value is the key name | `key-name` | K20 | 15 Nov 2026 | checked |
 | `secret-key.string-data` | Secret | the keys of `stringData`, one line for each, value is the key name | `key-name` | K20 | 15 Nov 2026 | checked |
+| `secret-key.data-empty`, `secret-key.string-data-empty` | Secret | a key of `data` or `stringData` whose value is empty, `null`, or `~`, printed in place of `secret-key.data` or `secret-key.string-data` | `key-name` | K20 | 16 Nov 2026 | checked |
 | `secret-immutable` | Secret | `immutable` | `bool` | K20 | 15 Nov 2026 | checked |
 | `configmap-data.<key>` | ConfigMap | the keys of `data`: a state, never the value | `state-word`, and `<key>` has to fit `key-name` | K21 | 15 Nov 2026 | checked |
 | `configmap-binary.<key>` | ConfigMap | the keys of `binaryData`: the word `present` | `<key>` has to fit `key-name` | K21 | 15 Nov 2026 | checked |
@@ -559,7 +561,7 @@ For each of the eighteen checks and each column of the reach map, the fields tha
 | K4 No pod shares the host | `host-network`, `host-pid`, `host-ipc`, `volume-type` with `host-path`, `mount.<volume-name>` (the page says path restrictions on a hostPath hold only for read-only mounts, K15), `host-port` | A `hostUsers` setting and a `procMount` setting have no field |
 | K5 Each workload has its own ServiceAccount, and mounts a token only when it calls the API | `service-account` and `automount-sa-token` on the pod, `automount-sa-token` on each ServiceAccount, and the bindings that name the account (`subject.<n>.*`, `role-ref-*`) | Whether the workload calls the Kubernetes API has no field. The question for the team covers it |
 | K6 RBAC rules name their verbs and their resources | `rule.<n>.verb`, `rule.<n>.resource`, `rule.<n>.api-group`, `rule.<n>.resource-names-count`, `rule.<n>.non-resource-urls-count`, `aggregation-rule`, `role-ref-*`, `subject.<n>.*` | The rules of an aggregated ClusterRole are filled in by a controller in the cluster (K16) and have no field. A role set only in the cluster has no field |
-| K7 Secrets stay out of manifests and values files | `object` of kind Secret, `secret-type`, `secret-key.*`, `sops`, `env.<NAME>` with `literal`, `env-other-count`, `args-credential-like-count`, `annotation-credential-like-count`, `configmap-data.<key>` with `scalar`, `values-key.*` with `scalar`, `source.<n>.url-has-user-part`, `list-element` lines | The value itself is never printed, so the report names a file, a line, and a type, and cannot say how strong a secret is. A sealed or external secret kind is not read. A secret inside a Helm template that is not rendered is "not found" |
+| K7 Secrets stay out of manifests and values files | `object` of kind Secret, `secret-type`, `secret-key.*`, `sops`, `sops-clear-count`, `configmap-data.<key>` and `values-key.*` with `encrypted`, `env.<NAME>` with `literal-empty`, `env.<NAME>` with `literal`, `env-other-count`, `args-credential-like-count`, `annotation-credential-like-count`, `configmap-data.<key>` with `scalar`, `values-key.*` with `scalar`, `source.<n>.url-has-user-part`, `list-element` lines | The value itself is never printed, so the report names a file, a line, and a type, and cannot say how strong a secret is. A sealed or external secret kind is not read. A secret inside a Helm template that is not rendered is "not found" |
 | K8 A NetworkPolicy covers every workload | `np-pod-selector`, `np-pod-label.<key>`, `np-policy-type`, and the workload's `pod-label.<key>` and `<namespace>` | A label with a key outside the list has no value, and a selector that uses one cannot be matched. The network plugin has no field |
 | K9 Images are pinned and come from a named registry | `image-registry`, `image-repository`, `image-pin`, `image-pull-policy`. In values files: the `values.<dotted path>` lines whose path ends in `image.tag` or `image.digest` | What a tag points to at the registry has no field. Image scanning is not in scope |
 | K10 Namespaces enforce a Pod Security level | `psa-enforce`, `psa-enforce-version`, `psa-warn`, `psa-warn-version`, on Namespace objects | A level set in the API server's own configuration instead of a label has no field. Whether that route exists was not read (verify) |
@@ -877,7 +879,7 @@ The reader has no field for each of these, on purpose or because no check needs 
 - **Anything set only in the cluster:** a LimitRange, a ResourceQuota, a NetworkPolicy, a role binding, a Pod Security label, or a change made by hand and never committed. A default injected by an admission controller or a mutating webhook. The network plugin that enforces NetworkPolicy. The cluster's Pod Security configuration. Whether a VerticalPodAutoscaler or a metrics source is installed.
 - **Image contents:** the user an image runs as, its packages, and what a tag points to.
 - **Node sizing,** the cluster autoscaler, and the cloud provider's node pools.
-- **A flow-style map,** a YAML anchor or alias, and a `List` kind. The reader gives "not found" for the fields in them.
+- **A flow-style map that is not empty,** and a YAML anchor or alias. The reader does not read a file that holds one (exit code 4, see "Layouts the reader does not read"). **A `List` kind.** The reader does not follow its `items`, so the objects in it are "not found".
 - **Pod-level resources as a substitute for container resources.** See "Facts that conflict or moved".
 
 ## Facts that conflict or moved
