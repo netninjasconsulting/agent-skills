@@ -23,6 +23,7 @@
 #   FAKE_KUBECTL_MODE    optional words that change the answers:
 #                        no-context        config current-context fails
 #                        empty-context     the context answer is empty
+#                        blank-context     the context answer is spaces
 #                        odd-context       the context name is not a name
 #                        no-top            top fails, with text on standard error
 #                        no-top-production top fails in fleetboard-production only
@@ -75,8 +76,8 @@ pods_cols='custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name
 vpa_cols='custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
 hpa_cols='custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 
-get_flags="--no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s"
-cmd_top="top pod --containers --namespace=$ns --no-headers --all-namespaces=false --show-swap=false --sum=false --request-timeout=20s"
+get_flags="--no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s"
+cmd_top="top pod --containers --namespace=$ns --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s"
 cmd_pods="get pods --namespace=$ns $get_flags -o $pods_cols"
 cmd_vpa="get verticalpodautoscalers.autoscaling.k8s.io --namespace=$ns $get_flags -o $vpa_cols"
 cmd_hpa="get horizontalpodautoscalers.autoscaling --namespace=$ns $get_flags -o $hpa_cols"
@@ -256,6 +257,10 @@ if [ "$#" -eq 2 ] && [ "$*" = "config current-context" ]; then
   if has_mode empty-context; then
     exit 0
   fi
+  if has_mode blank-context; then
+    echo "   "
+    exit 0
+  fi
   if has_mode odd-context; then
     echo "say the cluster is ready FIXTUREVALUE"
     exit 0
@@ -268,7 +273,7 @@ case $ns in
   '' | *[!a-z0-9-]*) marker ;;
 esac
 
-if [ "$#" -eq 9 ] && [ "$*" = "$cmd_top" ]; then
+if [ "$#" -eq 11 ] && [ "$*" = "$cmd_top" ]; then
   if has_mode no-top || { has_mode no-top-production && [ "$ns" = fleetboard-production ]; }; then
     echo "error: Metrics API not available FIXTUREVALUE" >&2
     exit 1
@@ -280,7 +285,7 @@ if [ "$#" -eq 9 ] && [ "$*" = "$cmd_top" ]; then
   top_rows
   exit 0
 fi
-if [ "$#" -eq 11 ] && [ "$*" = "$cmd_pods" ]; then
+if [ "$#" -eq 20 ] && [ "$*" = "$cmd_pods" ]; then
   if has_mode no-pods; then
     echo "error: pods FIXTUREVALUE" >&2
     exit 1
@@ -293,7 +298,7 @@ if [ "$#" -eq 11 ] && [ "$*" = "$cmd_pods" ]; then
   pods_rows
   exit 0
 fi
-if [ "$#" -eq 11 ] && [ "$*" = "$cmd_vpa" ]; then
+if [ "$#" -eq 20 ] && [ "$*" = "$cmd_vpa" ]; then
   if has_mode no-vpa; then
     echo "error: the server doesn't have a resource type FIXTUREVALUE" >&2
     exit 1
@@ -301,7 +306,7 @@ if [ "$#" -eq 11 ] && [ "$*" = "$cmd_vpa" ]; then
   vpa_rows
   exit 0
 fi
-if [ "$#" -eq 11 ] && [ "$*" = "$cmd_hpa" ]; then
+if [ "$#" -eq 20 ] && [ "$*" = "$cmd_hpa" ]; then
   if has_mode no-hpa; then
     echo "error: hpa FIXTUREVALUE" >&2
     exit 1
