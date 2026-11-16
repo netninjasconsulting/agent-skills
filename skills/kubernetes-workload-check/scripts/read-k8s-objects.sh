@@ -189,12 +189,16 @@ function balanced(t,    i, n, c, d, q) {
 }
 
 # The allow shape of a flow-list item: an unquoted token of letters,
-# digits, and _ . / @ + - that starts with a letter, a digit, ".", or "/",
-# or one single-quoted or double-quoted string with no quote, backslash, or
-# control character inside, with nothing but spaces around it. Such an item
-# is the same plain scalar to Kubernetes; nothing else is.
+# digits, and _ . / @ + = - that starts with a letter, a digit, ".", or
+# "/", or with a "-" that has at least one more character after it, or one
+# single-quoted or double-quoted string with no quote, backslash, or
+# control character inside, with nothing but spaces around it. No such item
+# is a map or a list to Kubernetes, and no such list has another number of
+# items there. The patterns are strings, not /.../, so that no awk takes a
+# backslash for a member of a bracket.
 function allowed(t,    q, inner) {
-  if (t ~ /^[A-Za-z0-9.\/][A-Za-z0-9_.\/@+-]*$/) return 1
+  if (t ~ "^[A-Za-z0-9./][A-Za-z0-9_./@+=-]*$") return 1  # an equals sign does not start an item
+  if (t ~ "^-[A-Za-z0-9_./@+=-]+$") return 1  # a dash alone is not an item
   q = substr(t, 1, 1)
   if (length(t) < 2 || (q != "\"" && q != "\047") || substr(t, length(t), 1) != q) return 0
   inner = substr(t, 2, length(t) - 2)
@@ -252,9 +256,9 @@ function keyline(s,    q, k, rest, i) {
     i = index(substr(s, 2), q)
     if (!i) return 0
     k = substr(s, 2, i - 1); rest = substr(s, i + 2)
-    if (k !~ /^[A-Za-z0-9_$.\/+-]+$/) return 0
+    if (k !~ "^[A-Za-z0-9_$./+-]+$") return 0
   } else {
-    if (!match(s, /^[A-Za-z0-9_$.][A-Za-z0-9_$.\/+-]*/)) return 0
+    if (!match(s, "^[A-Za-z0-9_$.][A-Za-z0-9_$./+-]*")) return 0
     k = substr(s, 1, RLENGTH); rest = substr(s, RLENGTH + 1)
   }
   if (rest != ":" && substr(rest, 1, 2) != ": ") return 0
@@ -654,7 +658,7 @@ function envitem(k, ip, cont,    nm, src, rk) {
 }
 
 function credarg(s,    t, i) {
-  if (s ~ /:\/\/[^\/@ ]+@/) return 1
+  if (s ~ "://[^/@ ]+@") return 1
   t = s; sub(/^-+/, "", t)
   i = index(t, "="); if (i) t = substr(t, 1, i - 1)
   return length(t) <= 64 && t ~ /^[A-Za-z0-9_.-]+$/ && credlike(t)
@@ -869,7 +873,7 @@ function argo_prepass(    k, p, rel) {
 function urlnorm(u) {
   u = tolower(u)
   sub(/^[a-z][a-z0-9+.-]*:\/\//, "", u)
-  sub(/^[^\/@]*@/, "", u)
+  sub("^[^/@]*@", "", u)
   if (index(u, ":") && (!index(u, "/") || index(u, ":") < index(u, "/"))) sub(/:/, "/", u)
   sub(/\/+$/, "", u); sub(/\.git$/, "", u); sub(/\/+$/, "", u)
   return u
@@ -906,7 +910,7 @@ function srcleaf(k, srel,    ln, v, user, w, i, n, nk, vk, pre) {
   if (srel == "repoURL") {
     v = LVAL[0, k]
     if (LT[0, k] != "scalar") { field(ln, "-", pre "repo", "unknown", 0, "scalar", "repo-word"); return 1 }
-    user = (v ~ /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\/@]*@/ || v ~ /^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:/) ? "true" : "false"
+    user = (v ~ "^[A-Za-z][A-Za-z0-9+.-]*://[^/@]*@" || v ~ /^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:/) ? "true" : "false"
     w = (NREMOTES == 0) ? "unknown" : "other"
     for (i = 1; i <= NREMOTES; i++) if (urlnorm(REMOTE[i]) == urlnorm(v)) w = "this"
     field(ln, "-", pre "repo", w, 0, "scalar", "repo-word")
@@ -1283,7 +1287,7 @@ plain_path() {
   return 0
 }
 
-# The physical path of an existing file or directory.
+# The text holds a control character: C0 or DEL, as LC_ALL=C names them.
 has_ctl() {
   case "$1" in *[[:cntrl:]]*) return 0 ;; esac
   return 1
@@ -1294,16 +1298,31 @@ no_ctl() {  # a control character in a path argument
   if has_ctl "$1"; then die2 "a path with a control character"; fi
 }
 
+# The directory part and the last part of a path, in DIR and BASE. A
+# command substitution drops every line break at the end of what it holds,
+# so dirname and basename are not used for this.
+dir_part() {
+  case "$1" in
+    */*) DIR=${1%/*}; [ -n "$DIR" ] || DIR=/ ;;
+    *) DIR=. ;;
+  esac
+  BASE=${1##*/}
+}
+
 # The physical path of an existing file or directory. A resolved path with a
 # control character (for example a repository under a directory whose name
-# holds a line break) is not given.
+# holds a line break) is not given. The "x" printed after the path keeps a
+# line break at the end of the path through the command substitution: a
+# path that lost one would be the path of another directory.
 phys() {
   if [ -d "$1" ]; then
-    r=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
+    DIR=$1; BASE=
   else
-    d=$(cd -P -- "$(dirname -- "$1")" 2>/dev/null && pwd -P) || return 1
-    r="${d%/}/$(basename -- "$1")"
+    dir_part "$1"
   fi
+  r=$(cd -P -- "$DIR" 2>/dev/null && pwd -P && echo x) || return 1
+  r=${r%"${NL}x"}  # a line break at the end of a resolved path
+  [ -z "$BASE" ] || r="${r%/}/$BASE"
   if has_ctl "$r"; then return 1; fi  # a control character in a resolved path
   printf '%s\n' "$r"
 }
@@ -1509,7 +1528,7 @@ read_file_mode() {
     echo "$me: not read, not a text file: $f" >&2
     exit 4
   fi
-  REMOTES=$(remotes_of "$(dirname -- "$f")")
+  dir_part "$f"; REMOTES=$(remotes_of "$DIR")  # the directory of the file, with a line break at its end
   status=0
   # shellcheck disable=SC2094 # the second argument is the name to print
   extract "$1" "$f" < "$f" || status=$?
@@ -1525,8 +1544,11 @@ refuse() {
   exit 3
 }
 
+# The top of the repository the reader runs in, or the working directory
+# where there is none. The "x" keeps a line break at its end, as in phys.
 set_root() {
-  top=$(git rev-parse --show-toplevel 2>/dev/null) || top=$(pwd)
+  top=$(git rev-parse --show-toplevel 2>/dev/null && echo x) || top=$(pwd && echo x)
+  top=${top%"${NL}x"}  # a line break at the end of the repository root
   ROOTP=$(phys "$top") || refuse "not a local file"
 }
 
