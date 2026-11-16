@@ -54,7 +54,7 @@ Sizing: N out of M confirmed in the repository (K to ask the team)
 Security: N out of M confirmed in the repository (K to ask the team)
 ```
 
-Each check gets one status for each environment: "pass", "warn", "fail", "ask the team", or "does not apply". M counts only the checks that apply. R8 never passes from the repository. It is "ask the team", because only measured use shows that a request fits.
+Each check gets one status for each environment: "pass", "warn", "fail", "ask the team", or "does not apply". M counts only the checks that apply. R8 never passes from the repository. Where R1 fails, R8 does not apply. Otherwise it is "ask the team", because only measured use shows that a request fits.
 
 Some environments are not fully seen. That means a chart or an overlay was not rendered, or a file was not read. In such an environment, no check passes and no check is "does not apply". It gets no "Ready" verdict. It gets "Not ready for production" when K7 fails from a printed case, or when a manifest applied as it is prints a fail in K1, K4, or K6. Otherwise it gets a line that says what was not seen.
 
@@ -91,7 +91,7 @@ With no answer, or a no, R8 stays "ask the team" and no cluster command runs.
 ## Limits
 
 - **The reader doesn't parse.** It works by line. A layout it cannot place gives "not found". A layout it cannot place at all, such as a non-empty flow map like `matchLabels: {app: web}`, an anchor, an alias, or a template line, makes the whole file "not read". The skill names that file under "Not checked" and doesn't open it another way.
-- **A chart that isn't rendered shows its values files only.** Its templates are "not found". An overlay that isn't rendered prints no line for what it builds. Only a K7 case decides in such an environment.
+- **A chart that isn't rendered shows its values files only.** Its templates are "not found". An overlay that isn't rendered prints no line for what it builds. In such an environment, only a K7 case and a manifest applied as it is can fail or warn a check, and nothing passes.
 - **Some settings have no field.** Probes, `seccompProfile`, Services, Ingresses, PodDisruptionBudgets, and PersistentVolumeClaims are examples. `references/fields.md` lists them under "Settings with no field".
 - **Some kinds leave no line.** The reader prints nothing for a sealed or external secret kind, KEDA, Knative, or Argo Workflows, so the skill can't score them. A file that holds a `List` kind is not read at all, so the environment it feeds is not fully seen. The list does not follow a symbolic link, and when it finds one, no environment is fully seen.
 - **The reader can refuse to render.** It refuses a symbolic link inside a chart or overlay, a remote base, a plugin or an inflator, a chart with dependencies that are not vendored, and a remote schema reference. kustomize and Helm read a key in any case, so a key such as `Resources` or `Dependencies` is refused too. Each refusal leaves that environment "not rendered".
