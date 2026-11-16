@@ -149,6 +149,7 @@ bad_args() {
   # They are numbered from 1 in the order of the list.
   long=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   i=0
+  # shellcheck disable=SC2016 # literal text, not an expansion
   for a in "" "a b" "-n" "-A" "--all-namespaces" "--namespace=x" "a;b" "a/b" "../etc" "Abc" "a_b" "a-" "-a" "a.b" "a${NL}b" "a${NL}" "a${TAB}b" "a${CR}" "default;rm" '$(id)' '*' "$long" "kube-system${NL}"; do
     i=$((i + 1))
     run "$s" "" "$a"
@@ -220,6 +221,7 @@ suite() {
   rc=0
   env -i PATH="$work/nokube" HOME="$home" /bin/sh "$s" fleetboard-production > "$work/out" 2> "$work/err" || rc=$?
   [ "$rc" -eq 5 ] || fail "kubectl missing: expected exit 5, got $rc"
+  grep -q "kubectl is not installed" "$work/err" || fail "kubectl missing: the message does not say kubectl is not installed"
 
   # The fixture's namespaces.
   # shellcheck disable=SC2086 # the namespace list
@@ -286,7 +288,7 @@ EOF
   expect_line "a status name that matches no container" "container stray-status-1 app 100m 500m 128Mi 256Mi - - not-read -"
   expect_line "a top row twice" "container dup-key-1 app 100m 500m 128Mi 256Mi not-read not-read 0 -"
   expect_line "reasons from a closed list" "container reasons-1 a 100m 500m 128Mi 256Mi - - 1 OOMKilled,other"
-  expect_line "a carriage return" "container crlf-1 app 100m 500m 128Mi 256Mi 5m other 1 other"
+  no_line "a row with a carriage return" "crlf-1"
   expect_line "a top row with no pod row" "container late-1 app not-read not-read not-read not-read 2m 20Mi not-read not-read"
   no_line "a row with a reason with spaces" "reason-space-1"
   no_line "a row with an extra column" "extra-col-1"
@@ -306,7 +308,7 @@ EOF
   expect_line "an hpa with two metrics" "hpa two-hpa Deployment two 1 3 1 2 Resource memory 80"
   expect_line "an hpa with values out of shape" "hpa odd-hpa Deployment other other 3 1 1 Resource other 70"
   expect_line "an hpa with no metrics" "hpa none-hpa Deployment none - 3 - - - - -"
-  expect_line "rows not placed are counted" "# rows not placed: top=3 pods=7 vpa=1 hpa=0"
+  expect_line "rows not placed are counted" "# rows not placed: top=4 pods=8 vpa=1 hpa=0"
 
   # top fails: exit 6 with a plain message, and nothing kubectl wrote.
   run "$s" "no-top" fleetboard-production
@@ -326,15 +328,16 @@ EOF
   expect_line "get pods fails" "container api-6b8c7d9e5-p3lmk api not-read not-read not-read not-read 2m 48Mi not-read not-read"
   no_marker "get pods fails"
 
-  # The environment kubectl sees.
+  # The environment kubectl sees. The shell that runs the stand-in may add
+  # PWD, OLDPWD, SHLVL, or _ itself.
   run "$s" "" fleetboard-staging
-  envs=$(sed -n 's/^name //p' "$home/fake-kubectl.env" | sort | tr '\n' ' ')
-  [ "$envs" = "HOME KUBECONFIG KUBERC LC_ALL PATH PWD " ] || fail "environment: kubectl saw the variables: $envs"
+  envs=$(sed -n 's/^name //p' "$home/fake-kubectl.env" | grep -vxE 'PWD|OLDPWD|SHLVL|_' | sort | tr '\n' ' ')
+  [ "$envs" = "HOME KUBECONFIG KUBERC LC_ALL PATH " ] || fail "environment: kubectl saw the variables: $envs"
   grep -qxF -e "value KUBECONFIG=$work/kubeconfig" "$home/fake-kubectl.env" || fail "environment: KUBECONFIG did not reach kubectl"
   grep -qxF -e "value KUBERC=off" "$home/fake-kubectl.env" || fail "environment: KUBERC is not off"
   run_no_kubeconfig "$s" fleetboard-staging
-  envs=$(sed -n 's/^name //p' "$home/fake-kubectl.env" | sort | tr '\n' ' ')
-  [ "$envs" = "HOME KUBERC LC_ALL PATH PWD " ] || fail "environment, no KUBECONFIG: kubectl saw the variables: $envs"
+  envs=$(sed -n 's/^name //p' "$home/fake-kubectl.env" | grep -vxE 'PWD|OLDPWD|SHLVL|_' | sort | tr '\n' ' ')
+  [ "$envs" = "HOME KUBERC LC_ALL PATH " ] || fail "environment, no KUBECONFIG: kubectl saw the variables: $envs"
 
   [ "$sf" -eq 0 ]
 }
@@ -366,7 +369,7 @@ pin() {
   fi
   sed -e "$3" "$real_script" > "$copy"
   case "$PIN_BREAK" in
-    awk) sed -e 's/^function fits(v, id) {$/function fits(v, id,, ) {/' "$copy" > "$copy.b" && mv "$copy.b" "$copy" ;;
+    awk) sed -e 's/^function cell(v, id) {$/function cell(v, id,, ) {/' "$copy" > "$copy.b" && mv "$copy.b" "$copy" ;;
     sh) sed -e 's/^kube() {$/kube() { if/' "$copy" > "$copy.b" && mv "$copy.b" "$copy" ;;
   esac
   if cmp -s "$copy" "$real_script"; then
@@ -402,12 +405,14 @@ pin() {
 pins() {
   pin "a namespace is a DNS label" '# a namespace is a DNS label' 's/^\(is_ns() {\)  # a namespace is a DNS label$/\1 return 0/' "front door: argument 2 expected exit 2"
   pin "a namespace starts with no dash" '# no dash at either end' 's/  '"''"' | -\* | \*- | \*\[!a-z0-9-\]\*) return 1 ;;  # no dash at either end/  '"''"' | *[!a-z0-9-]*) return 1 ;;/' "front door: argument 3 expected exit 2"
+  # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a namespace has at most 63 characters" '# at most 63 characters' 's/\[ "\${#1}" -le 63 \]  # at most 63 characters/true/' "front door: argument 22 expected exit 2"
   pin "a cleared environment" '# kubectl: a cleared environment' 's/env -i PATH=/env PATH=/' "environment: kubectl saw the variables"
   pin "kuberc off" '# kubectl: a cleared environment' 's/ KUBERC=off / /' "environment: KUBERC is not off"
   pin "the standard error of kubectl is dropped" '# kubectl: a cleared environment' 's| 2>/dev/null  # kubectl: a cleared environment|  # kubectl: a cleared environment|' "no metrics: the marker is in standard error"
   pin "the shape check" 'function fits(v, id) {' 's/^function fits(v, id) {$/function fits(v, id) { return 1/' "hostile rows: the marker is in standard output"
-  pin "the context name shape" '# the context name has its shape' 's/^\( *\)ctx=\$(printf .*  # the context name has its shape$/\1ctx=$raw/' "context: a context name that is not a name printed as it came"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "the context name shape" '# the context name has its shape' 's/^ctx=\$(context_name "\$raw")  # the context name has its shape$/ctx=$raw/' "context: a context name that is not a name printed as it came"
   pin "a pod row with another number of columns" '# a pod row with another number of columns' 's/if (NF != 10) { NP_BAD++; next }  # a pod row with another number of columns//' "a row with an extra column: printed: extra-col-1"
   pin "a top row with another number of columns" '# a top row with another number of columns' 's/if (NF != 5) { NT_BAD++; next }  # a top row with another number of columns//' "a top row with an extra column: printed: top-extra-1"
   pin "one value for each container" '# one value for each container' 's/if (n == nc)  # one value for each container/if (n >= 1)/' "misaligned columns: the request of app went to sidecar"
@@ -418,10 +423,12 @@ pins() {
   pin "a top row with no pod row" '# a top row with no pod row' 's/^\( *\)print "container", .*  # a top row with no pod row$/\1continue/' "a top row with no pod row: missing line"
   pin "vpa columns that differ in count" '# one value for each recommendation' 's/if (n == nc)  # one value for each recommendation/if (n >= 1)/' "vpa columns that differ in count: missing line"
   pin "hpa metric columns that differ in count" '# one value for each metric' 's/if (n == nc)  # one value for each metric/if (n >= 1)/' "hpa metric columns that differ in count: missing line"
-  pin "a failed vpa command leaves a trace" '# a failed command leaves a trace' 's/^\( *\)if (vpa == "failed") .*  # a failed command leaves a trace$/\1if (0) {/' "no vpa type: missing line"
+  pin "a failed vpa command leaves a trace" '# a failed command leaves a trace' 's/^\( *\)if (vpa == "failed") .*  # a failed command leaves a trace$/\1if (0) print/' "no vpa type: missing line"
   pin "no metrics exits 6" '# no metrics: exit 6' 's/|| die 6 .*  # no metrics: exit 6$/|| top=/' "no metrics: expected exit 6"
   pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| raw=x/' "no context: expected exit 5"
-  pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: expected exit 5"
+  pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a row with a control character" '# a row with a control character' 's/ -e "\/\[\[:cntrl:\]\]\/s\/^$1 \/$1X \/"  # a row with a control character//' "a row with a carriage return: printed: crlf-1"
   pin "the fixed command list" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^CMD_VPA=.kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> /CMD_VPA='"'"'kubectl get secrets --all-namespaces /' "the fixed command list of the script differs from fields.md"
 }
 copy_works "$real_script" || { echo "FAIL: the control case fails on the script itself"; total=$((total + 1)); }

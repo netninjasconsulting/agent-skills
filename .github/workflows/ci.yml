@@ -38,7 +38,9 @@ jobs:
         run: sh tests/read-serverless-config.test.sh
       - name: Test the Kubernetes object reader
         run: sh tests/read-k8s-objects.test.sh
+      - name: Test the cluster usage reader
+        run: sh tests/read-cluster-usage.test.sh
       - name: Test the names filter for env files
         run: sh tests/names-filter.test.sh
       - name: Lint the shell scripts
-        run: shellcheck -s sh skills/*/scripts/*.sh tests/*.sh tests/fixtures/*/make-repo.sh
+        run: shellcheck -s sh skills/*/scripts/*.sh tests/*.sh tests/fixtures/*/make-repo.sh tests/fixtures/kubernetes-workload-check/fake-kubectl/kubectl
