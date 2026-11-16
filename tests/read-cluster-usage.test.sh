@@ -48,11 +48,11 @@ CR=$(printf '\r')
 
 # The fixed command list of references/fields.md, held here on its own. The
 # test checks that fields.md and the script carry the same list.
-T_CMDS='kubectl config current-context --kubeconfig= --context= --server= --cluster=
-kubectl top pod --containers --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s
-kubectl get pods --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
-kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
-kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
+T_CMDS='kubectl config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=
+kubectl top pod --containers --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s
+kubectl get pods --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
+kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
+kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 
 # The shape block of the cluster script in references/fields.md. A shape
 # that the reader's block holds as well must be the same line there.
@@ -147,9 +147,9 @@ log_only() {  # $1 = label; the rest are the namespaces given
     # Every top and get carries the explicit neutral values that keep a
     # kuberc default from removing or changing rows.
     case $line in
-      *' top pod '*) need='--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --selector= --field-selector= --all-namespaces=false --show-swap=false --sum=false' ;;
-      *' get '*) need='--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --selector= --field-selector= --watch-only=false --ignore-not-found=false --output-watch-events=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --all-namespaces=false --watch=false' ;;
-      *' config current-context '*) need='--kubeconfig= --context= --server= --cluster=' ;;
+      *' top pod '*) need='--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --profile=none --cache-dir= --selector= --field-selector= --all-namespaces=false --show-swap=false --sum=false' ;;
+      *' get '*) need='--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --profile=none --cache-dir= --selector= --field-selector= --watch-only=false --ignore-not-found=false --output-watch-events=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --all-namespaces=false --watch=false' ;;
+      *' config current-context '*) need='--kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=' ;;
       *) need= ;;
     esac
     for f in $need; do
@@ -166,6 +166,18 @@ log_only() {  # $1 = label; the rest are the namespaces given
     for v in apply create delete patch replace edit scale rollout label annotate set drain cordon taint port-forward cp attach; do
       case "$line" in "2 $v "* | *" $v "*) fail "$ll: the log holds the writing verb $v: $line" ;; esac
     done
+  done < "$home/log"
+}
+
+# Every command kubectl ran carries --profile=none and --cache-dir=, so a
+# kuberc default can make kubectl write neither a profile file nor a
+# discovery cache in the working directory, which is the scanned
+# repository. $1 = label.
+writes_nothing() {
+  if [ ! -s "$home/log" ]; then fail "$1: the stand-in logged nothing"; return; fi
+  while IFS= read -r line; do
+    case " $line " in *' --profile=none '*) ;; *) fail "$1: a command lacks --profile=none: $line" ;; esac
+    case " $line " in *' --cache-dir= '*) ;; *) fail "$1: a command lacks --cache-dir=: $line" ;; esac
   done < "$home/log"
 }
 
@@ -232,12 +244,13 @@ suite() {
   # --context logs only config current-context.
   run "$s" "" --context
   [ "$rc" -eq 0 ] || fail "context: expected exit 0, got $rc"
-  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "context: the log holds more than config current-context"
+  [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "context: the log holds more than config current-context"
   [ "$(cat "$work/out")" = "fleetboard-stand-in" ] || fail "context: the output is not the context name"
+  writes_nothing "context"
   no_marker "context"
   run "$s" "odd-context" fleetboard-production
   [ "$rc" -eq 5 ] || fail "a context name that is not a name, namespace mode: expected exit 5, got $rc"
-  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "a context name that is not a name, namespace mode: a command ran after the context"
+  [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "a context name that is not a name, namespace mode: a command ran after the context"
   no_marker "odd context, namespace mode"
   run "$s" "odd-context" --context
   [ "$(cat "$work/out")" = "other" ] || fail "context: a context name that is not a name printed as it came"
@@ -246,7 +259,7 @@ suite() {
   [ "$rc" -eq 5 ] || fail "no context: expected exit 5, got $rc"
   grep -q "kubectl config current-context failed" "$work/err" || fail "no context: the message does not name the failed command"
   if grep -q "no current context" "$work/err"; then fail "no context: the message guesses a cause"; fi
-  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "no context: the log holds more than config current-context"
+  [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "no context: the log holds more than config current-context"
   no_marker "no context"
   run "$s" "empty-context" --context
   [ "$rc" -eq 5 ] || fail "an empty context answer: expected exit 5, got $rc"
@@ -255,7 +268,7 @@ suite() {
   [ "$rc" -eq 5 ] || fail "a context answer of spaces: expected exit 5, got $rc"
   run "$s" "no-context" fleetboard-production
   [ "$rc" -eq 5 ] || fail "no context, namespace mode: expected exit 5, got $rc"
-  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "no context, namespace mode: a command ran after the context failed"
+  [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "no context, namespace mode: a command ran after the context failed"
   no_marker "no context, namespace mode"
 
   # kubectl missing: exit 5.
@@ -272,6 +285,7 @@ suite() {
   # shellcheck disable=SC2086 # the namespace list
   log_only "fixture" $FIXTURE_NS
   [ "$(grep -c . "$home/log")" -eq 21 ] || fail "fixture: expected 21 commands in the log, got $(grep -c . "$home/log")"
+  writes_nothing "fixture"
   no_marker "fixture"
   [ ! -s "$work/err" ] || fail "fixture: standard error is not empty"
   expect_line "fixture" "# context fleetboard-stand-in"

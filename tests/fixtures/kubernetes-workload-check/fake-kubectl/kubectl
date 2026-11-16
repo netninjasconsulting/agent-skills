@@ -76,9 +76,9 @@ pods_cols='custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name
 vpa_cols='custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
 hpa_cols='custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 
-target="--context=fleetboard-stand-in --kubeconfig= --server= --cluster="
+target="--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --profile=none --cache-dir="
 get_flags="--no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s"
-cmd_top="top pod --containers --namespace=$ns --context=fleetboard-stand-in --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s"
+cmd_top="top pod --containers --namespace=$ns --context=fleetboard-stand-in --kubeconfig= --server= --cluster= --profile=none --cache-dir= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s"
 cmd_pods="get pods --namespace=$ns $target $get_flags -o $pods_cols"
 cmd_vpa="get verticalpodautoscalers.autoscaling.k8s.io --namespace=$ns $target $get_flags -o $vpa_cols"
 cmd_hpa="get horizontalpodautoscalers.autoscaling --namespace=$ns $target $get_flags -o $hpa_cols"
@@ -250,7 +250,7 @@ EOF
   esac
 }
 
-if [ "$#" -eq 6 ] && [ "$*" = "config current-context --kubeconfig= --context= --server= --cluster=" ]; then
+if [ "$#" -eq 8 ] && [ "$*" = "config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ]; then
   if has_mode no-context; then
     echo "error: current-context is not set FIXTUREVALUE" >&2
     exit 1
