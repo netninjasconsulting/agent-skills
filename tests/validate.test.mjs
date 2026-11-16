@@ -100,6 +100,8 @@ const cases = [
   ['kubernetes: the subject rule renamed', 'references/checks.md', s => s.replace('- **The subject rule.**', '- **A note on subjects.**'), kubernetes],
   ['kubernetes: a plain User counted as a workload', 'references/checks.md', s => s.replace('is a person or a system user, not a workload, and is not a K6 case', 'counts like a ServiceAccount'), kubernetes],
   ['kubernetes: an unread User form let through', 'references/checks.md', s => s.replace('A `User` with `user-form=other` is "ask the team"', 'A `User` with `user-form=other` is not a K6 case'), kubernetes],
+  ['kubernetes: reach map: a plain User counted as a workload', 'references/reach-map.md', s => s.replace('is a person or a system user, and reaches no workload', 'counts like a ServiceAccount'), kubernetes],
+  ['kubernetes: reach map: groups left out', 'references/reach-map.md', s => s.replace('The reader prints no group name, so every group counts', 'The reader prints no group name, so no group counts'), kubernetes],
   ['kubernetes: a read-only hostPath let through', 'references/checks.md', s => s.replace('or it has a `hostPath` volume, read-only or not.', 'or it has a `hostPath` volume mounted read-write.'), kubernetes],
   ['kubernetes: the cluster-admin binding softened', 'references/checks.md', s => s.replace('A binding to `cluster-admin` fails K6 when', 'A binding to `cluster-admin` warns on K6 when'), kubernetes],
   ['kubernetes: rule 10 without its pointer', 'SKILL.md', s => s.replace('The one exception is the table "Absent fields" in `references/checks.md`', 'The one exception is a key that is absent'), kubernetes],
