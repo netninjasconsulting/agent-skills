@@ -1115,6 +1115,56 @@ auth:
 resources:
   requests:
     cpu: 100m
+apiToken:
+  capabilities:
+    add:
+      - NET_ADMIN
+    drop: [ALL]
+EOF
+  cat > "$a/flow-implicit.yaml" <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flow-implicit
+spec:
+  containers:
+    - name: app
+      ports: [hostPort: 22]
+EOF
+  cat > "$a/flow-implicit-app.yaml" <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: flow-implicit-app
+spec:
+  sources: [repoURL: https://github.com/example-fleetboard/FIXTUREVALUE]
+EOF
+  cat > "$a/flow-items.yaml" <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flow-items
+spec:
+  containers:
+    - name: app
+      args: [--ok, "--quoted", key:]
+EOF
+  cat > "$a/flow-question.yaml" <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: flow-question
+spec:
+  containers:
+    - name: app
+      securityContext:
+        capabilities:
+          drop: [? ALL]
+EOF
+  cat > "$a/values-flow-item.yaml" <<'EOF'
+securityContext:
+  capabilities:
+    add: [NET_ADMIN, token: FIXTUREVALUE]
 EOF
   cat > "$a/values.yaml" <<'EOF'
 replicaCount: 3
@@ -1199,7 +1249,7 @@ EOF
   [ "$code" -eq 0 ] || fail "attack flow-empty: exit $code"
   expect_line "$out" "flow-empty.yaml:13:Pod/-/flow-empty:-:volume-type=emptyDir" "attack flow-empty"
   expect_line "$out" "flow-empty.yaml:10:Pod/-/flow-empty:app:cap-drop=ALL" "attack flow-empty"
-  for b in flow flow-map-sc cm-flow values-flow flow-lines anchors indent indent-deeper quoted-marker json template dup cr tabs tab-value directive tags control values-anchor nel ls ps nul; do
+  for b in flow flow-map-sc flow-implicit flow-implicit-app flow-items flow-question values-flow-item cm-flow values-flow flow-lines anchors indent indent-deeper quoted-marker json template dup cr tabs tab-value directive tags control values-anchor nel ls ps nul; do
     att "$b.yaml"
     [ "$code" -eq 4 ] || fail "attack $b: expected exit 4, got $code"
   done
@@ -1256,7 +1306,7 @@ EOF
   att values-cred.yaml
   [ "$code" -eq 0 ] || fail "attack values under a credential-like parent: exit $code"
   expect_line "$out" "values-cred.yaml:2:Values/-/-:-:values-key.passwordPolicy.minReplicas=scalar" "attack values under a credential-like parent"
-  expect_no "$out" ':values\.(passwordPolicy|auth)\.' "attack values under a credential-like parent"
+  expect_no "$out" ':values\.(passwordPolicy|auth|apiToken)\.' "attack values under a credential-like parent"
   expect_line "$out" "values-cred.yaml:7:Values/-/-:-:values.resources.requests.cpu=100m" "attack values under a credential-like parent"
 
   att list-kind.yaml
@@ -1537,6 +1587,37 @@ EOF
   refuse "k5:overlay:remote base" "render an overlay with a folded component" --render kustomize k5
   printf 'resources:\n  - ../kustomize/base\npatches:\n  - path: |-\n      https://attacker.invalid/FIXTUREVALUE-k6.yaml\n' > "$rr/k6/kustomization.yaml"
   refuse "k6:overlay:remote base" "render an overlay with a block-scalar patch path" --render kustomize k6
+  unread() {
+    # $1 = expected stdout line, $2 = label, then the reader arguments
+    expect=$1; label=$2; shift 2
+    rm -f "$work/fake-calls"
+    rd "$@"
+    [ "$code" -eq 4 ] || fail "$label: expected exit 4, got $code"
+    [ "$out" = "$expect" ] || fail "$label: expected $expect, got $out"
+    [ ! -e "$work/fake-calls" ] || fail "$label: the render tool ran before the refusal"
+  }
+  mkdir -p "$rr/k7" "$rr/k8" "$rr/k9/base" "$rr/k9/overlay" "$rr/k10"
+  printf 'resources:\n  - ../kustomize/base\npatches: [path: https://attacker.invalid/FIXTUREVALUE-k7.yaml]\n' > "$rr/k7/kustomization.yaml"
+  unread "k7:overlay:not read" "render an overlay with a patch path in a flow list" --render kustomize k7
+  printf 'resources:\n  - ../kustomize/base\nreplacements: [path: https://attacker.invalid/FIXTUREVALUE-k8.yaml]\n' > "$rr/k8/kustomization.yaml"
+  unread "k8:overlay:not read" "render an overlay with a replacement path in a flow list" --render kustomize k8
+  printf 'resources:\n  - ../../kustomize/base\npatches: [path: https://attacker.invalid/FIXTUREVALUE-k9.yaml]\n' > "$rr/k9/base/kustomization.yaml"
+  printf 'resources: [../base]\n' > "$rr/k9/overlay/kustomization.yaml"
+  unread "k9/overlay:overlay:not read" "render an overlay whose base has a patch path in a flow list" --render kustomize k9/overlay
+  printf 'resources:\n  - ../kustomize/base\npatches:\n  - https://attacker.invalid/FIXTUREVALUE-k10.yaml\n' > "$rr/k10/kustomization.yaml"
+  refuse "k10:overlay:remote base" "render an overlay with a patch that is not a map" --render kustomize k10
+  # A line break in a name anywhere in a chart or overlay tree.
+  cp -R "$rr/chart" "$rr/nlchart"
+  mkdir "$rr/nlchart/templates/a
+b"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: nl\n' > "$rr/nlchart/templates/a
+b/cm.yaml"
+  refuse "nlchart:chart:not a local file" "render a chart with a line break in a name" \
+    --render helm nlchart nlchart/values.yaml
+  mkdir -p "$rr/nlov/x
+y"
+  printf 'resources:\n  - ../kustomize/base\n' > "$rr/nlov/kustomization.yaml"
+  refuse "nlov:overlay:not a local file" "render an overlay with a line break in a name" --render kustomize nlov
   RPATH=$PATH
   fi
 
@@ -1598,6 +1679,17 @@ sub/ok.yaml"
   [ "$out" = "ok.yaml:manifest:no-git" ] || fail "list with unsafe names: printed
 $out"
   grep -q 'not listed' "$work/err" || fail "list with unsafe names: standard error does not say what was not listed"
+  mkdir -p "$lx/e/ok.yaml
+."
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$lx/e/ok.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: zz\n' > "$lx/e/zz.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: hidden\nspec:\n  hostNetwork: true\n' > "$lx/e/ok.yaml
+./zz.yaml"
+  rd e
+  [ "$code" -eq 4 ] || fail "list with a line break that repeats a name: expected exit 4, got $code"
+  [ "$out" = "ok.yaml:manifest:no-git
+zz.yaml:manifest:no-git" ] || fail "list with a line break that repeats a name: printed
+$out"
   ln -s a "$lx/alink"
   rd alink/
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list through a symbolic link with a trailing slash: exit $code"
@@ -1648,9 +1740,25 @@ fi
 
 # Pins: a copy of the reader with one safeguard switched off must fail,
 # and must fail on the check that covers that safeguard.
+# The control case: a copy must still parse as shell, still run its awk
+# program, and still read a plain file, so that a pin fails only through
+# the safeguard it switches off and never through a broken copy.
+mkdir "$work/control"
+printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: control\nspec:\n  replicas: 2\n' > "$work/control/control.yaml"
+copy_works() {
+  sh -n "$1" 2>/dev/null || return 1
+  ctl=$(cd "$work/control" && sh "$1" --fields control.yaml 2>/dev/null) || return 1
+  printf '%s\n' "$ctl" | grep -qxF -e "control.yaml:2:Deployment/-/control:-:object=present" || return 1
+  printf '%s\n' "$ctl" | grep -qxF -e "control.yaml:6:Deployment/-/control:-:replicas=2"
+}
+
+# PIN_BREAK set to awk or sh breaks every copy on purpose, after the pin's
+# own change: each pin must then report a broken copy and run nothing.
+PIN_BREAK=
 pin() {
   # $1 = label, $2 = a fixed string that marks the safeguard's line,
-  # $3 = a sed command, $4 = the sections to run, $5 = text of the failure
+  # $3 = a sed command, $4 = the sections to run, $5 = text of the failing
+  # check, which names the output line the safeguard keeps out or in
   copy="$work/pin-reader.sh"
   if [ "$(grep -cF -e "$2" "$real_reader")" -ne 1 ]; then
     echo "FAIL: pin $1: the safeguard line is not in the reader once"
@@ -1658,8 +1766,24 @@ pin() {
     return
   fi
   sed -e "$3" "$real_reader" > "$copy"
+  case "$PIN_BREAK" in
+    awk) sed -e 's/^function reset(I,/function reset(I,,/' "$copy" > "$copy.b" && mv "$copy.b" "$copy" ;;
+    sh) sed -e 's/^list_mode() {$/list_mode() { if/' "$copy" > "$copy.b" && mv "$copy.b" "$copy" ;;
+  esac
   if cmp -s "$copy" "$real_reader"; then
     echo "FAIL: pin $1: the copy did not change"
+    total=$((total + 1))
+    return
+  fi
+  if ! copy_works "$copy"; then
+    if [ -z "$PIN_BREAK" ]; then
+      echo "FAIL: pin $1: broken copy"
+      total=$((total + 1))
+    fi
+    return
+  fi
+  if [ -n "$PIN_BREAK" ]; then
+    echo "FAIL: pin $1: a copy broken in $PIN_BREAK was not reported as broken"
     total=$((total + 1))
     return
   fi
@@ -1672,39 +1796,52 @@ pin() {
     total=$((total + 1))
   fi
 }
-pin "shape check" 'function fits(v, q, sid,' 's/^\( *function fits(v, q, sid,[^)]*) {\)$/\1 return 1/' attacks "attack bad-shapes"
-pin "field list" 'function listed(f,' 's/^\( *function listed(f,[^)]*) {\)$/\1 return 1/' fields "a field that fields.md does not list"
-pin "names only for env values" '# names only: env' 's/src = "literal"  # names only: env/src = LVAL[0, vk]/' fields "fields env: missing line"
-pin "names only for Secret values" '# names only: secret' 's/sv = key  # names only: secret/sv = LVAL[0, k]/' fields "a planted value leaked"
-pin "other for a key seen and not read" '# a key seen and not read' 's/^\( *\)else out(ln, cont, f, "other")  # a key seen and not read$/\1else return/' attacks "attack YAML 1.1 flags"
-pin "a flow collection that holds a map" '# a flow collection that holds a map' 's/if (flowmap(CT, CV))/if (0)/' attacks "attack flow-map-sc"
-pin "a file that is not text" '# not text' 's/^\(not_text() {\)  # not text$/\1 return 1/' attacks "attack nul"
-pin "a credential-like parent" '# a credential-like key or parent' 's/for (i = 1; i <= n; i++) if (credlike(s\[i\])) return  # a credential-like key or parent/if (credlike(last)) return/' attacks "attack values under a credential-like parent"
-pin "rel-path parameters" '# a generator parameter' 's/gsub(.*, "P", v)  # a generator parameter//' attacks "attack ApplicationSet"
-# shellcheck disable=SC2016 # literal text, not an expansion
-pin "rel-path without a space" 'rel-path 128 ^[$]?[A-Za-z0-9._/-]+$' 's#^rel-path 128 .*#rel-path 128 ^[A-Za-z0-9._/{}$ -]+$#' attacks "attack sentence path"
-pin "a kustomization entry that is not a plain scalar" '# an entry that is not a plain scalar' 's/{ print "bad -"; next }  # an entry that is not a plain scalar/{ next }/' refusals "render an overlay with a block-scalar resource"
-pin "a kustomization entry that looks like a repository" '# an entry kustomize can take for a repository' 's/refuse "remote base"  # an entry kustomize can take for a repository/:/' refusals "render an overlay with a local directory named like a host"
-# shellcheck disable=SC2016 # literal text, not an expansion
-pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L"
-pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link"
-# shellcheck disable=SC2016 # literal text, not an expansion
-pin "a path the list cannot carry" '# a path the list cannot carry' 's/unsafe=$((unsafe + 1)); continue ;;  # a path the list cannot carry/;;/' listx "list with unsafe names"
-if [ "$have_helm" -eq 1 ]; then
+pins() {
+  pin "shape check" 'function fits(v, q, sid,' 's/^\( *function fits(v, q, sid,[^)]*) {\)$/\1 return 1/' attacks "a planted value leaked"
+  pin "field list" 'function listed(f,' 's/^\( *function listed(f,[^)]*) {\)$/\1 return 1/' fields "a field that fields.md does not list"
+  pin "names only for env values" '# names only: env' 's/src = "literal"  # names only: env/src = LVAL[0, vk]/' fields "missing line manifests/cronjob.yaml:22:CronJob/fleetboard-tools/tracker-report:report:env.SMTP_PASSWORD=literal"
+  pin "names only for Secret values" '# names only: secret' 's/sv = key  # names only: secret/sv = LVAL[0, k]/' fields "a planted value leaked"
+  pin "other for a key seen and not read" '# a key seen and not read' 's/^\( *\)else out(ln, cont, f, "other")  # a key seen and not read$/\1else return/' attacks "missing line yaml11.yaml:6:Pod/-/yaml11:-:host-network=other"
+  pin "a flow collection that holds a map" '# a flow collection that holds a map' 's/if (flowmap(CT, CV))/if (0)/' attacks "attack flow-map-sc: expected exit 4, got 0"
+  pin "a flow item that is not a plain scalar" '# a flow item that is not a plain scalar' 's/if (FIT\[i\] != "scalar") r = 1  # a flow item that is not a plain scalar/if (FIT[i] == "flow") r = 1/' attacks "attack flow-implicit: expected exit 4, got 0"
+  pin "a file that is not text" '# not text' 's/^\(not_text() {\)  # not text$/\1 return 1/' attacks "attack nul: expected exit 4, got 0"
+  pin "a credential-like parent" '# a credential-like key or parent' 's/for (i = 1; i <= n; i++) if (credlike(s\[i\])) return  # a credential-like key or parent/if (credlike(last)) return/' attacks "a line matches :values\.(passwordPolicy|auth|apiToken)\."
+  pin "a credential-like parent of a capability list" '# a credential-like parent of a capability list' 's/for (j = 1; j < n; j++) if (credlike(s\[j\])) return  # a credential-like parent of a capability list//' attacks "a line matches :values\.(passwordPolicy|auth|apiToken)\."
+  pin "rel-path parameters" '# a generator parameter' 's/gsub(.*, "P", v)  # a generator parameter//' attacks "missing line argo.yaml:22:ApplicationSet/argocd/attack-set:-:source.1.path=apps/{{.cluster}}"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "the pipe from the renderer" '# the pipe' 's/ | extract render "$label"  # the pipe//' render "a planted value leaked"
-  pin "helm standard error is dropped" '# helm: drop standard error' 's/ 2>\/dev\/null) || status=$?  # helm: drop standard error/) || status=$?/' render "render a chart that fails: standard error holds chart text"
-  pin "a line separator in a rendered output" '# a line break YAML takes from Unicode' 's/{ ERR\[I\] = 1; return }  # a line break YAML takes from Unicode/{ }/' render "render a chart with a line separator"
-else
-  echo "skipped: the helm pins (helm is not installed)"
-fi
-if command -v kustomize >/dev/null 2>&1; then
-  pin "kustomize standard error is dropped" '# kustomize: drop standard error' 's/ 2>\/dev\/null) || status=$?  # kustomize: drop standard error/) || status=$?/' render "render an overlay that fails inside the tool: standard error holds chart text"
-elif command -v kubectl >/dev/null 2>&1; then
-  pin "kubectl standard error is dropped" '# kubectl: drop standard error' 's/ 2>\/dev\/null) || status=$?  # kubectl: drop standard error/) || status=$?/' render "render an overlay that fails inside the tool: standard error holds chart text"
-else
-  echo "skipped: the kustomize pin (kustomize and kubectl are not installed)"
-fi
+  pin "rel-path without a space" 'rel-path 128 ^[$]?[A-Za-z0-9._/-]+$' 's#^rel-path 128 .*#rel-path 128 ^[A-Za-z0-9._/{}$ -]+$#' attacks "missing line sentence.yaml:9:Application/argocd/sentence:-:source.1.path=other"
+  pin "a kustomization entry that is not a plain scalar" '# an entry that is not a plain scalar' 's/{ print "bad -"; next }  # an entry that is not a plain scalar/{ next }/' refusals "render an overlay with a block-scalar resource: the render tool ran before the refusal"
+  pin "a patch, a replacement, or a generator that is not a map" '# an item that is not a map' 's/{ print "bad -"; next }  # an item that is not a map/{ next }/' refusals "render an overlay with a patch that is not a map: the render tool ran before the refusal"
+  pin "a kustomization entry that looks like a repository" '# an entry kustomize can take for a repository' 's/refuse "remote base"  # an entry kustomize can take for a repository/:/' refusals "render an overlay with a local directory named like a host: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L: the render tool ran before the refusal"
+  pin "a line break in a chart or overlay tree" '# a line break in a name' 's/refuse "not a local file"  # a line break in a name/:/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
+  pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a path the list cannot carry" '# a path the list cannot carry' 's/ ! -path "$unsafe_path"  # a path the list cannot carry//' listx "list with a line break that repeats a name: printed"
+  if [ "$have_helm" -eq 1 ]; then
+    # shellcheck disable=SC2016 # literal text, not an expansion
+    pin "the pipe from the renderer" '# the pipe' 's/ | extract render "$label"  # the pipe//' render "a planted value leaked"
+    pin "helm standard error is dropped" '# helm: drop standard error' 's/ 2>\/dev\/null) || status=$?  # helm: drop standard error/) || status=$?/' render "render a chart that fails: standard error holds chart text"
+    pin "a line separator in a rendered output" '# a line break YAML takes from Unicode' 's/{ ERR\[I\] = 1; return }  # a line break YAML takes from Unicode/{ }/' render "render a chart with a line separator: expected exit 4, got 0"
+  else
+    echo "skipped: the helm pins (helm is not installed)"
+  fi
+  if command -v kustomize >/dev/null 2>&1; then
+    pin "kustomize standard error is dropped" '# kustomize: drop standard error' 's/ 2>\/dev\/null) || status=$?  # kustomize: drop standard error/) || status=$?/' render "render an overlay that fails inside the tool: standard error holds chart text"
+  elif command -v kubectl >/dev/null 2>&1; then
+    pin "kubectl standard error is dropped" '# kubectl: drop standard error' 's/ 2>\/dev\/null) || status=$?  # kubectl: drop standard error/) || status=$?/' render "render an overlay that fails inside the tool: standard error holds chart text"
+  else
+    echo "skipped: the kustomize pin (kustomize and kubectl are not installed)"
+  fi
+}
+copy_works "$real_reader" || { echo "FAIL: the control case fails on the reader itself"; total=$((total + 1)); }
+pins
+PIN_BREAK='awk'
+pins
+PIN_BREAK='sh'
+pins
+PIN_BREAK=
 
 if [ "$total" -gt 0 ]; then
   echo "$total check(s) failed"
