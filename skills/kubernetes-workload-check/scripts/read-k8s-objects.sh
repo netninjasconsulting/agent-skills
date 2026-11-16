@@ -424,6 +424,7 @@ function out(ln, cont, f, v) {
 # looks the same as a key that is absent.
 function field(ln, cont, f, v, q, t, sid) {
   if (!listed(f)) return
+  if (sid == "label-value" && tok20(v)) t = "token"  # a token is not a label value
   if (sid == "present") { out(ln, cont, f, (t == "unread") ? "other" : "present"); return }
   # A quota value is a quantity, which may be quoted.
   if (f == "quota-hard.pods") q = 0
@@ -1665,7 +1666,9 @@ $1" ;;
   if nl_inside "$cp_"; then refuse "not a local file"; fi
   [ -z "$(find "$cp_" -type l -print | sed -n 1p)" ] || refuse "symbolic link inside"
   # shellcheck disable=SC2016 # the text $ref and $id, not expansions
-  if [ -n "$(find "$cp_" -type f -name values.schema.json -exec grep -lF -e '$ref' -e '$id' {} + | sed -n 1p)" ]; then
+  # A JSON escape (\u) can spell either, so a schema that holds one is
+  # refused too.
+  if [ -n "$(find "$cp_" -type f -name values.schema.json -exec grep -lF -e '$ref' -e '$id' -e '\u' {} + | sed -n 1p)" ]; then  # a JSON escape can spell $ref
     refuse "remote schema ref"
   fi
   deps=$(find "$cp_" \( -name Chart.yaml -o -name requirements.yaml \) -type f -print | while IFS= read -r cf; do
@@ -1748,7 +1751,7 @@ $d"
         [ ! -L "$acc" ] || refuse "symbolic link inside"
       done
       pp=$(phys "$t") || refuse "remote base"
-      inside_root "$pp" || refuse "remote base"
+      inside_root "$pp" || refuse "remote base"  # a base outside the repository
       if [ "$what" = res ] && [ -d "$t" ]; then
         queue=$(printf '%s\n%s\n' "$queue" "$pp" | sed '/^$/d')
       fi

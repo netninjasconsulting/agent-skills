@@ -2700,6 +2700,12 @@ pins() {
   pin "a clear value in a sops Secret" '# a clear value in a sops Secret' '/# a clear value in a sops Secret$/s/c++/c = c/' attacks "missing line sops-fake.yaml:7:Secret/-/fake:-:sops-clear-count=1"
   pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
   pin "the form of a User name" '# the form of a User name' '/# the form of a User name$/s/== "system:serviceaccount:"/== "x"/' attacks "missing line rbac-users.yaml:11:ClusterRoleBinding/-/users:-:subject.1.user-form=service-account"
+  pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
+  pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a base outside the repository" '# a base outside the repository' 's/inside_root "$pp" || refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a JSON escape in a schema" '# a JSON escape can spell $ref' 's/ -e '"'"'\\u'"'"' {}/ {}/' refusals "render a chart with a schema reference spelt with a JSON escape: the render tool ran before the refusal"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "a symbolic link in the tree is counted" '# a symbolic link is not listed' '/# a symbolic link is not listed$/s/-type l /-type l -name x-no-link /' listx "list with a linked manifest and a linked directory: expected exit 4, got 0"
   pin "a List kind is not read" '# a List holds objects the reader does not follow' '/# a List holds objects the reader does not follow$/s/ERR\[0\] = 1; //' attacks "attack List kind: expected exit 4, got 0"
@@ -2710,6 +2716,7 @@ pins() {
     # shellcheck disable=SC2016 # literal text, not an expansion
     pin "the pipe from the renderer" '# the pipe' 's/ | extract render "$label"  # the pipe//' render "a planted value leaked"
     pin "helm standard error is dropped" '# helm: drop standard error' 's/ 2>\/dev\/null) || status=$?  # helm: drop standard error/) || status=$?/' render "render a chart that fails: standard error holds chart text"
+    pin "schema validation is skipped" '--skip-schema-validation' 's/ --skip-schema-validation$//' render "render a chart whose vendored dependency names a remote schema: exit 3"
     pin "a render that printed no object" '# a render that printed no object' '/# a render that printed no object$/s/exit 3/exit 0/' render "render a chart that prints no object: expected exit 3, got 0"
     pin "a line separator in a rendered output" '# a line break YAML takes from Unicode' 's/{ ERR\[I\] = 1; return }  # a line break YAML takes from Unicode/{ }/' render "render a chart with a line separator: expected exit 4, got 0"
   else
