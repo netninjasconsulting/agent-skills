@@ -263,7 +263,7 @@ Check the report against this list before printing it, and fix what fails.
 
 ### 9. The report and the two offers
 
-Print the report in chat in the shape of `references/report-format.md`, and nothing more: no summary or "short answer" paragraph and no advice of your own. Write no file. Then make each offer that applies, once, as the last lines of the reply, word for word as `report-format.md` gives it:
+Print the report in chat in the shape of `references/report-format.md`, and nothing more: no summary or "short answer" paragraph and no advice of your own. The one line allowed outside it: when an earlier reply of this run stated something wrong, a later reply opens with "Correction to my last reply: <one sentence>.", once. Write no file. Then make each offer that applies, once, as the last lines of the reply, word for word as `report-format.md` gives it:
 
 1. **The questions,** when Q, the number of questions written in step 6, is above 0. The words are in `report-format.md`.
 2. **The cluster pass,** when R8 is "ask the team" in an environment whose namespace is known. The offer names the namespace of each environment whose namespace is known (from an `Application`'s destination or from a render) and where R8 is "ask the team", fully seen or not. Read "Before the offer" in [references/cluster-pass.md](references/cluster-pass.md). It runs `sh <skill-dir>/scripts/read-cluster-usage.sh --context`, a local read that makes no request to the cluster, and gives the words of the offer. When R1 fails in every environment, R8 does not apply anywhere, and there is no cluster offer.
