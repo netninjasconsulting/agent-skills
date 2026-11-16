@@ -16,8 +16,9 @@
 # name, 5 kubectl missing or no current context, 6 no metrics.
 #
 # It runs only the commands of the fixed list below (references/fields.md,
-# "Command section 3: the cluster commands"), with a cleared environment,
-# and drops what kubectl writes to standard error. It never reads a Secret
+# "Command section 3: the cluster commands"), in the caller's environment
+# as it is (LC_ALL=C on top), with no input, and drops what kubectl writes
+# to standard error. It never switches the caller's kuberc off. It never reads a Secret
 # and never writes. It takes no command from its arguments: only namespace
 # names, each tested as a DNS label before any other work. No line of
 # kubectl output prints as it came: a cell prints when it fits its shape,
@@ -25,21 +26,23 @@
 # container prints "not-read"; a row that cannot be placed is counted.
 
 set -u
-LC_ALL=C
+LC_ALL=C  # kubectl and awk run in the C locale
 export LC_ALL
 # Split the words of a fixed command at a space, a tab, or a line break,
 # whatever the caller had.
 IFS=$(printf ' \t\nx')
 IFS=${IFS%x}
+NL='
+'
 
 me=read-cluster-usage
 
 # BEGIN the fixed command list
 CMD_CONTEXT='kubectl config current-context'
-CMD_TOP='kubectl top pod --containers --namespace=<name> --no-headers --request-timeout=20s'
-CMD_PODS='kubectl get pods --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason'
-CMD_VPA='kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
-CMD_HPA='kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
+CMD_TOP='kubectl top pod --containers --namespace=<name> --no-headers --all-namespaces=false --show-swap=false --sum=false --request-timeout=20s'
+CMD_PODS='kubectl get pods --namespace=<name> --no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason'
+CMD_VPA='kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
+CMD_HPA='kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --all-namespaces=false --watch=false --show-kind=false --show-labels=false --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 # END the fixed command list
 
 # The shape block of the cluster script in references/fields.md: id,
@@ -55,6 +58,7 @@ kind-name 63 ^[A-Z][A-Za-z0-9]*$
 update-mode 17 ^(Off|Initial|Recreate|Auto|InPlaceOrRecreate|InPlace)$
 metric-type 18 ^(ContainerResource|External|Object|Pods|Resource)$
 metric-resource 6 ^(cpu|memory)$
+container-name 63 ^([a-z0-9]|[a-z0-9][-a-z0-9]*[a-z0-9])$
 context-name 253 ^[A-Za-z0-9][A-Za-z0-9_.:@/+-]*$
 end-reason 22 ^(OOMKilled|Error|Completed|ContainerCannotRun|DeadlineExceeded|StartError|ContainerStatusUnknown)$
 '
@@ -78,7 +82,11 @@ is_ns() {  # a namespace is a DNS label
 
 # Run one command of the fixed list. $1 = the command, $2 = the namespace
 # that replaces <name>. The command's words hold no space and no glob that
-# could expand, and the namespace passed is_ns.
+# could expand, and the namespace passed is_ns. kubectl runs in the
+# caller's environment, with no input and its standard error dropped. Its
+# output goes to KOUT with every NUL turned into the control character 1,
+# so that the tag sees it; the exit status of kubectl is the last line of
+# that stream, and the return status of kube.
 kube() {
   c=$1
   case $c in *'<name>'*) c=${c%%'<name>'*}$2${c#*'<name>'} ;; esac
@@ -86,8 +94,11 @@ kube() {
   # shellcheck disable=SC2086 # the words of a fixed command
   set -- $c
   set +f
-  if [ -n "${KUBECONFIG-}" ]; then set -- "KUBECONFIG=$KUBECONFIG" "$@"; fi
-  env -i PATH="$PATH" HOME="${HOME-}" KUBERC=off LC_ALL=C "$@" 2>/dev/null  # kubectl: a cleared environment
+  KOUT=$( { "$@" </dev/null 2>/dev/null; printf '\n%s\n' "$?"; } |  # kubectl: the caller environment, no input, standard error dropped
+    tr '\000' '\001')  # a NUL in kubectl output becomes a control character
+  krc=${KOUT##*"$NL"}
+  KOUT=${KOUT%"$NL"*}
+  [ "$krc" = 0 ]
 }
 
 # The awk program that prints the tables of one namespace. Its input is
@@ -114,27 +125,13 @@ function cell(v, id) {
 }
 # Spread a column of comma-joined values over nc items. OUT[1..nc] gets
 # each value in its shape, "-" for all when the column is <none>, and
-# "not-read" for all when the count differs.
+# "not-read" for all when the count differs, so that a value never goes to
+# another item. Each call site carries the name of what it counts.
 function spread(s, nc, id,   a, n, j) {
+  split("", OUT)
   if (s == "<none>") { for (j = 1; j <= nc; j++) OUT[j] = "-"; return }
   n = split(s, a, ",")
-  if (n == nc)  # one value for each container
-    for (j = 1; j <= nc; j++) OUT[j] = cell(a[j], id)
-  else
-    for (j = 1; j <= nc; j++) OUT[j] = "not-read"
-}
-function spread_vpa(s, nc, id,   a, n, j) {
-  if (s == "<none>") { for (j = 1; j <= nc; j++) OUT[j] = "-"; return }
-  n = split(s, a, ",")
-  if (n == nc)  # one value for each recommendation
-    for (j = 1; j <= nc; j++) OUT[j] = cell(a[j], id)
-  else
-    for (j = 1; j <= nc; j++) OUT[j] = "not-read"
-}
-function spread_hpa(s, nc, id,   a, n, j) {
-  if (s == "<none>") { for (j = 1; j <= nc; j++) OUT[j] = "-"; return }
-  n = split(s, a, ",")
-  if (n == nc)  # one value for each metric
+  if (n == nc)
     for (j = 1; j <= nc; j++) OUT[j] = cell(a[j], id)
   else
     for (j = 1; j <= nc; j++) OUT[j] = "not-read"
@@ -177,7 +174,7 @@ $1 == "H" {
 }
 END {
   print "# container POD CONTAINER CPU_REQ CPU_LIM MEM_REQ MEM_LIM CPU_USED MEM_USED RESTARTS POD_LAST_END"
-  if (pods == "failed") print "# pods: not read, the command failed"
+  if (pods == "failed") print "# pods: not read, the query failed"
   else if (NP == 0 && NP_BAD == 0) print "# pods: none in this namespace"
   for (i = 1; i <= NP; i++) {
     if (PODS[PF[i, 2]] > 1) { NP_BAD++; continue }  # a pod row twice
@@ -185,11 +182,13 @@ END {
     nc = split(PF[i, 3], c, ",")
     split("", CN); dup = 0
     for (j = 1; j <= nc; j++) { if (c[j] in CN) dup = 1; CN[c[j]] = j }
-    if (nc == 0 || dup) { NP_BAD++; continue }
-    spread(PF[i, 4], nc, "qty-cpu"); for (j = 1; j <= nc; j++) CR[j] = OUT[j]
-    spread(PF[i, 5], nc, "qty-mem"); for (j = 1; j <= nc; j++) MR[j] = OUT[j]
-    spread(PF[i, 6], nc, "qty-cpu"); for (j = 1; j <= nc; j++) CL[j] = OUT[j]
-    spread(PF[i, 7], nc, "qty-mem"); for (j = 1; j <= nc; j++) ML[j] = OUT[j]
+    if (nc == 0 || dup) { NP_BAD++; continue }  # two containers with one name
+    # Columns 4 to 7: CPU_REQ, MEM_REQ, CPU_LIM, MEM_LIM.
+    for (col = 4; col <= 7; col++) {
+      id = (col % 2 == 0) ? "qty-cpu" : "qty-mem"
+      spread(PF[i, col], nc, id)  # one value for each container
+      for (j = 1; j <= nc; j++) PV[col, j] = OUT[j]
+    }
     # Restarts, matched to a container by status name.
     for (j = 1; j <= nc; j++) RST[j] = "-"
     if (!(PF[i, 8] == "<none>" && PF[i, 9] == "<none>")) {
@@ -197,7 +196,7 @@ END {
       ok = (ns_ == nr && PF[i, 8] != "<none>")
       split("", SEEN)
       for (m = 1; m <= ns_ && ok; m++) {
-        if (sn[m] in SEEN) ok = 0
+        if (sn[m] in SEEN) ok = 0  # a status name twice
         SEEN[sn[m]] = 1
         if (!(sn[m] in CN)) ok = 0  # a status name that matches no container
       }
@@ -223,11 +222,13 @@ END {
       mc = mm = "-"
       if (k in TC) { mc = cell(TC[k], "qty-cpu"); mm = cell(TM[k], "qty-mem"); USED[k] = 1 }
       if (k in TD) mc = mm = "not-read"  # a top row twice
-      print "container", cell(PF[i, 2], "dns-subdomain"), cell(c[j], "dns-label"), CR[j], CL[j], MR[j], ML[j], mc, mm, RST[j], le
+      print "container", cell(PF[i, 2], "dns-subdomain"), cell(c[j], "container-name"), PV[4, j], PV[6, j], PV[5, j], PV[7, j], mc, mm, RST[j], le
     }
   }
-  # A top row with no pod row prints its measured values, and not-read for
-  # the rest. A pod row that was not placed takes its top rows with it.
+  # A top row that no pod row used. When its pod is in the pod output
+  # (placed or not), the row is counted. When its pod is not in the pod
+  # output, or get pods failed, it prints its measured values, and
+  # not-read for the rest.
   for (t = 1; t <= NT; t++) {
     k = TK[t]
     if ((k in USED) || (k in DONE)) continue
@@ -235,35 +236,42 @@ END {
     if (PODS[TP[t]] > 0 && pods != "failed") { NT_BAD++; continue }
     mc = cell(TC[k], "qty-cpu"); mm = cell(TM[k], "qty-mem")
     if (k in TD) mc = mm = "not-read"
-    print "container", cell(TP[t], "dns-subdomain"), cell(TN[t], "dns-label"), "not-read", "not-read", "not-read", "not-read", mc, mm, "not-read", "not-read"  # a top row with no pod row
+    print "container", cell(TP[t], "dns-subdomain"), cell(TN[t], "container-name"), "not-read", "not-read", "not-read", "not-read", mc, mm, "not-read", "not-read"  # a top row with no pod row
   }
 
   print "# vpa VPA TARGET_KIND TARGET MODE CONTAINER CPU_TARGET MEM_TARGET CPU_LOWER MEM_LOWER CPU_UPPER MEM_UPPER"
-  if (vpa == "failed") print "# vpa: not read, the command failed (the type may not be installed)"  # a failed command leaves a trace
+  if (vpa == "failed") print "# vpa: not read, the query failed or the server has no such type"  # a failed vpa query leaves a trace
   else if (NV == 0 && NV_BAD == 0) print "# vpa: none in this namespace"
   for (i = 1; i <= NV; i++) {
     head = "vpa " cell(VF[i, 2], "dns-subdomain") " " cell(VF[i, 3], "kind-name") " " cell(VF[i, 4], "dns-subdomain") " " cell(VF[i, 5], "update-mode")
     if (VF[i, 6] == "<none>") { print head, "-", "-", "-", "-", "-", "-", "-"; continue }
     nc = split(VF[i, 6], c, ",")
+    # Columns 7 to 12: CPU_TARGET, MEM_TARGET, CPU_LOWER, MEM_LOWER,
+    # CPU_UPPER, MEM_UPPER.
     for (col = 7; col <= 12; col++) {
-      spread_vpa(VF[i, col], nc, (col % 2 == 1) ? "qty-cpu" : "qty-mem")
+      id = (col % 2 == 1) ? "qty-cpu" : "qty-mem"
+      spread(VF[i, col], nc, id)  # one value for each recommendation
       for (j = 1; j <= nc; j++) V[col, j] = OUT[j]
     }
     for (j = 1; j <= nc; j++)
-      print head, cell(c[j], "dns-label"), V[7, j], V[8, j], V[9, j], V[10, j], V[11, j], V[12, j]
+      print head, cell(c[j], "container-name"), V[7, j], V[8, j], V[9, j], V[10, j], V[11, j], V[12, j]
   }
 
   print "# hpa HPA TARGET_KIND TARGET MIN MAX CURRENT DESIRED METRIC_TYPE METRIC UTILIZATION"
-  if (hpa == "failed") print "# hpa: not read, the command failed"
+  if (hpa == "failed") print "# hpa: not read, the query failed or the server has no such type"  # a failed hpa query leaves a trace
   else if (NH == 0 && NH_BAD == 0) print "# hpa: none in this namespace"
   for (i = 1; i <= NH; i++) {
     head = "hpa " cell(HF[i, 2], "dns-subdomain") " " cell(HF[i, 3], "kind-name") " " cell(HF[i, 4], "dns-subdomain")
     head = head " " cell(HF[i, 5], "int") " " cell(HF[i, 6], "int") " " cell(HF[i, 7], "int") " " cell(HF[i, 8], "int")
     if (HF[i, 9] == "<none>") { print head, "-", "-", "-"; continue }
     nc = split(HF[i, 9], c, ",")
-    spread_hpa(HF[i, 10], nc, "metric-resource"); for (j = 1; j <= nc; j++) HM[j] = OUT[j]
-    spread_hpa(HF[i, 11], nc, "int"); for (j = 1; j <= nc; j++) HU[j] = OUT[j]
-    for (j = 1; j <= nc; j++) print head, cell(c[j], "metric-type"), HM[j], HU[j]
+    # Columns 10 and 11: METRIC and UTILIZATION.
+    for (col = 10; col <= 11; col++) {
+      id = (col == 10) ? "metric-resource" : "int"
+      spread(HF[i, col], nc, id)  # one value for each metric
+      for (j = 1; j <= nc; j++) HV[col, j] = OUT[j]
+    }
+    for (j = 1; j <= nc; j++) print head, cell(c[j], "metric-type"), HV[10, j], HV[11, j]
   }
 
   print "# rows not placed: top=" NT_BAD " pods=" NP_BAD " vpa=" NV_BAD " hpa=" NH_BAD
@@ -317,8 +325,9 @@ esac
 
 command -v kubectl >/dev/null 2>&1 || die 5 "kubectl is not installed"  # kubectl missing: exit 5
 
-raw=$(kube "$CMD_CONTEXT" "") || die 5 "no current context: kubectl config current-context failed"  # no context: exit 5
-[ -n "$raw" ] || die 5 "no current context"
+kube "$CMD_CONTEXT" "" || die 5 "no current context: kubectl config current-context failed"  # no context: exit 5
+raw=$(printf '%s' "$KOUT")
+[ -n "$raw" ] || die 5 "no current context: kubectl config current-context printed nothing"  # an empty context answer: exit 5
 ctx=$(context_name "$raw")  # the context name has its shape
 
 if [ "$mode" = context ]; then
@@ -331,11 +340,19 @@ echo "# Measured in the cluster: one sample from kubectl top, which is one momen
 echo "# Values: - means none is set or none was measured; other means a value was seen and does not fit its shape; not-read means a value was seen and cannot be placed on one container."
 echo "# POD_LAST_END is the last termination reason of any container of the pod, given for the pod as a whole and not for each container."
 
+# A failed top stops the run: the namespaces from that one on are not read.
+failed=
+notread=
 for ns in "$@"; do
-  top=$(kube "$CMD_TOP" "$ns") || die 6 "no metrics for namespace $ns: kubectl top pod failed. A metrics source such as the Metrics Server may be missing, or the metrics are not ready yet."  # no metrics: exit 6
-  pods_state=ok; pods=$(kube "$CMD_PODS" "$ns") || { pods_state=failed; pods=; }
-  vpa_state=ok; vpas=$(kube "$CMD_VPA" "$ns") || { vpa_state=failed; vpas=; }
-  hpa_state=ok; hpas=$(kube "$CMD_HPA" "$ns") || { hpa_state=failed; hpas=; }
+  if [ -n "$failed" ]; then notread="$notread $ns"; continue; fi
+  if ! kube "$CMD_TOP" "$ns"; then failed=$ns; notread=" $ns"; continue; fi
+  top=$KOUT
+  pods_state=ok; kube "$CMD_PODS" "$ns" || pods_state=failed; pods=$KOUT
+  vpa_state=ok; kube "$CMD_VPA" "$ns" || vpa_state=failed; vpas=$KOUT
+  hpa_state=ok; kube "$CMD_HPA" "$ns" || hpa_state=failed; hpas=$KOUT
+  [ "$pods_state" = ok ] || pods=
+  [ "$vpa_state" = ok ] || vpas=
+  [ "$hpa_state" = ok ] || hpas=
   echo "# namespace $ns"
   {
     printf '%s\n' "$top" | tag T
@@ -344,4 +361,5 @@ for ns in "$@"; do
     printf '%s\n' "$hpas" | tag H
   } | table "$pods_state" "$vpa_state" "$hpa_state" || die 1 "the table of namespace $ns could not be printed"
 done
+[ -z "$failed" ] || die 6 "kubectl top pod failed for namespace $failed, so no metrics were read (a missing metrics source, no access, or no answer). Namespaces not read:$notread"  # no metrics: exit 6
 exit 0

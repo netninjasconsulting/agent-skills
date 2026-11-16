@@ -220,6 +220,7 @@ suite() {
   no_marker "odd context"
   run "$s" "no-context" --context
   [ "$rc" -eq 5 ] || fail "no context: expected exit 5, got $rc"
+  grep -q "kubectl config current-context failed" "$work/err" || fail "no context: the message does not name the failed command"
   [ "$(log_text)" = "2 config current-context" ] || fail "no context: the log holds more than config current-context"
   no_marker "no context"
   run "$s" "empty-context" --context
@@ -480,7 +481,7 @@ pins() {
   pin "a failed hpa query leaves a trace" '# a failed hpa query leaves a trace' 's/^\( *\)if (hpa == "failed") .*  # a failed hpa query leaves a trace$/\1if (0) print/' "hpa query fails: missing line"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "no metrics exits 6" '# no metrics: exit 6' 's/^\[ -z "\$failed" \] || die 6 .*  # no metrics: exit 6$/:/' "no metrics: expected exit 6"
-  pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| :/' "no context: expected exit 5"
+  pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| :/' "no context: the message does not name the failed command"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "an empty context answer exits 5" '# an empty context answer: exit 5' 's/^\[ -n "\$raw" \] || die 5 .*  # an empty context answer: exit 5$/:/' "an empty context answer: expected exit 5"
   pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
