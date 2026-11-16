@@ -1119,7 +1119,6 @@ apiToken:
   capabilities:
     add:
       - NET_ADMIN
-    drop: [ALL]
 EOF
   cat > "$a/flow-implicit.yaml" <<'EOF'
 apiVersion: v1
@@ -1160,6 +1159,17 @@ spec:
       securityContext:
         capabilities:
           drop: [? ALL]
+EOF
+  cat > "$a/flow-q-app.yaml" <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: flow-q-app
+spec:
+  sources: [?"repoURL":https://github.com/example-fleetboard/FIXTUREVALUE]
+EOF
+  cat > "$a/values-flow-q.yaml" <<'EOF'
+ports: [?"hostPort":22]
 EOF
   cat > "$a/values-flow-item.yaml" <<'EOF'
 securityContext:
@@ -1249,10 +1259,86 @@ EOF
   [ "$code" -eq 0 ] || fail "attack flow-empty: exit $code"
   expect_line "$out" "flow-empty.yaml:13:Pod/-/flow-empty:-:volume-type=emptyDir" "attack flow-empty"
   expect_line "$out" "flow-empty.yaml:10:Pod/-/flow-empty:app:cap-drop=ALL" "attack flow-empty"
-  for b in flow flow-map-sc flow-implicit flow-implicit-app flow-items flow-question values-flow-item cm-flow values-flow flow-lines anchors indent indent-deeper quoted-marker json template dup cr tabs tab-value directive tags control values-anchor nel ls ps nul; do
+  for b in flow flow-map-sc flow-implicit flow-implicit-app flow-items flow-question flow-q-app values-flow-item values-flow-q cm-flow values-flow flow-lines anchors indent indent-deeper quoted-marker json template dup cr tabs tab-value directive tags control values-anchor nel ls ps nul; do
     att "$b.yaml"
     [ "$code" -eq 4 ] || fail "attack $b: expected exit 4, got $code"
   done
+
+  # Flow-list items, one per file as "args: [<items>]". The reader accepts
+  # an item only when it fits the allow shape of fields.md; every other
+  # form, from all review rounds, makes the file unread.
+  mkdir "$work/flow-table"
+  flowfile() {
+    printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: flow-table\nspec:\n  containers:\n    - name: app\n      args: [%s]\n' "$1" > "$work/flow-table/f.yaml"
+  }
+  while IFS= read -r item; do
+    flowfile "$item"
+    cwd=$work/flow-table
+    rd --fields f.yaml
+    [ "$code" -eq 4 ] || fail "flow form table: [$item] expected exit 4, got $code"
+  done <<'EOF'
+hostPort: 22
+key:
+? ALL
+?x
+?"hostPort":22
+?'hostPort':22
+?"hostPort":"22"
+?"hostPort":22, ?"x":1
+?hostPort
+?"hostPort"
+?"repoURL":https://github.com/example-fleetboard/FIXTUREVALUE
+?"x":NET_ADMIN
+:x
+x:y
+{a: b}
+{}
+[a]
+[]
+{{ .Values.x }}
+--ok
+-x
+*alias
+&anchor x
+!tag x
+!!str x
+"a\"b"
+"a\\b"
+'it''s'
+"a" b
+'a' b
+a,,b
+a,
+a b
+|
+>
+%x
+@x
+`x`
+=x
+~
+_x
+"FIXTUREVALUE	tab"
+EOF
+  while IFS= read -r item; do
+    flowfile "$item"
+    cwd=$work/flow-table
+    rd --fields f.yaml
+    [ "$code" -eq 0 ] || fail "flow form table: [$item] expected to be read, got exit $code"
+  done <<'EOF'
+ALL
+"NET_ADMIN"
+80, 443
+../base
+.hidden
+/abs/path
+"sh", "-c", "echo a b"
+'--x=y'
+"--url=https://user:x@db.example.com"
+NET_ADMIN, SYS_TIME
+a.b_c/d@e+f-g
+EOF
+  cwd=$a
 
   att block.yaml
   [ "$code" -eq 0 ] || fail "attack block scalars: exit $code"
@@ -1606,6 +1692,9 @@ EOF
   unread "k9/overlay:overlay:not read" "render an overlay whose base has a patch path in a flow list" --render kustomize k9/overlay
   printf 'resources:\n  - ../kustomize/base\npatches:\n  - https://attacker.invalid/FIXTUREVALUE-k10.yaml\n' > "$rr/k10/kustomization.yaml"
   refuse "k10:overlay:remote base" "render an overlay with a patch that is not a map" --render kustomize k10
+  mkdir -p "$rr/k11"
+  printf 'resources:\n  - ../kustomize/base\npatches: [?"path":https://attacker.invalid/FIXTUREVALUE-k11.yaml]\n' > "$rr/k11/kustomization.yaml"
+  unread "k11:overlay:not read" "render an overlay with a ? key in a flow list" --render kustomize k11
   # A line break in a name anywhere in a chart or overlay tree.
   cp -R "$rr/chart" "$rr/nlchart"
   mkdir "$rr/nlchart/templates/a
@@ -1618,6 +1707,77 @@ b/cm.yaml"
 y"
   printf 'resources:\n  - ../kustomize/base\n' > "$rr/nlov/kustomization.yaml"
   refuse "nlov:overlay:not a local file" "render an overlay with a line break in a name" --render kustomize nlov
+  # A path argument with a control character is refused at the front door
+  # in every mode, before any other work, with a usage error.
+  front() {
+    # $1 = label, then the reader arguments
+    label=$1; shift
+    rm -f "$work/fake-calls"
+    rd "$@"
+    [ "$code" -eq 2 ] || fail "$label: expected exit 2, got $code"
+    [ -z "$out" ] || fail "$label: printed output"
+    [ ! -e "$work/fake-calls" ] || fail "$label: the render tool ran before the refusal"
+  }
+  remote_patch='resources:\n  - cm.yaml\npatches:\n  - path: https://attacker.invalid/FIXTUREVALUE-front.yaml\n'
+  cm='apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: front\n'
+  mkdir -p "$rr/p
+q" "$rr/r
+s/ov" "$rr/t
+u/ov" "$rr/t
+u/b"
+  printf %b "$remote_patch" > "$rr/p
+q/kustomization.yaml"
+  printf %b "$cm" > "$rr/p
+q/cm.yaml"
+  printf %b "$remote_patch" > "$rr/r
+s/ov/kustomization.yaml"
+  printf %b "$cm" > "$rr/r
+s/ov/cm.yaml"
+  printf 'resources:\n  - ../b\n' > "$rr/t
+u/ov/kustomization.yaml"
+  printf %b "$remote_patch" > "$rr/t
+u/b/kustomization.yaml"
+  printf %b "$cm" > "$rr/t
+u/b/cm.yaml"
+  front "render an overlay whose path holds a line break" --render kustomize "p
+q"
+  front "render an overlay under a directory whose name holds a line break" --render kustomize "r
+s/ov"
+  front "render an overlay that reaches a base through a name with a line break" --render kustomize "t
+u/ov"
+  cp -R "$rr/chart" "$rr/c
+d"
+  front "render a chart whose path holds a line break" --render helm "c
+d" "c
+d/values.yaml"
+  front "render with a values file whose path holds a line break" --render helm chart "c
+d/values.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: tab\n' > "$rr/a	b.yaml"
+  front "read a file whose path holds a tab" --fields "a	b.yaml"
+  front "read a values file whose path holds a tab" --values "a	b.yaml"
+  front "list a path that holds a line break" "r
+s"
+  # A repository whose own path holds a line break: the resolved paths
+  # are refused too.
+  mkdir "$work/w
+x"
+  cp -R "$rr/kustomize" "$rr/chart" "$work/w
+x/"
+  git -C "$work/w
+x" init -q 2>/dev/null
+  cwd="$work/w
+x"
+  rm -f "$work/fake-calls"
+  rd --render kustomize kustomize/overlays/staging
+  [ "$code" -eq 3 ] && [ "$out" = "kustomize/overlays/staging:overlay:not a local file" ] ||
+    fail "render from a repository under a path with a line break: exit $code, printed $out"
+  [ ! -e "$work/fake-calls" ] || fail "render from a repository under a path with a line break: the render tool ran before the refusal"
+  rd --render helm chart chart/values.yaml
+  [ "$code" -eq 3 ] && [ "$out" = "chart:chart:not a local file" ] ||
+    fail "render a chart from a repository under a path with a line break: exit $code, printed $out"
+  rd .
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list a repository under a path with a line break: exit $code"
+  cwd=$rr
   RPATH=$PATH
   fi
 
@@ -1821,6 +1981,14 @@ pins() {
   pin "a kustomization entry that looks like a repository" '# an entry kustomize can take for a repository' 's/refuse "remote base"  # an entry kustomize can take for a repository/:/' refusals "render an overlay with a local directory named like a host: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L: the render tool ran before the refusal"
+  pin "the allow shape of a flow item" '# the allow shape of a flow item' 's/^\( *\)ok = .*  # the allow shape of a flow item$/\1ok = 1/' attacks 'flow form table: [?"hostPort":22] expected exit 4, got 0'
+  pin "a control character in a path argument" '# a control character in a path argument' 's/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/' refusals "render an overlay whose path holds a line break: expected exit 2"
+  # The inner layers sit behind the front door, so their pins switch the
+  # layers in front of them off as well.
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a control character in a resolved path" '# a control character in a resolved path' 's/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/;s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/' refusals "render from a repository under a path with a line break: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a queue entry that does not exist" '# a queue entry that does not exist' 's/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/;s/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/;s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/' refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
