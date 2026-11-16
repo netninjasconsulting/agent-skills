@@ -35,13 +35,13 @@ Run nothing else with `kubectl` before a yes, and nothing with `kubectl` outside
 
 ## The offer
 
-One offer, made once, as the last lines of the reply, after the closing line of the report and after the offer of the questions when both are made. For several namespaces:
+One offer, made once, as the last lines of the reply, after the closing line of the report and after the offer of the questions when both are made. Copy each quoted line below word for word, with only the names filled in. For several namespaces:
 
-"R8 needs measured use. I can read CPU and memory from the cluster context `<name>` with kubectl, read-only, for the namespaces `<list>`. Shall I? (yes or no)"
+> R8 needs measured use. I can read CPU and memory from the cluster context `<name>` with kubectl, read-only, for the namespaces `<list>`. Shall I? (yes or no)
 
 The first sentences are the spec's, word for word. Put this line directly before the offer, so that the question stays last:
 
-"It reads only the namespaces named below. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing."
+> It reads only the namespaces named below. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing.
 
 For one namespace, write "for the namespace `<namespace>`" in the offer. `<list>` is the names joined with commas, each in backticks. With no answer, or a no, the report is the result, and R8 stays "ask the team".
 

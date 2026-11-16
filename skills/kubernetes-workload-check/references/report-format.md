@@ -140,7 +140,13 @@ A line number is the line in one file, read with one command, or the line of one
 
 After the closing line, make each offer that applies, once, as the last lines of the reply, in this order. Nothing follows them.
 
-**1. The questions,** when Q is above 0. Q is the number of questions under "Questions for the team", one for each such check in each environment. A check that is "ask the team" only because its environment is not fully seen has no question, and is not in Q. Write it word for word, with only Q filled in. For several: "Q questions about the checks sit outside the repository. Shall I ask them? (yes or no)". For one: "1 question about a check sits outside the repository. Shall I ask it? (yes or no)".
+**1. The questions,** when Q is above 0. Q is the number of questions under "Questions for the team", one for each such check in each environment. A check that is "ask the team" only because its environment is not fully seen has no question, and is not in Q. Copy it word for word from the quoted line below, with only Q filled in. For several:
+
+> Q questions about the checks sit outside the repository. Shall I ask them? (yes or no)
+
+For one:
+
+> 1 question about a check sits outside the repository. Shall I ask it? (yes or no)
 
 **2. The cluster pass,** when R8 is "ask the team" in an environment whose namespace is known, and the context name was read. The words, for one namespace and for several, are in "The offer" in [cluster-pass.md](cluster-pass.md).
 
