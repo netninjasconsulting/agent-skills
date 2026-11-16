@@ -529,6 +529,8 @@ function fields_doc(    kk, k, p, i, ab, nm) {
 function fields_leaf(k, p,    ln, rel) {
   ln = LLN[0, k]
   if (p == "apiVersion") { field(ln, "-", "api-version", LVAL[0, k], LQ[0, k], LT[0, k], "api-version"); return 1 }
+  # A top-level sops key that is a block map: its name only, never a line under it.
+  if (p == "sops") { if (LT[0, k] == "none" && listcount(0, k) == -1 && LKIDS[0, k] > 0) out(ln, "-", "sops", "present"); return 1 }  # a sops block map
   if ((p == "metadata>annotations" || (POD && p == TM ">annotations")) && !ANNDONE) {
     ANNDONE = 1
     if (ANNCOUNT > 0) field(ln, "-", "annotation-credential-like-count", ANNCOUNT "", 0, "scalar", "int")
@@ -1080,7 +1082,7 @@ BEGIN {
     "quota-hard.requests.ephemeral-storage quota-hard.limits.ephemeral-storage " \
     "quota-hard.ephemeral-storage quota-hard.pods quota-other-count psa-enforce psa-enforce-version " \
     "psa-warn psa-warn-version rule.#.verb rule.#.resource rule.#.api-group rule.#.resource-names-count " \
-    "rule.#.non-resource-urls-count aggregation-rule role-ref-kind role-ref-name subject.#.kind " \
+    "rule.#.non-resource-urls-count aggregation-rule sops role-ref-kind role-ref-name subject.#.kind " \
     "subject.#.name subject.#.namespace np-pod-selector np-pod-label. np-pod-label-other-count " \
     "np-policy-type np-ingress-rules np-egress-rules np-ingress.#.peers np-egress.#.peers " \
     "np-ingress.#.peer.#.pod-selector np-egress.#.peer.#.pod-selector " \

@@ -445,6 +445,28 @@ const kubernetesVerdicts = [
   "| Ready from what the repository shows | No check is a fail or a warn. |",
 ];
 const kubernetesOrder = "Order: K7, K6, K4, K1, K8, K5, K2, K10, R1, R2, K9, K3, R3, R4, R5, R6, R7.";
+const kubernetesRules = [
+  'With several workloads in an environment, judge each one. The check gets the weakest status: fail, then warn, then "ask the team", then pass. The evidence names the workload that earned it. A workload whose part does not apply leaves the comparison.',
+  'R8 cannot pass from the repository. When R1 fails, R8 does not apply. Otherwise R8 is "ask the team", and the cluster pass is how it is answered. R3 uses a line of this skill\'s own, not a Kubernetes rule: a memory limit of more than twice its request is a warn.',
+];
+// The K7 table: one status for each case, every row of it.
+const kubernetesK7Rows = [
+  "| Case | Fields | Status |",
+  "| --- | --- | --- |",
+  "| A Secret with values in the repository | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |",
+  "| A Secret encrypted by SOPS | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and `sops=present` | pass for that object |",
+  "| A sealed or external secret kind | A kind the reader does not read, such as `SealedSecret` or `ExternalSecret` | not a K7 case: \"Not checked\" |",
+  "| An env var with a written value and a name on the fail list | `env.<NAME>=literal` | fail |",
+  "| A key with a value in a values file, named on the fail list | `values-key.<path>=scalar` with the kind `Values` | fail |",
+  "| A key with a value in an `Application`'s inline values, named on the fail list | `values-key.<path>=scalar` with the kind `Application` or `ApplicationSet` | fail |",
+  "| A key with a value in a ConfigMap, named on the fail list | `configmap-data.<key>=scalar`. A ConfigMap gives no secrecy (K21) | fail |",
+  "| A key in an `ApplicationSet` list generator, named on the fail list | `list-element.<i>.<j>.<key>` | fail |",
+  "| A name on the ask list, in any of the five cases above | `env.<NAME>=literal`, `values-key.<path>=scalar`, `configmap-data.<key>=scalar`, `list-element.<i>.<j>.<key>` | ask the team |",
+  "| A credential-like command or argument item | `args-credential-like-count` above 0 | ask the team |",
+  "| A credential-like annotation key with a value | `annotation-credential-like-count` above 0 | ask the team |",
+  "| A user part in a repository address | `source.<n>.url-has-user-part=true`. The reader does not tell a user name from a password | ask the team |",
+  "| A key or an env entry the reader could not read | `env-other-count` above 0, `values-key-unreadable-count` above 0, `source.<n>.helm-values=other` | ask the team at best; the file and line go under \"Not checked\" |",
+];
 // The cluster script runs these commands and no others. Each is pinned whole, in order, in the
 // script's own block and in the code block of fields.md, so that a command added, removed, or
 // changed in either place fails here.
@@ -475,9 +497,30 @@ if (existsSync(kubernetesSkill)) {
     if (!skillLines.includes(check)) fail(skillFile, `a check does not match its fixed wording: ${check}`);
     if (!checksLines.includes(`### ${check}`)) fail(checksFile, `a check heading does not match its fixed wording: ${check}`);
   });
-  [...kubernetesStatuses, ...kubernetesVerdicts, kubernetesOrder].forEach((line) => {
+  [...kubernetesStatuses, ...kubernetesVerdicts, kubernetesOrder, ...kubernetesRules].forEach((line) => {
     if (!skillLines.includes(line)) fail(skillFile, `a line does not match its fixed wording: ${line}`);
   });
+  // Every row of the two tables, so that an extra row fails whatever its first cell says.
+  sameLines(skillFile, checksSection.filter((line) => /^\| /.test(line)), ["| Status | Meaning | Points |", "| --- | --- | --- |", ...kubernetesStatuses], "every row of the status table");
+  sameLines(skillFile, sectionLines(skillLines, "## The verdict").filter((line) => /^\| /.test(line)), ["| Verdict | Rule |", "| --- | --- |", ...kubernetesVerdicts], "every row of the verdict table");
+  // One order line in each file, and the two rules each once.
+  sameLines(skillFile, skillLines.filter((line) => /Order:/.test(line)), [kubernetesOrder], "the one order line");
+  sameLines(checksFile, checksLines.filter((line) => /Order:/.test(line)), [kubernetesOrder], "the one order line");
+  kubernetesRules.forEach((rule) => sameLines(skillFile, skillLines.filter((line) => line === rule), [rule], "the weakest-status rule and the R3 line"));
+  // Each check sits under its own score.
+  const sizing = kubernetesChecks.filter((check) => check.startsWith("R"));
+  const security = kubernetesChecks.filter((check) => check.startsWith("K"));
+  const between = (lines, from, to) => {
+    const a = lines.indexOf(from);
+    const b = to === null ? lines.length : lines.indexOf(to);
+    return a === -1 || b === -1 || b < a ? [] : lines.slice(a + 1, b);
+  };
+  const isCheck = (line) => /^[RK]\d+\. /.test(line);
+  sameLines(skillFile, between(checksSection, "**Sizing**", "**Security**").filter(isCheck), sizing, "the sizing checks under Sizing");
+  sameLines(skillFile, between(checksSection, "**Security**", null).filter(isCheck), security, "the security checks under Security");
+  sameLines(checksFile, sectionLines(checksLines, "## Sizing").filter((line) => /^#+ [RK]\d+\. /.test(line)), sizing.map((check) => `### ${check}`), "the sizing check headings under Sizing");
+  sameLines(checksFile, sectionLines(checksLines, "## Security").filter((line) => /^#+ [RK]\d+\. /.test(line)), security.map((check) => `### ${check}`), "the security check headings under Security");
+  sameLines(checksFile, between(checksLines, `### ${kubernetesChecks[14]}`, `### ${kubernetesChecks[15]}`).filter((line) => /^\| /.test(line)), kubernetesK7Rows, "every row of the K7 table");
   const script = path.join(kubernetesSkill, "scripts", "read-cluster-usage.sh");
   const scriptLines = existsSync(script) ? read(script).split("\n") : [];
   const begin = scriptLines.indexOf("# BEGIN the fixed command list");

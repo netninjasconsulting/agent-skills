@@ -9,8 +9,9 @@ The status table, the verdict table, and the order of the first three are in [SK
 1. [Rules that hold for every check](#rules-that-hold-for-every-check)
 2. [Sizing](#sizing)
 3. [Security](#security)
-4. [The cluster pass and R8](#the-cluster-pass-and-r8)
-5. [The first three to change](#the-first-three-to-change)
+4. [Known limits](#known-limits)
+5. [The cluster pass and R8](#the-cluster-pass-and-r8)
+6. [The first three to change](#the-first-three-to-change)
 
 ## Rules that hold for every check
 
@@ -47,7 +48,7 @@ An absent field is "not found" too, with the exceptions in this table. Each exce
 | K5 | `service-account` | The `default` ServiceAccount of the namespace | K27 |
 | K5 | `automount-sa-token` on the pod and on its ServiceAccount | Token mounting not turned off | not applicable |
 | K6 | No Role, ClusterRole, RoleBinding, or ClusterRoleBinding in the environment | Nothing to judge | not applicable |
-| K7 | No Secret object, and none of the K7 fields with a credential-like name | No secret written in the repository | not applicable |
+| K7 | No Secret object, and none of the K7 cases | No secret written in the repository | not applicable |
 | K8 | No NetworkPolicy that selects a workload's pods | The workload is not isolated, so all traffic is allowed | K18 |
 | K10 | `psa-enforce` on a Namespace object in the environment | No level enforced | K19 |
 
@@ -113,10 +114,10 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 - **Which containers:** a container that prints both values. A container that lacks either one is judged by R1 or R2, and its part of R3 does not apply.
 - **Pass:** every such container has a limit of at most twice its request.
 - **Warn:** a limit is more than twice its request, or below its request. A memory value with the suffix `m` is named in the evidence as millibytes.
-- **Fail:** not used. A wide limit costs money and does not stop the workload.
+- **Fail:** not used. This check's own call: a wide limit is a sizing gap, and the sizing checks do not block alone.
 - **Ask the team:** either value is `other`.
 - **Does not apply:** no container in the environment prints both values.
-- **Question:** "Is the memory request of <container> of <workload> at <file:line> the value it needs under normal load?"
+- **Question:** "Does the <field> at <file:line> sit within twice the memory request of <container> of <workload>?"
 
 ### R4. Every autoscaler has what it needs to work.
 
@@ -124,8 +125,8 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 - **Fields, VerticalPodAutoscaler:** `scale-target-kind`, `scale-target-name`, `update-mode`.
 - **Fields, the target:** the workload with that kind and name in the same namespace of the environment (`object=present`), and the `cpu-request` and `memory-request` of every container in its pod template. A `Rollout` is a valid target, and with `workloadRef` its pod template is the Deployment's (A1, A3).
 - **Pass:** every autoscaler names a target that is in the environment; every HorizontalPodAutoscaler has `min-replicas` below `max-replicas`; and for every metric with `metric-type=Resource` and `metric-target-type=Utilization`, every container of the target prints a request for that `metric-resource`. A `Utilization` target is a percentage of the request (K9).
-- **Warn:** `min-replicas` is equal to or above `max-replicas`, so the autoscaler cannot scale out.
-- **Fail:** an autoscaler names a target that is not in the environment; or a `Utilization` target on `cpu` or `memory` meets a container of the target with no request for it.
+- **Warn:** `min-replicas` is equal to or above `max-replicas`, so the autoscaler cannot scale out; or a `Utilization` target on `cpu` or `memory` meets a container of the target with no request for it, and a LimitRange in its namespace in the environment prints the matching `limit-default-request`. The request is filled in at admission (K12), as in R1.
+- **Fail:** an autoscaler names a target that is not in the environment; or a `Utilization` target on `cpu` or `memory` meets a container of the target with no request for it, and no LimitRange in the environment fills it.
 - **Ask the team:** a metric of a type other than `Resource` (its source sits outside the repository); a deciding field is `other`; or the target is not read or not rendered.
 - **Not checked, always:** whether a metrics source runs in the cluster, and whether the VerticalPodAutoscaler is installed (K10). They are listed under "Not checked" for each environment with an autoscaler, and they do not change the status.
 - **Does not apply:** the environment holds no HorizontalPodAutoscaler and no VerticalPodAutoscaler.
@@ -158,10 +159,10 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 - **Fields:** on each Job and CronJob: `active-deadline-seconds`, and `pod-active-deadline-seconds` on its pod template. On each CronJob: `concurrency-policy` (defaults to `Allow`, K8). Context: `backoff-limit`, `ttl-seconds-after-finished`, `starting-deadline-seconds`, `history-limit-successful`, `history-limit-failed`.
 - **Pass:** every Job and CronJob prints `active-deadline-seconds` or `pod-active-deadline-seconds`, and every CronJob prints `concurrency-policy=Forbid` or `concurrency-policy=Replace`.
 - **Warn:** every Job and CronJob has a deadline, and a CronJob leaves `concurrency-policy` absent or at `Allow`, so a slow run and the next one can run at once.
-- **Fail:** a Job or CronJob has no deadline at either level. Its retries stop at `backoff-limit` (6 by default, K7), and a run that hangs does not end.
+- **Fail:** a Job or CronJob has no deadline at either level. Its retries stop at `backoff-limit` (6 by default, K7). Whether anything else ends a run that hangs was not read (verify).
 - **Ask the team:** a deadline field or `concurrency-policy` is `other`.
 - **Does not apply:** the environment holds no Job and no CronJob. A Deployment that does batch work has no field to say so (see `fields.md`).
-- **Question:** "Does the code of <workload> end a run that hangs?"
+- **Question:** "Does the <field> at <file:line> give <workload> a deadline, and keep its scheduled runs from overlapping?"
 
 ### R8. Requests match measured use.
 
@@ -198,7 +199,7 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 - **Fields:** `read-only-root-fs` on each container. Context: `mount.<volume-name>`, `volume-type`, `emptydir-size-limit`, for where the program can still write.
 - **Pass:** every container prints `read-only-root-fs=true`.
 - **Warn:** a container prints `read-only-root-fs=false`, or leaves it absent (it defaults to false, K1).
-- **Fail:** not used. A writable root filesystem widens what an intruder can change, and does not alone expose the node or the cluster.
+- **Fail:** not used. This check's own call: a writable root filesystem is a hardening gap, and K1, K2, and K4 judge the settings that reach the node.
 - **Ask the team:** `read-only-root-fs` is `other`, or the workload is not read or not rendered.
 - **Question:** "Is the root filesystem of <containers> made read-only in a setting the repository does not show?"
 
@@ -206,8 +207,8 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 
 - **Fields:** `host-network`, `host-pid`, `host-ipc` on the pod; `volume-type=hostPath`, `host-path`, and `mount.<volume-name>` for each mount of that volume; `host-port` on each container.
 - **Pass:** no workload prints `host-network=true`, `host-pid=true`, `host-ipc=true`, a `volume-type=hostPath`, or a `host-port`.
-- **Warn:** a `hostPath` volume that every container mounts with `mount.<volume-name>=read-only`; or a `host-port`. The page says that path restrictions on a `hostPath` hold only for read-only mounts (K15).
-- **Fail:** a pod prints `host-network=true`, `host-pid=true`, or `host-ipc=true`; or a `hostPath` volume has a mount of `read-write` (`readOnly` absent or false), or no mount at all.
+- **Warn:** a `host-port`.
+- **Fail:** a pod prints `host-network=true`, `host-pid=true`, or `host-ipc=true`; or it has a `hostPath` volume, read-only or not. A read-only mount narrows what the pod can change on the node and still shares the node's files (K15). The evidence names each `mount.<volume-name>` line.
 - **Ask the team:** `host-network`, `host-pid`, `host-ipc`, or `host-port` is `other`, or the workload is not read or not rendered. A `volume-type=other` is not a `hostPath`, because `hostPath` is one of the source keys the reader reads; it goes under "Not checked".
 - **Not checked, always:** `hostUsers` and `procMount` have no field.
 - **Question:** "Does <workload> leave the host's network, processes, and files alone in a setting the repository does not show?"
@@ -227,37 +228,46 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 
 - **Fields:** on each Role and ClusterRole in the environment: `rule.<n>.verb`, `rule.<n>.resource`, `rule.<n>.api-group`, `rule.<n>.resource-names-count`, `rule.<n>.non-resource-urls-count`, `aggregation-rule`. On each RoleBinding and ClusterRoleBinding: `role-ref-kind`, `role-ref-name`, `subject.<n>.*`.
 - **Pass:** every rule names its verbs and its resources with no `*`, and no rule carries a warn below.
-- **Warn:** a rule names `*` in `rule.<n>.api-group` with named verbs and resources; grants `get`, `list`, or `watch` on `secrets` with no `resource-names-count` (each of the three reveals Secret contents, K17); grants `create` on `pods` or a workload resource (it grants the access of every ServiceAccount in the namespace, K17); or prints `rule.<n>.non-resource-urls-count`.
-- **Fail:** a rule prints `rule.<n>.verb=*` or `rule.<n>.resource=*` (a wildcard also covers kinds created later, K17), or the verb `escalate`, `bind`, or `impersonate` (each lets a holder reach rights it was not given, K17).
-- **Ask the team:** a ClusterRole prints `aggregation-rule=present` (its rules are filled in by a controller in the cluster, K16); a binding names a `role-ref-name` that is not in the environment; or a rule field is `other`.
+- **Warn:** a binding prints `role-ref-kind=ClusterRole` with `role-ref-name=admin` or `role-ref-name=edit`; a rule names `*` in `rule.<n>.api-group` with named verbs and resources; grants `get`, `list`, or `watch` on `secrets` with no `resource-names-count` (each of the three reveals Secret contents, K17); grants `create` on `pods` or a workload resource (it grants the access of every ServiceAccount in the namespace, K17); or prints `rule.<n>.non-resource-urls-count`.
+- **Fail:** a rule prints `rule.<n>.verb=*` or `rule.<n>.resource=*` (a wildcard also covers kinds created later, K17), or the verb `escalate`, `bind`, or `impersonate` (each lets a holder reach rights it was not given, K17); or a RoleBinding or ClusterRoleBinding prints `role-ref-kind=ClusterRole` with `role-ref-name=cluster-admin`, whatever its subject: a workload's ServiceAccount, the `default` account, or a group (the reader prints no group name, so `subject.<n>.kind=Group` stands for it).
+- **Built-in roles.** A binding may name a ClusterRole that the cluster carries and the repository does not. This check judges three of them by name: `cluster-admin` grants every action on every resource, and `admin` and `edit` grant wide write access within a namespace (verify: these built-in roles are not in `fields.md`).
+- **Ask the team:** a ClusterRole prints `aggregation-rule=present` (its rules are filled in by a controller in the cluster, K16); a binding names a `role-ref-name` that is not in the environment and is not one of the three built-in roles above; or a rule field is `other`.
 - **Does not apply:** the environment holds no Role, ClusterRole, RoleBinding, or ClusterRoleBinding.
 - **Question:** "Do the roles <list>, named by bindings in the repository and defined outside it, name their verbs and resources with no wildcard?"
 
 ### K7. Secrets stay out of manifests and values files.
 
-- **Fields:** see each case. The reader never prints a Secret value, a ConfigMap value, an env value, an argument, an annotation value, or a values-file value. K7 is decided from key names, sources, states, and counts. A name is credential-like when it matches the list in `fields.md` ("Credential-like names").
+- **Fields:** see each case. The reader never prints a Secret value, a ConfigMap value, an env value, an argument, an annotation value, or a values-file value. K7 is decided from key names, sources, states, marks, and counts.
 - **Which files:** the files of the environment and their rendered output, the values files the environment uses (the chart's own `values.yaml` and each `valueFiles` entry), and the inline values of its `Application`.
+- **Two lists of names.** Both are this skill's own lines, not a Kubernetes rule.
+  - **The words of a name.** Split the name at `_`, `-`, and `.`, and before a capital letter that follows a lower case letter or a digit, then make each word lower case. `MAP_TILES_API_KEY` gives `map tiles api key`, and `automountServiceAccountToken` gives `automount service account token`. For a values path, the name is its last key: `smtp.password` is judged as `password`.
+  - **The fail list.** A name whose last word is `password`, `passwd`, `secret`, `token`, `apikey`, `privatekey`, `accesskey`, `secretkey`, `credential`, or `credentials`, or whose last two words are `api key`, `private key`, `access key`, or `secret key`. These names are never on it: `existingSecret`, `secretName`, `secretRef`, `secretKeyRef`, `automountServiceAccountToken`, and any name whose word before the last is `existing`. So `DB_PASSWORD`, `smtp.password`, `MAP_TILES_API_KEY`, and `partner-api-token` are on the fail list, and `DB_PASSWORD_FILE`, `TOKEN_TTL`, `tls.secretName`, `existingSecret`, and `auth.enabled` are not.
+  - **The ask list.** Every other name that the reader's wide list in `fields.md` ("Credential-like names") marks as credential-like, and every values path with a credential-like key above its last one (`database.credentials.user`). That list is wide on purpose, to keep values from printing, and most names on it hold no secret.
 - **One status for each case:**
 
 | Case | Fields | Status |
 | --- | --- | --- |
-| A Secret with values in the repository | A `Secret` object that prints `secret-key.data` or `secret-key.string-data` | fail |
-| A sealed or encrypted secret kind | A kind other than `Secret`, such as an operator's sealed or external secret kind. The reader does not read it | not a K7 case: listed under "Not checked" |
-| An env var with a written value and a credential-like name | `env.<NAME>=literal` | fail |
-| A credential-like key with a value in a values file | `values-key.<path>=scalar` with the kind `Values`, where any key on the path is credential-like | fail |
-| A credential-like key with a value in an `Application`'s inline values | `values-key.<path>=scalar` with the kind `Application` or `ApplicationSet`, where any key on the path is credential-like | fail |
-| A credential-like key with a value in a ConfigMap | `configmap-data.<key>=scalar`. A ConfigMap gives no secrecy (K21) | fail |
-| A credential-like key in an `ApplicationSet` list generator | `list-element.<i>.<j>.<key>` with a credential-like key | fail |
-| A credential-like command or argument item | `args-credential-like-count` above 0. The item may carry a value, a file path, or a reference, and the reader shows none of them | ask the team |
-| A credential-like annotation key with a value | `annotation-credential-like-count` above 0. The value may be a path or a reference | ask the team |
+| A Secret with values in the repository | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |
+| A Secret encrypted by SOPS | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and `sops=present` | pass for that object |
+| A sealed or external secret kind | A kind the reader does not read, such as `SealedSecret` or `ExternalSecret` | not a K7 case: "Not checked" |
+| An env var with a written value and a name on the fail list | `env.<NAME>=literal` | fail |
+| A key with a value in a values file, named on the fail list | `values-key.<path>=scalar` with the kind `Values` | fail |
+| A key with a value in an `Application`'s inline values, named on the fail list | `values-key.<path>=scalar` with the kind `Application` or `ApplicationSet` | fail |
+| A key with a value in a ConfigMap, named on the fail list | `configmap-data.<key>=scalar`. A ConfigMap gives no secrecy (K21) | fail |
+| A key in an `ApplicationSet` list generator, named on the fail list | `list-element.<i>.<j>.<key>` | fail |
+| A name on the ask list, in any of the five cases above | `env.<NAME>=literal`, `values-key.<path>=scalar`, `configmap-data.<key>=scalar`, `list-element.<i>.<j>.<key>` | ask the team |
+| A credential-like command or argument item | `args-credential-like-count` above 0 | ask the team |
+| A credential-like annotation key with a value | `annotation-credential-like-count` above 0 | ask the team |
 | A user part in a repository address | `source.<n>.url-has-user-part=true`. The reader does not tell a user name from a password | ask the team |
 | A key or an env entry the reader could not read | `env-other-count` above 0, `values-key-unreadable-count` above 0, `source.<n>.helm-values=other` | ask the team at best; the file and line go under "Not checked" |
 
-- **Sealed or encrypted.** A secret kind that holds only a sealed or encrypted value (any kind other than `Secret`) is not read by the reader and is never a K7 fail. A `Secret` object fails whatever its annotations say: the reader prints no annotation key, so version 1 has no field that shows a `Secret` encrypted in place, and the evidence says so.
-- **States that do not count alone:** a `values-key` or `configmap-data` line with `empty` or `block`. The keys under a `block` print lines of their own, and a `scalar` one among them counts when any key on its path is credential-like (`database.credentials.user`).
-- **Pass:** none of the cases above in the environment.
+- **Empty placeholders.** A `values-key` or `configmap-data` line with `empty` (an empty string, `null`, or `~`) or `block` holds no value of its own and is not a case. The keys under a `block` print lines of their own. The reader cannot tell an empty env value or an empty Secret key from a set one: `env.<NAME>=literal` and `secret-key.*` print the same either way, so those cases are judged as written in the table.
+- **SOPS.** `sops=present` says that the file carries the metadata block SOPS writes when it encrypts a file (verify). The skill cannot check that every value is encrypted: SOPS leaves key names in clear and can leave chosen values in clear (verify). The evidence says "encrypted by SOPS as far as the file shows", with the line of `sops=present`.
+- **Sealed and external secret kinds.** The reader does not read them. The list mode prints such a file as `manifest`, and `--fields` prints no line at all for a document of a kind it does not read, not even `object=present`. So a listed `manifest` for which `--fields` prints nothing, with exit code 0, holds only kinds the reader does not read: it goes under "Not checked" by its path, as "a kind the reader does not read", and never fails K7. The agent cannot see the kind's name. In a file with several documents, a document of such a kind leaves no line, and the report says that the file may hold kinds the reader does not read.
+- **Annotations.** The reader prints no annotation key, so an annotation can never show that a `Secret` is sealed or encrypted.
+- **Pass:** none of the fail or "ask the team" cases in the environment.
 - **Evidence:** each case names the file, the line, the object, and the key name or the count. Never a value. A credential in other source code (not a manifest and not a values file) is reported under "Also found" with its path, its line, and its type, and the report points to the vibe-code pre-launch check for the full secrets pass.
-- **Question:** "Do the items at <file:line list> hold only references, file paths, or user names, and no secret values?"
+- **Question:** "Do the items at <file:line list> hold only references, file paths, user names, or settings, and no secret values?"
 
 ### K8. A NetworkPolicy covers every workload.
 
@@ -274,20 +284,28 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 
 - **Fields:** `image-pin`, `image-registry`, and `image-repository` on each container. Context: `image-pull-policy`. The reader never prints a tag.
 - **Pass:** every container prints `image-pin=digest` and an `image-registry` other than `default`.
-- **Warn:** a container prints `image-pin=tag` (a tag can be moved to another image), or `image-registry=default`. With no registry written, the image comes from the Docker public registry (K26). How the reader tells a host from a path is "verify" (see `fields.md`), and the evidence says so.
+- **Warn:** a container prints `image-pin=tag` (whether a registry lets a tag move to another image is not read, verify; this check's own call is that only a digest pins), or `image-registry=default`. With no registry written, the image comes from the Docker public registry (K26). How the reader tells a host from a path is "verify" (see `fields.md`), and the evidence says so.
 - **Fail:** a container prints `image-pin=latest` or `image-pin=none`. An image with no tag and no digest is treated as `latest` (K26).
 - **Ask the team:** `image-registry` or `image-repository` is `other` (the image did not fit the image shape), or the workload is not read or not rendered. For a chart that was not rendered, the `values.<path>` lines ending in `image.tag` or `image.digest` are named in the evidence as what the values set.
 - **Question:** "Do the images of <containers> come from a registry the team controls, pinned by digest?"
 
 ### K10. Every namespace enforces the restricted Pod Security level.
 
-- **Fields:** on each Namespace object in the environment: `psa-enforce`, `psa-enforce-version`, `psa-warn`, `psa-warn-version`. Only `enforce` rejects a pod; `warn` only warns (K19).
+- **Fields:** on each Namespace object in the environment: `psa-enforce`, `psa-enforce-version`, `psa-warn`, `psa-warn-version`. Only `enforce` rejects a pod; `warn` only warns (K19). The third mode label, which writes to the audit log, is not printed by the reader (see `fields.md`), and it never counts as a level here.
 - **Pass:** every namespace of the environment has a Namespace object that prints `psa-enforce=restricted`.
 - **Warn:** a Namespace object prints `psa-enforce=baseline`, or prints no `psa-enforce` and a `psa-warn` line.
 - **Fail:** a Namespace object prints `psa-enforce=privileged`, or prints neither `psa-enforce` nor `psa-warn`.
 - **Ask the team:** the environment holds no Namespace object for a namespace, or `psa-enforce` is `other`.
 - **Not checked, always:** a level set in the API server's own configuration has no field (verify).
 - **Question:** "Do the namespaces <list> enforce the restricted Pod Security level in a label the repository does not show?"
+
+## Known limits
+
+- **A system workload that needs the host fails K4 by design.** A network plugin, a node exporter, or a log shipper mounts a `hostPath` or uses the host network on purpose. K4 fails it all the same, and the evidence line names the workload and the field, so that a team can see the failure is one it chose. The skill does not keep a list of workloads that may use the host.
+- **A credential in an argument or an annotation is counted, not seen.** `args-credential-like-count` and `annotation-credential-like-count` count items with a credential-like name. The reader cannot tell a written secret from a reference such as `--token=$(TOKEN)` or a file path, so each count is "ask the team", and it cannot block a verdict on its own.
+- **An empty env value or Secret key looks set.** `env.<NAME>=literal` and `secret-key.*` print the same for an empty value as for a set one (see K7).
+- **SOPS as far as the file shows.** `sops=present` does not prove that every value is encrypted (see K7).
+- **Kinds the reader does not read leave no line.** A sealed or external secret kind, or any other kind outside `fields.md`, prints nothing (see K7).
 
 ## The cluster pass and R8
 
