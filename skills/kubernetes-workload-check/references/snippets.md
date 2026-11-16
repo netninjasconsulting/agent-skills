@@ -1,6 +1,6 @@
 # Snippets
 
-Fixes to paste, one section for each check. The field paths come from [fields.md](fields.md). Adapt names and paths to the repository, and say which lines were adapted.
+Fixes to paste, one section for each check. The field paths come from [fields.md](fields.md). Each snippet is one YAML block and at most one line under it that starts with "Note:". A first-three item copies the block and its note as they stand, with names, files, and placeholders adapted to the repository, and takes nothing else from this file. In a report, each "verify" is written as "not confirmed against the documentation".
 
 Every value is a placeholder in angle brackets. A snippet shows where a setting goes and leaves the value to the team: the skill never says what a request, a limit, a size, a deadline, a replica count, or a utilisation target should be. Here, "verify" marks a name, a key, or a form that `fields.md` does not hold, or that it marks "verify": it was not read in the Kubernetes, Helm, Kustomize, or Argo documentation on 15 November 2026, so read the current page before pasting it. A secret never goes into a snippet, as a value or as an example.
 
@@ -29,8 +29,6 @@ Each snippet shows only the fields that fix its check, in the place they sit. `<
 
 ## R1. Requests
 
-Set both requests on every container, init containers included. Choose the values from measured use.
-
 ```yaml
 # <P>
 containers:
@@ -47,10 +45,10 @@ initContainers:
         memory: <memory request, from measured use>
 ```
 
-In a chart whose template reads `resources` from its values (the key names are the chart's own, verify):
+Note: Every container needs both requests, init containers included.
 
 ```yaml
-# values-<environment>.yaml
+# values-<environment>.yaml, for a chart whose template reads resources from its values (the key names are the chart's own, verify)
 resources:
   requests:
     cpu: <CPU request, from measured use>
@@ -68,11 +66,9 @@ containers:
         memory: <memory limit>
 ```
 
-The chart form is the R1 values block with `limits` in place of `requests` (verify).
+Note: In a chart, the values form is the R1 values block with `limits` in place of `requests` (verify).
 
 ## R3. Limit close to the request
-
-Keep the memory limit at most twice the memory request. Twice is this skill's own line, not a Kubernetes rule. A limit below the request is a warn too.
 
 ```yaml
 # <P>
@@ -85,9 +81,9 @@ containers:
         memory: <memory limit, at most twice the request>
 ```
 
-## R4. Autoscalers
+Note: Twice is this skill's own line, not a Kubernetes rule, and a limit below the request is a warn too.
 
-Name a target that is in the environment, keep the minimum below the maximum, and give every container of the target a request for each resource a `Utilization` metric reads (R1).
+## R4. Autoscalers
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -111,11 +107,9 @@ spec:
           averageUtilization: <percent of the request>
 ```
 
-For a VerticalPodAutoscaler, the target is `spec.targetRef` with the same three keys, and the mode is `spec.updatePolicy.updateMode`. Whether the VerticalPodAutoscaler and a metrics source are installed is outside the repository.
+Note: Every container of the target needs a request for the resource a `Utilization` metric reads (R1); a VerticalPodAutoscaler names its target in `spec.targetRef` with the same three keys.
 
 ## R5. Namespace defaults and ceilings
-
-Give each namespace a LimitRange, a ResourceQuota, or both, in the same environment as its workloads.
 
 ```yaml
 apiVersion: v1
@@ -137,6 +131,8 @@ spec:
         memory: <memory ceiling>
 ```
 
+Note: Put it in the same environment as the namespace's workloads, so that the check can see it.
+
 ```yaml
 apiVersion: v1
 kind: ResourceQuota
@@ -151,11 +147,9 @@ spec:
     limits.memory: <total memory limits>
 ```
 
-With a ResourceQuota on CPU or memory, every new pod in the namespace must set a request or a limit for it, or it may be rejected.
+Note: With a ResourceQuota on CPU or memory, every new pod in the namespace must set a request or a limit for it, or it may be rejected.
 
 ## R6. Scratch space
-
-Give every `emptyDir` volume a size limit. A volume with `medium: Memory` keeps its files in memory.
 
 ```yaml
 # <P>
@@ -165,9 +159,9 @@ volumes:
       sizeLimit: <size>
 ```
 
-## R7. Batch deadlines
+Note: Every `emptyDir` volume needs a size limit, one with `medium: Memory` included.
 
-Give every Job a deadline, and keep each CronJob's runs from overlapping.
+## R7. Batch deadlines
 
 ```yaml
 apiVersion: batch/v1
@@ -190,13 +184,13 @@ spec:
       activeDeadlineSeconds: <seconds>
 ```
 
+Note: `concurrencyPolicy` keeps a slow run and the next one from running at once.
+
 ## R8. Measured use
 
-No snippet. R8 is answered by measured use, not by a file: the cluster pass reads it after a yes, and the team chooses the requests from it.
+No snippet: R8 is answered by measured use, not by a file.
 
 ## K1. Not root, not privileged
-
-Run as a user other than root, at the pod or at each container, and leave `privileged` unset or false. A container-level setting overrides the pod-level one.
 
 ```yaml
 # <P>
@@ -209,6 +203,8 @@ containers:
     securityContext:
       privileged: false
 ```
+
+Note: A container-level setting overrides the pod-level one.
 
 ## K2. Capabilities and escalation
 
@@ -223,11 +219,9 @@ containers:
           - ALL
 ```
 
-Remove `capabilities.add` and `privileged: true`. A privileged container can always escalate, whatever `allowPrivilegeEscalation` says.
+Note: Remove `capabilities.add` and `privileged: true` too: a privileged container can always escalate, whatever `allowPrivilegeEscalation` says.
 
 ## K3. Read-only root filesystem
-
-Make the root filesystem read-only, and give the program a volume for the paths it writes.
 
 ```yaml
 # <P>
@@ -246,8 +240,6 @@ volumes:
 
 ## K4. Nothing shared with the host
 
-Delete `hostNetwork`, `hostPID`, and `hostIPC` from the pod spec, or set each to `false`. Delete `hostPort` from each entry of `ports`. Replace a `hostPath` volume with a volume that does not share the node's files.
-
 ```yaml
 # <P>
 hostNetwork: false
@@ -259,11 +251,9 @@ volumes:
       sizeLimit: <size>
 ```
 
-A workload that has to reach the host, such as a node agent, fails K4 by design. Keep it in a namespace of its own, and say so to the team.
+Note: Delete `hostPort` from each entry of `ports`, and replace a `hostPath` volume with a volume that does not share the node's files.
 
 ## K5. ServiceAccount and token
-
-Give each workload an account of its own, and turn the token off unless the workload calls the Kubernetes API. When the pod and the account both set `automountServiceAccountToken`, the pod's setting wins.
 
 ```yaml
 apiVersion: v1
@@ -280,9 +270,9 @@ serviceAccountName: <workload>
 automountServiceAccountToken: false
 ```
 
-## K6. RBAC rules
+Note: When the pod and the account both set `automountServiceAccountToken`, the pod's setting wins.
 
-Name every verb and every resource, with no `*`. Bind a Role of the workload's own in place of `cluster-admin`, `admin`, or `edit`. Leave out `escalate`, `bind`, and `impersonate`.
+## K6. RBAC rules
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -313,7 +303,7 @@ subjects:
     namespace: <namespace>
 ```
 
-A rule that grants `get`, `list`, or `watch` on `secrets` reveals their contents. Give it `resourceNames` with the Secrets it reads, under the same rule (verify: which verbs `resourceNames` narrows is not in `fields.md`):
+Note: Name every verb and resource with no `*`, bind this Role in place of `cluster-admin`, `admin`, or `edit`, and leave out `escalate`, `bind`, and `impersonate`.
 
 ```yaml
 rules:
@@ -327,11 +317,9 @@ rules:
       - get
 ```
 
+Note: `get`, `list`, and `watch` on `secrets` reveal their contents, so the rule names the Secrets it reads (verify: which verbs `resourceNames` narrows is not in `fields.md`).
+
 ## K7. Secrets out of the repository
-
-Take the value out of the manifest, the values file, the ConfigMap, or the `Application`, and keep it in a Secret made outside the repository. A value that was committed stays in the Git history, so change it at its source as well.
-
-An env var reads the Secret by name:
 
 ```yaml
 # <P>
@@ -345,19 +333,15 @@ containers:
             key: <key>   # verify
 ```
 
-In a chart, many charts take the name of an existing Secret in a values key instead of the value (the key name is the chart's own, verify):
+Note: The value leaves the manifest, the values file, the ConfigMap, or the `Application`, and the env var reads a Secret made outside the repository by name.
 
 ```yaml
-# values-<environment>.yaml
+# values-<environment>.yaml, for a chart that takes the name of an existing Secret in a values key (the key name is the chart's own, verify)
 database:   # the section of the chart that takes the Secret: adapt it (verify)
   existingSecret: <secret made outside the repository>
 ```
 
-A Secret kept in the repository passes K7 only when SOPS has encrypted every value, as far as the file shows (`sops=present` and `sops-clear-count=0`). How to set SOPS up is in its own documentation (verify).
-
 ## K8. NetworkPolicy
-
-Select each workload's pods with a label key the reader reads (`app`, `app.kubernetes.io/name`, `app.kubernetes.io/instance`, `app.kubernetes.io/component`, `app.kubernetes.io/part-of`, `component`, `tier`, `role`, or `environment`), and name the peers allowed in.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -381,7 +365,7 @@ spec:
           port: <port>
 ```
 
-A policy that selects every pod of the namespace, and lists `Ingress` with no ingress rule, covers every workload there and lets no traffic in until a policy like the one above allows it (verify: how a policy with no ingress rule is read is not in `fields.md`):
+Note: Select the pods with a label key the reader reads: `app`, `app.kubernetes.io/name`, `app.kubernetes.io/instance`, `app.kubernetes.io/component`, `app.kubernetes.io/part-of`, `component`, `tier`, `role`, or `environment`.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -395,11 +379,9 @@ spec:
     - Ingress
 ```
 
-A policy has no effect when the cluster's network plugin does not enforce it.
+Note: This policy covers every workload of the namespace and lets no traffic in until a policy like the one above allows it (verify: how a policy with no ingress rule is read is not in `fields.md`).
 
 ## K9. Images pinned by digest
-
-Name the registry, and pin the image by its digest.
 
 ```yaml
 # <P>
@@ -408,18 +390,14 @@ containers:
     image: <registry host>/<repository>@sha256:<digest>
 ```
 
-In a chart whose template builds the image from `image.digest` (a chart convention, verify):
-
 ```yaml
-# values-<environment>.yaml
+# values-<environment>.yaml, for a chart whose template builds the image from image.digest (a chart convention, verify)
 image:
   repository: <registry host>/<repository>
   digest: sha256:<digest>
 ```
 
 ## K10. Pod Security level
-
-Label each Namespace object to enforce the restricted level.
 
 ```yaml
 apiVersion: v1   # verify: the pages read show no apiVersion for Namespace
@@ -431,4 +409,4 @@ metadata:
     pod-security.kubernetes.io/enforce-version: <latest, or a minor version such as v1.NN>
 ```
 
-Put the Namespace object in the same environment as its workloads, so that the check can see it.
+Note: Put the Namespace object in the same environment as its workloads, so that the check can see it.

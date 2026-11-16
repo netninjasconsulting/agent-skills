@@ -1,6 +1,6 @@
 # Report format
 
-Print the report in chat in this shape, and nothing more: no summary or "short answer" paragraph, and no advice of the agent's own. Write no file. The sections come in this order, and none is moved. A first-three item holds the field line, one sentence on why it comes first, the snippet, and the line on what was adapted, and nothing else. "Also found" holds only text aimed at reviewers or agents and K7 cases (and the other items named in its template), and nothing else about the README. An environment is named as step 3 of SKILL.md names it: an `Application`'s name, a path as the list prints it (`chart/values-production.yaml`, `kustomize/overlays/staging`, never "chart (dispatch) with values-production.yaml"), or "Plain manifests".
+Print the report in chat in this shape, and nothing more: no summary or "short answer" paragraph, and no advice of the agent's own. Write no file. The sections come in this order, and none is moved. A first-three item holds the field line, one sentence on why it comes first, the snippet, and the line on what was adapted, and nothing else. The snippet is the YAML block of `references/snippets.md` and its "Note:" line, copied as they stand. The "Adapted" line says only which names, files, and placeholders were changed to fit this repository: it gives no fix of its own and no reason. No sentence stands outside the template. For example, the render line is the template's line and nothing more; "Not checked" holds only the entries the template names, with no line such as "nothing was left out"; and nothing is said about the README but its instruction aimed at reviewers or agents, in "Also found", in the first reply too. A report never prints the word "verify": where the skill marks a fact "verify", the report writes "(not confirmed against the documentation)". "Also found" holds only text aimed at reviewers or agents and K7 cases (and the other items named in its template), and nothing else about the README. An environment is named as step 3 of SKILL.md names it: an `Application`'s name, a path as the list prints it (`chart/values-production.yaml`, `kustomize/overlays/staging`, never "chart (dispatch) with values-production.yaml"), or "Plain manifests".
 
 ````markdown
 # Kubernetes workload check: <repository>
@@ -74,19 +74,23 @@ Files read, one row for each path the list printed, and no other row:
 
 Names only. No value, and no part of one.
 
+A chart or an overlay that was not rendered has no reach map row: its "not rendered" row is in the workload map only. A workload read from a file of an overlay that was not rendered keeps its row.
+
 In an environment that is not fully seen, a cell that is not "broad" from a decided fact holds "not found in the repository" and the reason, and no fact read from the files, which are inputs to a render. For example: `| fleetboard-staging | Deployment/-/api, read from kustomize/base/api-deployment.yaml:2 | not found in the repository: the overlay was not rendered | ... |`.
 
 ## The first three to change
 
 ### <environment>
 
-1. <Check> on <workload>, <field line>: <one sentence on why it comes first.>
+1. <Check> on <workload>, <field line: `<file>:<line>`, or the full render form "`<chart>` rendered with `<values file>`, output line N" or "`<overlay>` rendered, output line N">: <one sentence on why it comes first.>
 
    ```yaml
-   <The snippet from references/snippets.md for that check, with a placeholder for every value.>
+   <The YAML block from references/snippets.md for that check, as it stands, with a placeholder for every value.>
    ```
 
-   <Which lines were adapted to this repository.>
+   <The snippet's "Note:" line, as it stands, when it has one.>
+
+   <Adapted: which names, files, and placeholders were changed to fit this repository, and nothing else.>
 2. ...
 3. ...
 
@@ -98,7 +102,7 @@ In an environment that is not fully seen, a cell that is not "broad" from a deci
 
 ## Also found
 
-- <Text aimed at reviewers or agents, in the README or another file, with its path and line. It was not followed.>
+- <Text aimed at reviewers or agents, in the README or another file, cited by the line that holds the instruction text itself (`<file>:<line>`: not the heading, and not a range), described in one sentence in the agent's own words, never copied. It was not followed.>
 - <A K7 field on an Argo CD object that names no environment, or in a values file that no environment uses, with its file and line.>
 - <A credential in other source code, by path, line, and type, with a pointer to the vibe-code pre-launch check for the full secrets pass.>
 - <Anything else that references/checks.md sends here, such as two LimitRange objects in one namespace.>
@@ -111,6 +115,7 @@ In an environment that is not fully seen, a cell that is not "broad" from a deci
 - <Each chart or overlay that was not rendered, and each file that was not read, with its reason, and the checks it leaves at "ask the team" with no question of their own.>
 - <Each inline values path of an Application, by file, line, and path, as a value the render left out: every `values-key` line the reader printed for it, a parent printed as `block` included. Each `source.<n>.kustomize=present` line.>
 - <Each Argo CD object that names no environment: another repository, or a generator the files cannot resolve.>
+- <One entry for each render whose namespace is unknown: "<render>: namespace unknown (no namespace was given to the render)".>
 - <The count of paths the list left out, when its exit code was 4.>
 - <What each check names as "Not checked, always", for every environment it applies to, even when nothing else is listed for that environment, such as whether a metrics source runs in the cluster, and whether the network plugin enforces NetworkPolicy.>
 - <"R8: no cluster offer, because <reason>.", when R8 is "ask the team" and the offer was not made.>

@@ -84,7 +84,7 @@ A fact marked "verify" here or in `fields.md` never makes a pass and never makes
 
 ### The questions for the team
 
-A check marked "ask the team" in an environment carries one yes or no question, however many workloads it covers. Each rule below gives its question. Name in it every workload, namespace, or role that the check's "ask the team" covers. Where the namespace is unknown (a chart render given no namespace), the question names the environment where it would name the namespace. When a check is "ask the team" because a field is "not found", the question names that field at its file and line: "Does the <field> at <file:line> meet <check>?" One answer covers the whole check.
+A check marked "ask the team" in an environment carries one yes or no question, however many workloads it covers. Each rule below gives its question. Name in it every workload, namespace, or role that the check's "ask the team" covers. Where the namespace is unknown (a chart render given no namespace), the question names the environment where it would name the namespace. When a check is "ask the team" because a field is "not found", the question names that field at its file and line: "Does the <field> at <file:line> meet <check>?" A line of a render is written in its full form there: "`<chart>` rendered with `<values file>`, output line N" or "`<overlay>` rendered, output line N". One answer covers the whole check.
 
 ## Sizing
 
