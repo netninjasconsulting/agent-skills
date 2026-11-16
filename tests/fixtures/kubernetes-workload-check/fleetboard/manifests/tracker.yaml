@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracker
+  namespace: fleetboard-tools
+  labels:
+    app: tracker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tracker
+  template:
+    metadata:
+      labels:
+        app: tracker
+        tier: ingest
+    spec:
+      hostNetwork: true
+      securityContext:
+        runAsUser: 0
+      containers:
+        - name: tracker
+          image: registry.example.com/fleetboard/tracker:latest
+          args:
+            - --listen=:9090
+            - --ingest-token=FIXTUREVALUE-tracker-ingest-token
+          ports:
+            - containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: tracker-config
+            - secretRef:
+                name: tracker-credentials
+          volumeMounts:
+            - name: vehicle-logs
+              mountPath: /var/log/vehicles
+      volumes:
+        - name: vehicle-logs
+          hostPath:
+            path: /var/log/vehicles

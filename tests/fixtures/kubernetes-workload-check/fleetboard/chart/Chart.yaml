@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dispatch
+description: Plans the day's jobs for the Fleetboard vehicles
+type: application
+version: 0.5.0
+appVersion: "3.1.0"

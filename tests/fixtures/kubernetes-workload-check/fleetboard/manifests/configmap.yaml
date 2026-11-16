@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tracker-config
+  namespace: fleetboard-tools
+data:
+  LOG_LEVEL: info
+  REPORT_BUCKET: fleetboard-reports
+  partner-api-token: FIXTUREVALUE-partner-api-token

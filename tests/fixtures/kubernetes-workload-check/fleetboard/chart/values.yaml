@@ -1,0 +1,47 @@
+replicaCount: 2
+
+image:
+  repository: registry.example.com/fleetboard/dispatch
+  tag: "3.1.0"
+
+serviceAccount:
+  name: dispatch
+  automount: false
+
+podAnnotations: {}
+
+extraArgs: []
+
+database:
+  host: db.fleetboard.example.com
+  password: ""
+
+resources:
+  requests:
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+securityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10003
+  capabilities:
+    drop:
+      - ALL
+
+scratch:
+  sizeLimit: ""
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+migrate:
+  activeDeadlineSeconds: 0
+
+networkPolicy:
+  enabled: false

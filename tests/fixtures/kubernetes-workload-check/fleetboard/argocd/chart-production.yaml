@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dispatch-production
+  namespace: argocd
+spec:
+  project: fleetboard
+  source:
+    repoURL: https://github.com/example-fleetboard/fleetboard.git
+    targetRevision: main
+    path: chart
+    helm:
+      valueFiles:
+        - values-production.yaml
+      values: |
+        replicaCount: 4
+        smtp:
+          host: smtp.fleetboard.example.com
+          password: FIXTUREVALUE-inline-smtp-password
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dispatch-production
+  syncPolicy:
+    automated:
+      prune: true

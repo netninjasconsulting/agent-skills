@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleetboard-staging
+  namespace: argocd
+spec:
+  project: fleetboard
+  source:
+    repoURL: https://github.com/example-fleetboard/fleetboard.git
+    targetRevision: main
+    path: kustomize/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleetboard-staging
+  syncPolicy:
+    automated:
+      prune: true

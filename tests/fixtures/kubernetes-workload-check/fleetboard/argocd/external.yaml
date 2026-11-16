@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleetboard-edge
+  namespace: argocd
+spec:
+  project: fleetboard
+  source:
+    repoURL: https://deploy:FIXTUREVALUE-edge-git-password@github.com/example-fleetboard/fleetboard-edge.git
+    targetRevision: main
+    path: deploy/edge
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleetboard-edge
