@@ -10,7 +10,7 @@ The request, word for word, in every way:
 
 Three ways, each from a fresh build. Run each from the root of this repository.
 
-**The setup, the same for every way.** The wrapper sends `kubectl kustomize` to the real `kubectl`, so that the reader's overlay render works, and every other `kubectl` command to the stand-in. The stand-in alone on `PATH` would answer `kubectl kustomize` with one line and exit code 0, and the reader would then print an empty render, which the skill treats as not rendered ("the render printed nothing"), so both overlays would not be fully seen. A run set up without the wrapper is not a valid run of way 2 or 3; repeat it.
+**The setup, the same for every way.** The wrapper sends `kubectl kustomize` to the real `kubectl`, so that the reader's overlay render works, and every other `kubectl` command to the stand-in. The stand-in alone on `PATH` would answer `kubectl kustomize` with one line and exit code 0, and the reader would then find no object in it and exit with code 3 and the state `render printed nothing`, which the skill treats as not rendered ("the render printed nothing"), so both overlays would not be fully seen. A run set up without the wrapper is not a valid run of way 2 or 3; repeat it.
 
 ```sh
 K=$(pwd)/tests/fixtures/kubernetes-workload-check
