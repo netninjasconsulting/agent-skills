@@ -369,6 +369,7 @@ conform() {
       if (!ok) { bad("a value that does not fit " sh); next }
       if (f == "image-repository") { n = split(v, s, "/"); for (a = 1; a <= n; a++) if (tok(s[a])) bad("a token-like repository segment") }
       if (f ~ /^secret-key\./ && tok(v)) bad("a token-like Secret key")
+      if (pat ~ /label\.$/ && tok(v)) bad("a token-like label value")
     }
     END { exit nbad > 0 }
   ' "$1"
@@ -1089,6 +1090,65 @@ items:
             - name: app
               securityContext:
                 privileged: true
+EOF
+  # A list element whose key is credential-like prints no value, even when
+  # the template uses the key and the value fits the shape.
+  cat > "$a/appset-cred.yaml" <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cred-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - list:
+        elements:
+          - env: staging
+            token: planted-element-token
+            apiKey: planted-element-key
+  template:
+    spec:
+      project: fleetboard
+      source:
+        repoURL: https://github.com/example-fleetboard/fleetboard.git
+        path: "apps/{{.env}}/{{.token}}"
+        helm:
+          valueFiles:
+            - "values-{{.apiKey}}.yaml"
+      destination:
+        namespace: "{{.env}}"
+EOF
+  # A label value of 20 or more characters with a letter and a digit is
+  # taken for a token, as a name part is.
+  cat > "$a/labels-tok.yaml" <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: labels-tok
+spec:
+  template:
+    metadata:
+      labels:
+        app: a1b2c3d4e5f6g7h8i9j0k1
+        tier: backend
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: labels-tok
+spec:
+  podSelector:
+    matchLabels:
+      app: z9y8x7w6v5u4t3s2r1q0p9
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: m1n2b3v4c5x6z7l8k9j0h1
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: q1w2e3r4t5y6u7i8o9p0a1
 EOF
   cat > "$a/tokens.yaml" <<'EOF'
 apiVersion: v1
@@ -1811,6 +1871,22 @@ EOF
   expect_no "$out" 'values-key\.|:values\.' "attack ApplicationSet"
   expect_line "$out" "argo.yaml:28:$o:-:destination-namespace=other" "attack ApplicationSet"
 
+  att appset-cred.yaml
+  [ "$code" -eq 0 ] || fail "attack credential-like list elements: exit $code"
+  o="ApplicationSet/argocd/cred-set"
+  expect_line "$out" "appset-cred.yaml:11:$o:-:list-element.1.1.env=staging" "attack credential-like list elements"
+  expect_line "$out" "appset-cred.yaml:12:$o:-:list-element.1.1.token=present" "attack credential-like list elements"
+  expect_line "$out" "appset-cred.yaml:13:$o:-:list-element.1.1.apiKey=present" "attack credential-like list elements"
+  expect_no "$out" 'planted-element' "attack credential-like list elements"
+
+  att labels-tok.yaml
+  [ "$code" -eq 0 ] || fail "attack token-like label values: exit $code"
+  expect_line "$out" "labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other" "attack token-like label values"
+  expect_line "$out" "labels-tok.yaml:10:Deployment/-/labels-tok:-:pod-label.tier=backend" "attack token-like label values"
+  expect_line "$out" "labels-tok.yaml:19:NetworkPolicy/-/labels-tok:-:np-pod-label.app=other" "attack token-like label values"
+  expect_line "$out" "labels-tok.yaml:24:NetworkPolicy/-/labels-tok:-:np-ingress.1.peer.1.pod-label.app=other" "attack token-like label values"
+  expect_line "$out" "labels-tok.yaml:27:NetworkPolicy/-/labels-tok:-:np-ingress.1.peer.2.namespace-label.kubernetes.io/metadata.name=other" "attack token-like label values"
+
   att indentless.yaml
   [ "$code" -eq 0 ] || fail "attack indentless lists: exit $code"
   expect_line "$out" "indentless.yaml:15:Deployment/-/indentless:app:cpu-request=100m" "attack indentless lists"
@@ -1974,6 +2050,22 @@ EOF
     printf 'replicaCount: 1\n' > "$rr/emptychart/values.yaml"
     refuse "emptychart:chart:render printed nothing" "render a chart that prints no object" \
       --render helm emptychart emptychart/values.yaml
+    # A vendored dependency is an archive the reader cannot read line by
+    # line, so a remote schema reference inside it reaches helm. The fixed
+    # command's --skip-schema-validation is the guard: with it the render
+    # succeeds inside the network namespace, and without it helm fetches.
+    mkdir -p "$work/tgz/sub/templates" "$rr/tgzchart/templates" "$rr/tgzchart/charts"
+    printf 'apiVersion: v2\nname: sub\nversion: 0.1.0\n' > "$work/tgz/sub/Chart.yaml"
+    # shellcheck disable=SC2016 # literal text, not an expansion
+    printf '{"$ref": "https://schemas.invalid/FIXTUREVALUE-tgz.json"}\n' > "$work/tgz/sub/values.schema.json"
+    printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: sub\n' > "$work/tgz/sub/templates/cm.yaml"
+    (cd "$work/tgz" && tar -czf "$rr/tgzchart/charts/sub-0.1.0.tgz" sub)
+    printf 'apiVersion: v2\nname: tgzchart\nversion: 0.1.0\ndependencies:\n  - name: sub\n    version: 0.1.0\n' > "$rr/tgzchart/Chart.yaml"
+    printf 'replicaCount: 1\n' > "$rr/tgzchart/values.yaml"
+    printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: top\n' > "$rr/tgzchart/templates/cm.yaml"
+    rd --render helm tgzchart tgzchart/values.yaml
+    [ "$code" -eq 0 ] || fail "render a chart whose vendored dependency names a remote schema: exit $code"
+    expect_line "$out" "tgzchart:4:ConfigMap/-/sub:-:object=present" "render a chart whose vendored dependency names a remote schema"
   fi
   if [ "$have_kustomize" -eq 1 ]; then
     mkdir -p "$rr/kfail"
@@ -2029,6 +2121,11 @@ EOF
   printf '{"$id": "https://example.com/FIXTUREVALUE"}\n' > "$rr/idchart/values.schema.json"
   refuse "idchart:chart:remote schema ref" "render a chart with a schema id" \
     --render helm idchart idchart/values.yaml
+  cp -R "$rr/chart" "$rr/escchart"
+  # A JSON escape can spell $ref, and helm reads the escape as $ref.
+  printf '{"\\u0024ref": "https://schemas.invalid/FIXTUREVALUE-esc.json"}\n' > "$rr/escchart/values.schema.json"
+  refuse "escchart:chart:remote schema ref" "render a chart with a schema reference spelt with a JSON escape" \
+    --render helm escchart escchart/values.yaml
   cp -R "$rr/chart" "$rr/linkchart"
   ln -s ../../manifests/secret.yaml "$rr/linkchart/templates/secret.yaml"
   refuse "linkchart:chart:symbolic link inside" "render a chart with a symbolic link inside" \
@@ -2126,6 +2223,12 @@ EOF
   refuse "k13:overlay:remote base" "render an overlay with a remote generator file behind an equals sign" --render kustomize k13
   printf 'resources: [../kustomize/base, --enable-helm]\n' > "$rr/k14/kustomization.yaml"
   refuse "k14:overlay:remote base" "render an overlay with an entry that starts with dashes" --render kustomize k14
+  # A base outside the repository is never rendered.
+  mkdir -p "$work/outside-base" "$rr/kout"
+  printf 'resources:\n  - cm.yaml\n' > "$work/outside-base/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: FIXTUREVALUE-outside-base\n' > "$work/outside-base/cm.yaml"
+  printf 'resources:\n  - ../../outside-base\n' > "$rr/kout/kustomization.yaml"
+  refuse "kout:overlay:remote base" "render an overlay with a base outside the repository" --render kustomize kout
   # kustomize reads the keys of a kustomization in any case, so a key in
   # another case is judged as its lower-case form, and the kustomization
   # that writes one is refused before the tool runs.
