@@ -2598,6 +2598,8 @@ pins() {
   pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
   pin "the form of a User name" '# the form of a User name' '/# the form of a User name$/s/== "system:serviceaccount:"/== "x"/' attacks "missing line rbac-users.yaml:11:ClusterRoleBinding/-/users:-:subject.1.user-form=service-account"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
+  pin "a symbolic link in the tree is counted" '# a symbolic link is not listed' '/# a symbolic link is not listed$/s/-type l /-type l -name x-no-link /' listx "list with a linked manifest and a linked directory: expected exit 4, got 0"
+  pin "a List kind is not read" '# a List holds objects the reader does not follow' '/# a List holds objects the reader does not follow$/s/ERR\[0\] = 1; //' attacks "attack List kind: expected exit 4, got 0"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a path the list cannot carry" '! -path "$unsafe_path" -print' 's/ ! -path "$unsafe_path" -print/ -print/' listx "list with a line break that repeats a name: printed"
@@ -2605,6 +2607,7 @@ pins() {
     # shellcheck disable=SC2016 # literal text, not an expansion
     pin "the pipe from the renderer" '# the pipe' 's/ | extract render "$label"  # the pipe//' render "a planted value leaked"
     pin "helm standard error is dropped" '# helm: drop standard error' 's/ 2>\/dev\/null) || status=$?  # helm: drop standard error/) || status=$?/' render "render a chart that fails: standard error holds chart text"
+    pin "a render that printed no object" '# a render that printed no object' '/# a render that printed no object$/s/exit 3/exit 0/' render "render a chart that prints no object: expected exit 3, got 0"
     pin "a line separator in a rendered output" '# a line break YAML takes from Unicode' 's/{ ERR\[I\] = 1; return }  # a line break YAML takes from Unicode/{ }/' render "render a chart with a line separator: expected exit 4, got 0"
   else
     echo "skipped: the helm pins (helm is not installed)"

@@ -20,8 +20,8 @@
 #   state: tracked | untracked | ignored | no-git, or a refusal state of --render
 # Field line: <file>:<line>:<object kind>/<namespace>/<name>:<container or ->:<field>=<value>
 #
-# Exit codes: 0 success, 2 wrong usage, 3 render refused or failed, 4 a file
-# that is not read.
+# Exit codes: 0 success, 2 wrong usage, 3 render refused, failed, or with
+# no object, 4 a file that is not read or a path that is not listed.
 #
 # Nothing prints by default. A field prints only when references/fields.md
 # names it for its object kind and place, and its value fits the shape that
@@ -529,10 +529,11 @@ function fields_doc(    kk, k, p, i, ab, nm) {
   kk = leaf0("kind")
   if (!kk || LT[0, kk] != "scalar" || !fits(LVAL[0, kk], LQ[0, kk], "kind-name")) return
   KIND = LVAL[0, kk]
+  if (KIND ~ /List$/) { ERR[0] = 1; LISTK = 1; return }  # a List holds objects the reader does not follow
   if (!(KIND in KINDS)) return
   NAME = "-"; k = leaf0("metadata>name"); if (k && LT[0, k] == "scalar" && fits(LVAL[0, k], LQ[0, k], "dns-subdomain")) NAME = LVAL[0, k]
   NSP = "-"; k = leaf0("metadata>namespace"); if (k && LT[0, k] == "scalar" && fits(LVAL[0, k], LQ[0, k], "dns-label")) NSP = LVAL[0, k]
-  NDO = 0
+  NDO = 0; NOBJ++
   out(LLN[0, kk], "-", "object", "present")
   POD = (KIND in PODKINDS) && !(KIND == "Rollout" && leaf0("spec>workloadRef"))
   P = (KIND == "Pod") ? "spec" : (KIND == "CronJob") ? "spec>jobTemplate>spec>template>spec" : "spec>template>spec"
@@ -1280,7 +1281,8 @@ BEGIN {
 
 END {
   if (!ERR[0]) doc_end()
-  if (ERR[0]) exit 4
+  if (ERR[0]) exit (LISTK ? 5 : 4)
+  if (mode == "render" && !NOBJ) exit 3  # a render that printed no object
   for (i = 1; i <= NOUT; i++) print OUT[i]
 }
 '
@@ -1496,6 +1498,10 @@ list_mode() {
   unsafe_path='*[!A-Za-z0-9._/@+-]*'
   files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)
   unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
+  # A symbolic link named like a manifest, or to a directory, is not
+  # followed, so it is counted with the paths above.
+  links=$(find . -name .git -prune -o -type l \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')  # a symbolic link is not listed
+  unsafe=$((unsafe + links))
   charts=
   for f in $files; do
     case "$f" in Chart.yaml) charts="$charts ." ;; */Chart.yaml) charts="$charts ${f%/Chart.yaml}" ;; esac
@@ -1570,7 +1576,7 @@ list_mode() {
     done
   } | sort
   if [ "$unsafe" -gt 0 ]; then
-    echo "$me: not listed: $unsafe paths with a character other than letters, digits, and . _ / @ + -, or with a line break" >&2
+    echo "$me: not listed: $unsafe paths with a character other than letters, digits, and . _ / @ + -, with a line break, or that are a symbolic link" >&2
     exit 4
   fi
 }
@@ -1591,6 +1597,10 @@ read_file_mode() {
   status=0
   # shellcheck disable=SC2094 # the second argument is the name to print
   extract "$1" "$f" < "$f" || status=$?
+  if [ "$status" -eq 5 ]; then
+    echo "$me: not read, a List kind, whose objects the reader does not follow: $f" >&2
+    exit 4
+  fi
   if [ "$status" -ne 0 ]; then
     echo "$me: not read, a layout the reader cannot place: $f" >&2
     exit 4
@@ -1765,6 +1775,10 @@ emit_render() {
   # The rendered text goes into the extractor and nowhere else.
   printf '%s\n' "$rendered" | extract render "$label"  # the pipe
   status=$?
+  if [ "$status" -eq 3 ]; then
+    echo "$me: the render printed no object the reader reads: $label" >&2
+    refuse "render printed nothing"
+  fi
   if [ "$status" -ne 0 ]; then
     echo "$me: not read, the rendered output has a layout the reader cannot place: $label" >&2
     printf '%s:%s:%s\n' "$label" "$rkind" "not read"
