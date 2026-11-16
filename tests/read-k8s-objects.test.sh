@@ -97,7 +97,7 @@ metric-resource 6 ^(cpu|memory)$
 metric-target-type 13 ^(Utilization|Value|AverageValue)$
 limit-type 21 ^(Container|Pod|PersistentVolumeClaim)$
 protocol 4 ^(TCP|UDP|SCTP)$
-env-source 17 ^(literal|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|fileKeyRef)$
+env-source 17 ^(literal|literal-empty|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|fileKeyRef)$
 scale-down 13 ^(never|onsuccess|progressively)$
 volume-type 14 ^(hostPath|emptyDir|secret|configMap|projected|downwardAPI)$
 container-kind 4 ^(main|init)$
@@ -214,6 +214,7 @@ rule.#.resource-names-count int
 rule.#.non-resource-urls-count int
 aggregation-rule present
 sops present
+sops-clear-count int
 role-ref-kind role-ref-kind other
 role-ref-name role-name
 subject.#.kind subject-kind other
@@ -248,6 +249,8 @@ np-egress.#.protocol protocol other
 secret-type secret-type other
 secret-key.data key-name other
 secret-key.string-data key-name other
+secret-key.data-empty key-name other
+secret-key.string-data-empty key-name other
 secret-immutable bool
 configmap-data.* state-word
 configmap-binary.* present
@@ -301,7 +304,7 @@ conform() {
       }
       RE["image-pin"] = "^(digest|tag|latest|none)$"; MX["image-pin"] = 6
       RE["mount-mode"] = "^(read-only|read-write)$"; MX["mount-mode"] = 10
-      RE["state-word"] = "^(scalar|empty|block)$"; MX["state-word"] = 6
+      RE["state-word"] = "^(scalar|empty|block|encrypted)$"; MX["state-word"] = 9
       RE["selector-word"] = "^(all|labels)$"; MX["selector-word"] = 6
       RE["generator-word"] = "^(list|other)$"; MX["generator-word"] = 5
       RE["repo-word"] = "^(this|other|unknown)$"; MX["repo-word"] = 7
@@ -815,6 +818,97 @@ metadata:
 data:
   key: plain
 sops: FIXTUREVALUE-sops-scalar
+EOF
+  cat > "$a/sops-fake.yaml" <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fake
+stringData:
+  password: FIXTUREVALUE-fake-clear
+sops:
+  note: x
+  other: y
+EOF
+  cat > "$a/sops-mixed.yaml" <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mixed
+data:
+  enc: "ENC[AES256_GCM,data:FIXTUREVALUE-mixed-enc,type:str]"
+  clear: FIXTUREVALUE-mixed-clear
+  open: ENC[FIXTUREVALUE-mixed-open
+  blank: ""
+stringData:
+  block: |
+    ENC[FIXTUREVALUE-mixed-block]
+sops:
+  mac: ENC[AES256_GCM,data:FIXTUREVALUE-mixed-mac,type:str]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enc-config
+data:
+  api-token: ENC[AES256_GCM,data:FIXTUREVALUE-cm-enc,type:str]
+  plain: FIXTUREVALUE-cm-plain
+sops:
+  mac: ENC[AES256_GCM,data:FIXTUREVALUE-cm-mac,type:str]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: no-sops-config
+data:
+  api-token: ENC[AES256_GCM,data:FIXTUREVALUE-nosops-cm,type:str]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: no-sops-secret
+data:
+  password: ENC[AES256_GCM,data:FIXTUREVALUE-nosops-secret,type:str]
+EOF
+  cat > "$a/empties.yaml" <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: empties
+spec:
+  containers:
+    - name: app
+      env:
+        - name: API_KEY
+          value: ""
+        - name: DB_PASSWORD
+          value:
+        - name: TOKEN
+          value: ~
+        - name: SET_PASSWORD
+          value: FIXTUREVALUE-empties-set
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: empty-keys
+data:
+  empty-data: ""
+  full-data: RklYVFVSRVZBTFVFLWVtcHR5
+stringData:
+  empty-string:
+  null-string: ~
+EOF
+  cat > "$a/values-sops.yaml" <<'EOF'
+db:
+  password: ENC[AES256_GCM,data:FIXTUREVALUE-values-enc,type:str]
+  user: FIXTUREVALUE-values-clear
+sops:
+  mac: ENC[AES256_GCM,data:FIXTUREVALUE-values-mac,type:str]
+EOF
+  cat > "$a/values-enc.yaml" <<'EOF'
+db:
+  password: ENC[AES256_GCM,data:FIXTUREVALUE-values-nosops,type:str]
 EOF
   cat > "$a/multi.yaml" <<'EOF'
 apiVersion: v1
@@ -1491,6 +1585,45 @@ EOF
   expect_line "$out" "sops.yaml:7:Secret/-/sops-secret:-:secret-key.string-data=password" "attack SOPS"
   expect_line "$out" "sops.yaml:8:Secret/-/sops-secret:-:sops=present" "attack SOPS"
   expect_no "$out" 'sops-scalar:-:sops=|:(mac|lastmodified|version|unencrypted_suffix)=' "attack SOPS"
+  expect_line "$out" "sops.yaml:8:Secret/-/sops-secret:-:sops-clear-count=0" "attack SOPS"
+
+  att sops-fake.yaml
+  [ "$code" -eq 0 ] || fail "attack SOPS fake block: exit $code"
+  expect_line "$out" "sops-fake.yaml:7:Secret/-/fake:-:sops=present" "attack SOPS fake block"
+  expect_line "$out" "sops-fake.yaml:7:Secret/-/fake:-:sops-clear-count=1" "attack SOPS fake block"
+
+  att sops-mixed.yaml
+  [ "$code" -eq 0 ] || fail "attack SOPS mixed: exit $code"
+  o="Secret/-/mixed"
+  expect_line "$out" "sops-mixed.yaml:13:$o:-:sops-clear-count=3" "attack SOPS mixed"
+  expect_line "$out" "sops-mixed.yaml:9:$o:-:secret-key.data-empty=blank" "attack SOPS mixed"
+  expect_line "$out" "sops-mixed.yaml:21:ConfigMap/-/enc-config:-:configmap-data.api-token=encrypted" "attack SOPS mixed"
+  expect_line "$out" "sops-mixed.yaml:22:ConfigMap/-/enc-config:-:configmap-data.plain=scalar" "attack SOPS mixed"
+  expect_line "$out" "sops-mixed.yaml:31:ConfigMap/-/no-sops-config:-:configmap-data.api-token=scalar" "attack SOPS mixed"
+  expect_line "$out" "sops-mixed.yaml:38:Secret/-/no-sops-secret:-:secret-key.data=password" "attack SOPS mixed"
+  expect_no "$out" 'no-sops-secret:-:sops|no-sops-config:-:sops' "attack SOPS mixed"
+
+  att empties.yaml
+  [ "$code" -eq 0 ] || fail "attack empty values: exit $code"
+  o="Pod/-/empties"
+  expect_line "$out" "empties.yaml:9:$o:app:env.API_KEY=literal-empty" "attack empty values"
+  expect_line "$out" "empties.yaml:11:$o:app:env.DB_PASSWORD=literal-empty" "attack empty values"
+  expect_line "$out" "empties.yaml:13:$o:app:env.TOKEN=literal-empty" "attack empty values"
+  expect_line "$out" "empties.yaml:15:$o:app:env.SET_PASSWORD=literal" "attack empty values"
+  o="Secret/-/empty-keys"
+  expect_line "$out" "empties.yaml:23:$o:-:secret-key.data-empty=empty-data" "attack empty values"
+  expect_line "$out" "empties.yaml:24:$o:-:secret-key.data=full-data" "attack empty values"
+  expect_line "$out" "empties.yaml:26:$o:-:secret-key.string-data-empty=empty-string" "attack empty values"
+  expect_line "$out" "empties.yaml:27:$o:-:secret-key.string-data-empty=null-string" "attack empty values"
+
+  att values-sops.yaml
+  [ "$code" -eq 0 ] || fail "attack SOPS values: exit $code"
+  expect_line "$out" "values-sops.yaml:2:Values/-/-:-:values-key.db.password=encrypted" "attack SOPS values"
+  expect_line "$out" "values-sops.yaml:3:Values/-/-:-:values-key.db.user=scalar" "attack SOPS values"
+
+  att values-enc.yaml
+  [ "$code" -eq 0 ] || fail "attack ENC values with no sops block: exit $code"
+  expect_line "$out" "values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar" "attack ENC values with no sops block"
 
   att multi.yaml
   [ "$code" -eq 0 ] || fail "attack multi-document: exit $code"
@@ -2267,6 +2400,11 @@ pins() {
     echo "skipped: the pin on the generation against kubectl (kubectl is not installed)"
   fi
   pin "a sops block map" '# a sops block map' '/# a sops block map$/s/p == "sops"/p == "x-no-sops"/' attacks "missing line sops.yaml:8:Secret/-/sops-secret:-:sops=present"
+  pin "an empty env literal" '# an empty literal' '/# an empty literal$/s/== "empty"/== "never"/' attacks "missing line empties.yaml:9:Pod/-/empties:app:env.API_KEY=literal-empty"
+  pin "an empty Secret key" '# an empty Secret key' '/# an empty Secret key$/s/== "empty"/== "never"/' attacks "missing line empties.yaml:23:Secret/-/empty-keys:-:secret-key.data-empty=empty-data"
+  pin "an encrypted value ends with a bracket" '# looks encrypted' '/# looks encrypted$/s/ \&\& substr(v, length(v), 1) == "]"//' attacks "missing line sops-mixed.yaml:13:Secret/-/mixed:-:sops-clear-count=3"
+  pin "a clear value in a sops Secret" '# a clear value in a sops Secret' '/# a clear value in a sops Secret$/s/c++/c = c/' attacks "missing line sops-fake.yaml:7:Secret/-/fake:-:sops-clear-count=1"
+  pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion

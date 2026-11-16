@@ -42,7 +42,7 @@ const cmdEnd = '# END the fixed command list';
 const k8sWeakest = 'With several workloads in an environment, judge each one. The check gets the weakest status: fail, then warn, then "ask the team", then pass. The evidence names the workload that earned it. A workload whose part does not apply leaves the comparison.';
 const k8sTwice = 'R8 cannot pass from the repository. When R1 fails, R8 does not apply. Otherwise R8 is "ask the team", and the cluster pass is how it is answered. R3 uses a line of this skill\'s own, not a Kubernetes rule: a memory limit of more than twice its request is a warn.';
 const k8sLastStatus = '| does not apply | The environment holds nothing that the check judges. | not counted |';
-const k7Row = '| A Secret with values in the repository | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |';
+const k7Row = '| A Secret with values in the repository | A `Secret` object that prints at least one `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |';
 const cases = [
   ['reword check', 'SKILL.md', s => s.replace(first, first.replace('works', 'runs'))],
   ['renumber check', 'SKILL.md', s => s.replace(first, first.replace('1.', '21.'))],
@@ -94,6 +94,10 @@ const cases = [
   ['kubernetes: a K7 case added', 'references/checks.md', s => s.replace(k7Row, k7Row + '\n| A Secret the team trusts | `secret-type` | pass |'), kubernetes],
   ['kubernetes: the R3 line reworded', 'SKILL.md', s => s.replace(k8sTwice, k8sTwice.replace('more than twice', 'more than four times')), kubernetes],
   ['kubernetes: the weakest-status rule reworded', 'SKILL.md', s => s.replace(k8sWeakest, k8sWeakest.replace('the weakest status', 'the most common status')), kubernetes],
+  ['kubernetes: a fail-list word dropped', 'references/checks.md', s => s.replace("`pwd`, `pw`, `passphrase`", "`pwd`, `passphrase`"), kubernetes],
+  ['kubernetes: a read-only hostPath let through', 'references/checks.md', s => s.replace('or it has a `hostPath` volume, read-only or not.', 'or it has a `hostPath` volume mounted read-write.'), kubernetes],
+  ['kubernetes: the cluster-admin binding softened', 'references/checks.md', s => s.replace('A binding to `cluster-admin` fails K6 when', 'A binding to `cluster-admin` warns on K6 when'), kubernetes],
+  ['kubernetes: rule 10 without its pointer', 'SKILL.md', s => s.replace('The one exception is the table "Absent fields" in `references/checks.md`', 'The one exception is a key that is absent'), kubernetes],
   ['kubernetes: a command added to the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace(cmdEnd, "CMD_SECRETS='kubectl get secrets --namespace=<name> -o yaml'\n" + cmdEnd), kubernetes],
   ['kubernetes: a command changed in the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace('--request-timeout=20s -o custom-columns=HPA:', '--request-timeout=20s -o yaml -o custom-columns=HPA:'), kubernetes],
   // The guided app starter: the guards for the security scan corrections of 15 November 2026.
