@@ -11,6 +11,7 @@ Each skill ships with a fixture and the result it has to produce. A skill is a s
 | `agent-permissions-check` | `fixtures/agent-permissions-check/loose-agents/`, a repository with loose agent settings, and `home/`, a stand-in home folder | `fixtures/agent-permissions-check/EXPECTED.md`, and `scenarios.md` for a repository with no agent files and for the `open-rows` variant of the fixture |
 | `ai-feature-architecture-check` | `fixtures/ai-feature-architecture-check/support-copilot/`, a small support app with two AI features | `fixtures/ai-feature-architecture-check/EXPECTED.md`, and `scenarios.md` for a repository with no model call |
 | `serverless-deploy-check` | `fixtures/serverless-deploy-check/quickship/`, a delivery tracking app on all four platforms | `fixtures/serverless-deploy-check/EXPECTED.md`, and `scenarios.md` for a repository with none of the four platforms (`plain-cli/`), Vercel and Supabase only, E1 as a warn, and a Lambda function defined in AWS CDK (`cdk/`) |
+| `kubernetes-workload-check` | `fixtures/kubernetes-workload-check/fleetboard/`, a fleet-tracking product with plain manifests, Kustomize overlays, a Helm chart, and Argo CD objects, and `fake-kubectl/`, a stand-in `kubectl` for the cluster pass | `fixtures/kubernetes-workload-check/EXPECTED.md`, and `scenarios.md` for a repository with no workload, the fixture with `helm` and `kubectl` off the path, the fixture with the CPU request of `api` removed, and the fixture with `argocd/` removed |
 
 The fixtures are unsafe on purpose. Every key in them is fake, and none of them is meant to run.
 
@@ -32,6 +33,8 @@ Then, in a new agent session with only the skill under test installed:
 
 Use a fresh session each time. An agent that has read `EXPECTED.md` is not a test.
 
+The Kubernetes fixture needs more setup than this: `helm` and `kubectl` on the path, and a wrapper that sends every `kubectl` command except `kustomize` to the stand-in. `fixtures/kubernetes-workload-check/EXPECTED.md` gives the setup and the three ways to run it.
+
 ## What runs without an agent
 
 ```sh
@@ -40,16 +43,18 @@ node tests/validate.test.mjs       # format and repository rules for every skill
 sh tests/scan-secrets.test.sh   # the secret scanner against the vibe-shop fixture
 sh tests/list-agent-config.test.sh   # the agent configuration reader against the loose-agents fixture
 sh tests/read-serverless-config.test.sh   # the serverless configuration reader against the quickship fixture and its attack files
+sh tests/read-k8s-objects.test.sh   # the Kubernetes object reader against the fleetboard fixture and its attack files; its render cases need helm and kubectl
+sh tests/read-cluster-usage.test.sh   # the cluster usage script against a stand-in kubectl, which never contacts a cluster
 sh tests/names-filter.test.sh   # the names-only filter that two skills use on env files
 ```
 
-All six commands run in CI on every pull request. The validator mutation suite includes the starter's default permissions, redacted quotation, and package approval rules. Scenarios 10 to 12 cover the corresponding agent behaviour and security check requirements; these scenarios have not been run yet.
+All eight commands run in CI on every pull request. The validator mutation suite includes the starter's default permissions, redacted quotation, and package approval rules. Scenarios 10 to 12 cover the corresponding agent behaviour and security check requirements; these scenarios have not been run yet.
 
 ## Before a release
 
 1. Run every fixture on a machine that has never had the skills installed, with the install command from the README.
 2. Re-check each third-party LICENSE file and author name.
-3. Re-check every provider fact in `skills/guided-app-starter/references/stack-matrix.md` and `skills/serverless-deploy-check/references/platforms.md`, and update their dates.
+3. Re-check every provider fact in `skills/guided-app-starter/references/stack-matrix.md`, `skills/serverless-deploy-check/references/platforms.md`, and `skills/kubernetes-workload-check/references/fields.md`, and update their dates.
 4. Compare the ten checks and the score bands with the published checklist.
 5. Record all of it in `CHANGELOG.md` and `RESULTS.md`.
 
