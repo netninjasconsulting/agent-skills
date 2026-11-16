@@ -2029,6 +2029,34 @@ EOF
   refuse "k13:overlay:remote base" "render an overlay with a remote generator file behind an equals sign" --render kustomize k13
   printf 'resources: [../kustomize/base, --enable-helm]\n' > "$rr/k14/kustomization.yaml"
   refuse "k14:overlay:remote base" "render an overlay with an entry that starts with dashes" --render kustomize k14
+  # kustomize reads the keys of a kustomization in any case, so a key in
+  # another case is judged as its lower-case form, and the kustomization
+  # that writes one is refused before the tool runs.
+  mkdir -p "$rr/kc1" "$rr/kc2" "$rr/kc3" "$rr/kc4" "$rr/kc5" "$rr/kc6" "$rr/kc7"
+  printf 'Resources:\n  - https://github.com/example-fleetboard/FIXTUREVALUE-kc1//base?ref=main\n' > "$rr/kc1/kustomization.yaml"
+  refuse "kc1:overlay:remote base" "render an overlay with a remote base under Resources" --render kustomize kc1
+  printf 'RESOURCES:\n  - ../kustomize/base\n' > "$rr/kc2/kustomization.yaml"
+  refuse "kc2:overlay:remote base" "render an overlay with a local base under RESOURCES" --render kustomize kc2
+  printf 'Bases:\n  - github.com/example-fleetboard/FIXTUREVALUE-kc3\n' > "$rr/kc3/kustomization.yaml"
+  refuse "kc3:overlay:remote base" "render an overlay with a remote base under Bases" --render kustomize kc3
+  printf 'resources:\n  - ../kustomize/base\nComponents:\n  - git@github.com:example-fleetboard/FIXTUREVALUE-kc4.git//x\n' > "$rr/kc4/kustomization.yaml"
+  refuse "kc4:overlay:remote base" "render an overlay with a remote component under Components" --render kustomize kc4
+  printf 'resources:\n  - ../kustomize/base\nPatches:\n  - Path: https://attacker.invalid/FIXTUREVALUE-kc5.yaml\n' > "$rr/kc5/kustomization.yaml"
+  refuse "kc5:overlay:remote base" "render an overlay with a remote patch under Patches and Path" --render kustomize kc5
+  printf 'resources:\n  - ../kustomize/base\nHelmCharts:\n  - name: redis\n    repo: https://charts.example.com/FIXTUREVALUE-kc6\n' > "$rr/kc6/kustomization.yaml"
+  refuse "kc6:overlay:plugin or inflator needed" "render an overlay that inflates a chart under HelmCharts" --render kustomize kc6
+  printf 'resources:\n  - ../kustomize/base\nconfigmapgenerator:\n  - name: kc7\n    Files:\n      - https://attacker.invalid/FIXTUREVALUE-kc7\n' > "$rr/kc7/kustomization.yaml"
+  refuse "kc7:overlay:remote base" "render an overlay with a remote generator file under configmapgenerator and Files" --render kustomize kc7
+  # Helm reads the keys of Chart.yaml in any case too.
+  cp -R "$rr/chart" "$rr/depcase"
+  cat >> "$rr/depcase/Chart.yaml" <<'EOF'
+Dependencies:
+  - name: redis
+    version: 19.0.0
+    repository: https://charts.example.com/FIXTUREVALUE-depcase
+EOF
+  refuse "depcase:chart:dependencies not vendored" "render a chart with a dependency under Dependencies" \
+    --render helm depcase depcase/values.yaml
   # A line break in a name anywhere in a chart or overlay tree.
   cp -R "$rr/chart" "$rr/nlchart"
   mkdir "$rr/nlchart/templates/a
