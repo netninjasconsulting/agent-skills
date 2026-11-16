@@ -410,6 +410,91 @@ if (existsSync(serverlessSkill)) {
   });
 }
 
+// The Kubernetes workload check keeps one wording for its eighteen checks, its statuses, its verdicts,
+// and the order of the first three, and one fixed command list for its cluster script.
+const kubernetesChecks = [
+  "R1. Every container sets a CPU request and a memory request, init containers and sidecars included.",
+  "R2. Every container sets a memory limit.",
+  "R3. Each memory limit sits close to its request.",
+  "R4. Every autoscaler has what it needs to work.",
+  "R5. Every namespace sets defaults or ceilings for CPU and memory.",
+  "R6. Scratch space has a ceiling.",
+  "R7. Batch work has a deadline, and scheduled runs do not pile up.",
+  "R8. Requests match measured use.",
+  "K1. No container runs as root or privileged.",
+  "K2. Every container drops all capabilities and blocks privilege escalation.",
+  "K3. Every container's root filesystem is read-only.",
+  "K4. No pod shares the host's network, processes, or files.",
+  "K5. Each workload has its own ServiceAccount, and mounts a token only when it calls the API.",
+  "K6. RBAC rules name their verbs and their resources.",
+  "K7. Secrets stay out of manifests and values files.",
+  "K8. A NetworkPolicy covers every workload.",
+  "K9. Every image is pinned by digest and comes from a named registry.",
+  "K10. Every namespace enforces the restricted Pod Security level.",
+];
+const kubernetesStatuses = [
+  "| pass | Every part of the check is met, from what the reader printed. | 1 |",
+  "| warn | The check is met in part, and the missing part would be in the repository. | 0 |",
+  "| fail | A printed field breaks the check, or a setting it needs is absent. | 0 |",
+  "| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |",
+  "| does not apply | The environment holds nothing that the check judges. | not counted |",
+];
+const kubernetesVerdicts = [
+  "| Not ready for production | Any of K1, K4, K6, or K7 is a fail. |",
+  "| Ready after the first three | None of K1, K4, K6, or K7 is a fail, and at least one of the eighteen checks is a fail or a warn. |",
+  "| Ready from what the repository shows | No check is a fail or a warn. |",
+];
+const kubernetesOrder = "Order: K7, K6, K4, K1, K8, K5, K2, K10, R1, R2, K9, K3, R3, R4, R5, R6, R7.";
+// The cluster script runs these commands and no others. Each is pinned whole, in order, in the
+// script's own block and in the code block of fields.md, so that a command added, removed, or
+// changed in either place fails here.
+const getColumns = "--no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=";
+const clusterCommands = [
+  "kubectl config current-context --kubeconfig= --context= --server= --cluster=",
+  "kubectl top pod --containers --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s",
+  "kubectl get pods --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= " + getColumns + "POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason",
+  "kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= " + getColumns + "VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory",
+  "kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= " + getColumns + "HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization",
+];
+const kubernetesSkill = path.join(skillsDir, "kubernetes-workload-check");
+if (existsSync(kubernetesSkill)) {
+  const linesOf = (file) => (existsSync(file) ? visibleLines(read(file).split("\n")) : []);
+  const skillFile = path.join(kubernetesSkill, "SKILL.md");
+  const skillLines = linesOf(skillFile);
+  const checksFile = path.join(kubernetesSkill, "references", "checks.md");
+  const checksLines = linesOf(checksFile);
+  const checksSection = sectionLines(skillLines, "## The eighteen checks");
+  // Whole lines, in their own sections, so that "K1. ..." is not found inside "K10. ...".
+  sameLines(skillFile, checksSection.filter((line) => /^[RK]\d+\. /.test(line)), kubernetesChecks, "the eighteen checks");
+  sameLines(checksFile, checksLines.filter((line) => /^#+ [RK]\d+\. /.test(line)), kubernetesChecks.map((check) => `### ${check}`), "the eighteen check headings");
+  sameLines(skillFile, checksSection.filter((line) => /^\| (pass|warn|fail|ask the team|does not apply) \|/.test(line)), kubernetesStatuses, "the status table");
+  sameLines(skillFile, sectionLines(skillLines, "## The verdict").filter((line) => /^\| (Not ready|Ready)/.test(line)), kubernetesVerdicts, "the verdict table");
+  sameLines(skillFile, sectionLines(skillLines, "## The first three to change").filter((line) => /^Order:/.test(line)), [kubernetesOrder], "the order of the first three");
+  sameLines(checksFile, sectionLines(checksLines, "## The first three to change").filter((line) => /^Order:/.test(line)), [kubernetesOrder], "the order of the first three");
+  kubernetesChecks.forEach((check) => {
+    if (!skillLines.includes(check)) fail(skillFile, `a check does not match its fixed wording: ${check}`);
+    if (!checksLines.includes(`### ${check}`)) fail(checksFile, `a check heading does not match its fixed wording: ${check}`);
+  });
+  [...kubernetesStatuses, ...kubernetesVerdicts, kubernetesOrder].forEach((line) => {
+    if (!skillLines.includes(line)) fail(skillFile, `a line does not match its fixed wording: ${line}`);
+  });
+  const script = path.join(kubernetesSkill, "scripts", "read-cluster-usage.sh");
+  const scriptLines = existsSync(script) ? read(script).split("\n") : [];
+  const begin = scriptLines.indexOf("# BEGIN the fixed command list");
+  const end = scriptLines.indexOf("# END the fixed command list");
+  const scriptBlock = begin === -1 || end < begin ? [] : scriptLines.slice(begin + 1, end);
+  // Every line of the block is one command, CMD_<NAME>='<command>', and nothing else.
+  const scriptCommands = scriptBlock.map((line) => /^CMD_[A-Z]+='([^']*)'$/.exec(line)?.[1] ?? `not a command line: ${line}`);
+  sameLines(script, scriptCommands, clusterCommands, "the fixed command list of the cluster script");
+  const fieldsFile = path.join(kubernetesSkill, "references", "fields.md");
+  const fieldsLines = existsSync(fieldsFile) ? read(fieldsFile).split("\n") : [];
+  const intro = fieldsLines.findIndex((line) => line.startsWith("The fixed command list of the cluster script"));
+  const open = fieldsLines.findIndex((line, i) => i > intro && line === "```text");
+  const close = fieldsLines.findIndex((line, i) => i > open && line === "```");
+  const fieldsCommands = intro === -1 || open === -1 || close === -1 ? [] : fieldsLines.slice(open + 1, close);
+  sameLines(fieldsFile, fieldsCommands, clusterCommands, "the fixed command list of the cluster script");
+}
+
 // The nine rows of the agent permissions check keep the wording of the published policy.
 const nineRows = [
   ["Repository", "Open branches and pull requests, and comment.", "Push to main, merge, approve its own work, or edit workflow files.", "A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/."],

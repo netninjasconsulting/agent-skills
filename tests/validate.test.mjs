@@ -25,6 +25,20 @@ const verdict = '| Not ready to deploy | Any of S1 to S5 is a fail. |';
 const verdict2 = '| Ready after the first three | No fail in S1 to S5, and at least one of the eighteen checks is a fail or a warn. |';
 const statusRow = '| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |';
 const order = 'Order: S3, S4, S1, S5, S2, S6, S7, E3, S8, S9, S10, E1, E2, E4, E5, E6, E7, E8.';
+// The Kubernetes workload check pins its eighteen checks, its status and verdict tables, the order
+// of the first three, and the fixed command list of its cluster script.
+const kubernetes = 'skills/kubernetes-workload-check/';
+const r1 = 'R1. Every container sets a CPU request and a memory request, init containers and sidecars included.';
+const r2 = 'R2. Every container sets a memory limit.';
+const k7 = 'K7. Secrets stay out of manifests and values files.';
+const k8sVerdicts = [
+  '| Not ready for production | Any of K1, K4, K6, or K7 is a fail. |',
+  '| Ready after the first three | None of K1, K4, K6, or K7 is a fail, and at least one of the eighteen checks is a fail or a warn. |',
+  '| Ready from what the repository shows | No check is a fail or a warn. |',
+];
+const k8sStatusRow = '| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |';
+const k8sOrder = 'Order: K7, K6, K4, K1, K8, K5, K2, K10, R1, R2, K9, K3, R3, R4, R5, R6, R7.';
+const cmdEnd = '# END the fixed command list';
 const cases = [
   ['reword check', 'SKILL.md', s => s.replace(first, first.replace('works', 'runs'))],
   ['renumber check', 'SKILL.md', s => s.replace(first, first.replace('1.', '21.'))],
@@ -52,6 +66,22 @@ const cases = [
   ['serverless: reword status row', 'SKILL.md', s => s.replace(statusRow, statusRow.replace('sits outside it', 'is unknown')), serverless],
   ['serverless: change first-three order', 'SKILL.md', s => s.replace(order, order.replace('S3, S4, S1', 'S4, S3, S1')), serverless],
   ['serverless: change first-three order in checks.md', 'references/checks.md', s => s.replace(order, order.replace('S7, E3', 'E3, S7')), serverless],
+  ['kubernetes: reword check', 'SKILL.md', s => s.replace(r2, r2.replace('sets', 'has')), kubernetes],
+  ['kubernetes: reword check heading', 'references/checks.md', s => s.replace('### ' + k7, '### ' + k7.replace('stay out of', 'are kept out of')), kubernetes],
+  ['kubernetes: renumber check', 'SKILL.md', s => s.replace(r2, r2.replace('R2.', 'R9.')), kubernetes],
+  ['kubernetes: renumber check heading', 'references/checks.md', s => s.replace('### ' + k7, '### ' + k7.replace('K7.', 'K11.')), kubernetes],
+  ['kubernetes: swap two checks', 'SKILL.md', s => s.replace(r1, '@@R1@@').replace(r2, r1).replace('@@R1@@', r2), kubernetes],
+  ['kubernetes: swap two check headings', 'references/checks.md', s => s.replace('### ' + r1, '@@R1@@').replace('### ' + r2, '### ' + r1).replace('@@R1@@', '### ' + r2), kubernetes],
+  ['kubernetes: duplicate check', 'SKILL.md', s => s.replace(r1, r1 + '\n' + r1), kubernetes],
+  ['kubernetes: decoy original check in a code fence', 'SKILL.md', s => s.replace(r2, r2.replace('sets', 'has')) + '\n```text\n' + r2 + '\n```\n', kubernetes],
+  ['kubernetes: reword the first verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[0], k8sVerdicts[0].replace('Not ready for production', 'Not ready to ship')), kubernetes],
+  ['kubernetes: reword the second verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[1], k8sVerdicts[1].replace('at least one of the eighteen checks', 'any other check')), kubernetes],
+  ['kubernetes: reword the third verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[2], k8sVerdicts[2].replace('No check is a fail or a warn.', 'No check is a fail.')), kubernetes],
+  ['kubernetes: reword status row', 'SKILL.md', s => s.replace(k8sStatusRow, k8sStatusRow.replace('sits outside it', 'is unknown')), kubernetes],
+  ['kubernetes: change first-three order', 'SKILL.md', s => s.replace(k8sOrder, k8sOrder.replace('K7, K6', 'K6, K7')), kubernetes],
+  ['kubernetes: change first-three order in checks.md', 'references/checks.md', s => s.replace(k8sOrder, k8sOrder.replace('R6, R7', 'R7, R6')), kubernetes],
+  ['kubernetes: a command added to the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace(cmdEnd, "CMD_SECRETS='kubectl get secrets --namespace=<name> -o yaml'\n" + cmdEnd), kubernetes],
+  ['kubernetes: a command changed in the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace('--request-timeout=20s -o custom-columns=HPA:', '--request-timeout=20s -o yaml -o custom-columns=HPA:'), kubernetes],
   // The guided app starter: the guards for the security scan corrections of 15 November 2026.
   ['starter: a request body in a file', starter + 'references/ci-cd-baseline.md', s => s.replace("--input - <<'JSON'", '--input body.json <<\'JSON\'')],
   ['starter: a named request body file', starter + 'references/ci-cd-baseline.md', s => s + '\nWrite `ruleset.json` to a temporary folder.\n'],
