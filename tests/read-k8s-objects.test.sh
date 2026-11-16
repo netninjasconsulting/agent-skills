@@ -1202,6 +1202,33 @@ spec:
       command: [sh, -c, run]
       args: [--token=FIXTUREVALUE-flow-args, -v, --listen=0.0.0.0, run]
 EOF
+  # A backslash: every awk must read these the same way. One awk takes
+  # "\/" in a bracket expression for two members.
+  cat > "$a/values-key-backslash.yaml" <<'EOF'
+replicaCount: 2
+pass\word: FIXTUREVALUE-key-backslash
+EOF
+  cat > "$a/url-backslash.yaml" <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: url-backslash
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://dep\loy@github.com/example-fleetboard/fleetboard.git
+    path: apps
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: url-backslash
+spec:
+  containers:
+    - name: app
+      args:
+        - --dsn=postgres://ap\p:FIXTUREVALUE-url-backslash@db.example.com/app
+EOF
   cat > "$a/flow-question.yaml" <<'EOF'
 apiVersion: v1
 kind: Pod
@@ -1313,7 +1340,7 @@ EOF
   [ "$code" -eq 0 ] || fail "attack flow-empty: exit $code"
   expect_line "$out" "flow-empty.yaml:13:Pod/-/flow-empty:-:volume-type=emptyDir" "attack flow-empty"
   expect_line "$out" "flow-empty.yaml:10:Pod/-/flow-empty:app:cap-drop=ALL" "attack flow-empty"
-  for b in flow flow-map-sc flow-implicit flow-implicit-app flow-items flow-question flow-q-app values-flow-item values-flow-q cm-flow values-flow flow-lines anchors indent indent-deeper quoted-marker json template dup cr tabs tab-value directive tags control values-anchor nel ls ps nul; do
+  for b in flow flow-map-sc flow-implicit flow-implicit-app flow-items flow-question flow-q-app values-flow-item values-flow-q values-key-backslash cm-flow values-flow flow-lines anchors indent indent-deeper quoted-marker json template dup cr tabs tab-value directive tags control values-anchor nel ls ps nul; do
     att "$b.yaml"
     [ "$code" -eq 4 ] || fail "attack $b: expected exit 4, got $code"
   done
@@ -1420,6 +1447,10 @@ EOF
   expect_line "$out" "flow-argo.yaml:12:Application/argocd/flow-argo:-:destination-namespace=fleetboard" "attack flow lists of Argo CD options"
   expect_line "$out" "flow-argo.yaml:27:ApplicationSet/argocd/flow-argo-set:-:list-element.1.1.env=staging" "attack flow lists of Argo CD options"
   expect_line "$out" "flow-argo.yaml:33:ApplicationSet/argocd/flow-argo-set:-:source.1.path=kustomize/overlays/{{.env}}" "attack flow lists of Argo CD options"
+  att url-backslash.yaml
+  [ "$code" -eq 0 ] || fail "attack backslash in a URL: exit $code"
+  expect_line "$out" "url-backslash.yaml:8:Application/argocd/url-backslash:-:source.1.url-has-user-part=true" "attack backslash in a URL"
+  expect_line "$out" "url-backslash.yaml:18:Pod/-/url-backslash:app:args-credential-like-count=1" "attack backslash in a URL"
   att flow-args.yaml
   [ "$code" -eq 0 ] || fail "attack flow list of flags: expected to be read, got exit $code"
   expect_line "$out" "flow-args.yaml:8:Pod/-/flow-args:app:args-credential-like-count=1" "attack flow list of flags"
