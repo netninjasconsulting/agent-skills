@@ -2,7 +2,7 @@
 
 Every field the reader extracts, the shape its value has to fit, and where it sits in each object. Also the three command sections (render, refuse, cluster) and the Kubernetes facts behind them. This file is the single source of facts for the reader script, the cluster script, and the evidence rules in `checks.md`.
 
-**Checked on 15 November 2026.** Each fact below is marked "checked" (read in the project's own documentation, or in its own source file where the row says so, on that date; sources at the end) or "verify" (not read on that date: read the current documentation before relying on it). A status cell holds one word. A row with two facts of different status is split in two. The pages read named Kubernetes v1.37 as the current version, except the ContainerStatus page, which is the v1.35 reference. Field names and limits move between versions, so this file is re-checked at every release of the skill.
+**Checked on 15 November 2026.** Each fact below is marked "checked" (read in the project's own documentation, in its own source file where the row says so, or in the output of a local tool whose version the row names, on that date; sources at the end) or "verify" (not read on that date: read the current documentation before relying on it). A status cell holds one word. A row with two facts of different status is split in two. The pages read named Kubernetes v1.37 as the current version, except the ContainerStatus page, which is the v1.35 reference. Field names and limits move between versions, so this file is re-checked at every release of the skill.
 
 The skill never states a size, a saving, or a cost in the first pass. The defaults and limits below say what Kubernetes does when a setting is absent. They are not recommendations.
 
@@ -571,7 +571,9 @@ What the page says about dependencies (H1, H3, H4, H5):
 - `--dependency-update` updates dependencies that are missing before the chart is installed (H1, H2). It is the flag that fetches them.
 - Dependencies sit in the chart's `charts/` directory, as `.tgz` archives or unpacked directories (H3). `helm dependency update` downloads them. `helm dependency build` rebuilds `charts/` from `Chart.lock`, and acts as an update when there is no lock file (H5).
 - A `file://` repository entry is a local path, and version matching still applies (H4).
-- What `helm template` does when `charts/` lacks a declared dependency is not on any page read (verify). The reader does not depend on the answer, because it refuses first. See section 2.
+- When `charts/` lacks a declared dependency, `helm template` fails and renders nothing (checked, T1, helm v4.3.2, 15 Nov 2026, `helm template r chart1` on a chart that declares `redis` and has no `charts/` directory). Exit status 1, nothing on standard output, and one `Error:` line on standard error that says the dependency is found in `Chart.yaml` but missing in the `charts/` directory. The run made no network request, because Helm stops before it fetches. The reader still refuses first (section 2), so it does not depend on this.
+- `lookup` in a template, with no cluster and no kubeconfig, returns an empty map and the render succeeds (checked, T1, helm v4.3.2, 15 Nov 2026, `helm template r chart2` where the template calls `lookup "v1" "Namespace" "" "kube-system"`). Exit status 0, the output holds `{}`, `empty` is true, and standard error is empty. This matches the page's statement that looked-up values are faked locally (H1).
+- Helm v4.3.2 accepts a `--validate` flag that its help does not list. It prints `Flag --validate has been deprecated, use '--dry-run=server' instead`, then tries to reach a cluster at `http://localhost:8080/version`, and exits 1 with nothing rendered (checked, T1, helm v4.3.2, 15 Nov 2026, `helm template r chart2 --validate`). `--dry-run=server` fails the same way (`helm template r chart2 --dry-run=server`).
 
 Flags the reader must never pass. Each one can reach a cluster, a registry, a chart repository, a URL, or a file write:
 
@@ -589,7 +591,11 @@ Flags the reader must never pass. Each one can reach a cluster, a registry, a ch
 | `--enable-dns` | Enables DNS lookups while rendering templates | H1 | 15 Nov 2026 | checked |
 | `--output-dir` | Writes the rendered files. The reader writes nothing | H1 | 15 Nov 2026 | checked |
 | `--set-file` | Sets values from files named on the command line, and the reader has not checked those paths | H1 | 15 Nov 2026 | checked |
-| `--validate` | The page read does not list it. If it exists, it validates against a cluster (verify) | H1 | 15 Nov 2026 | verify |
+| `--validate` | Hidden and deprecated in helm v4.3.2, it acts as `--dry-run=server` and tries to reach a cluster | T1 (`helm template r chart2 --validate`, helm v4.3.2) | 15 Nov 2026 | checked |
+| `--post-renderer`, `--post-renderer-args` | New in the helm v4.3.2 help: runs a post-render plugin, which is code | T1 (`helm template --help`, helm v4.3.2) | 15 Nov 2026 | checked |
+| `--kube-insecure-skip-tls-verify`, `--kube-tls-server-name` | Cluster connection flags of Helm itself, in the v4.3.2 global flags | T1 (`helm template --help`, helm v4.3.2) | 15 Nov 2026 | checked |
+| `--registry-config`, `--repository-config`, `--repository-cache`, `--content-cache` | Point Helm at registry, repository, and cache files or folders that the reader has not checked | T1 (`helm template --help`, helm v4.3.2) | 15 Nov 2026 | checked |
+| `--set`, `--set-string`, `--set-json`, `--set-literal` | Values typed on the command line. The reader passes values files only | T1 (`helm template --help`, helm v4.3.2) | 15 Nov 2026 | checked |
 
 The reader also never passes a chart name, a `oci://` address, or a `https://` address as the chart.
 
@@ -610,16 +616,23 @@ Flags the reader must never pass:
 | Flag | Why it is never passed | Source | Read | Status |
 | --- | --- | --- | --- | --- |
 | `--enable-alpha-plugins` | Enables plugins, which run code | Z2, K34 | 15 Nov 2026 | checked |
-| `--enable-exec` | Enables exec plugins | Z2 | 15 Nov 2026 | checked |
+| `--enable-exec` | Enables exec plugins. `kubectl kustomize` v1.37.2 does not accept it (`error: unknown flag: --enable-exec`), and an exec plugin fails without it. See the note under the table | Z2, T2 (`kubectl kustomize ov3 --enable-exec`, kubectl v1.37.2) | 15 Nov 2026 | checked |
 | `--enable-helm` | Enables the Helm chart inflator, which can fetch a chart | Z7, K34 | 15 Nov 2026 | checked |
 | `--helm-command`, `--helm-api-versions`, `--helm-debug`, `--helm-kube-version` | Options of the Helm inflator | K34 | 15 Nov 2026 | checked |
 | `--load-restrictor` | `LoadRestrictionsNone` lets a build read outside its root | K34 | 15 Nov 2026 | checked |
 | `--network`, `--network-name` | Network access for containerised functions | K34, Z2 | 15 Nov 2026 | checked |
 | `--mount`, `-e`, `--env`, `--as-current-user` | Options of containerised functions | K34 | 15 Nov 2026 | checked |
 | `-o`, `--output` | Writes the build to a path. The reader writes nothing | K34 | 15 Nov 2026 | checked |
-| `--reorder` | The flag is not on the pages read, and the reader has no use for it | not read | 15 Nov 2026 | verify |
+| `--reorder` | Not a flag of `kubectl kustomize` in kubectl v1.37.2 (Kustomize v5.8.1), and the reader has no use for it. The standalone binary was not installed, so its flags are not read | T2 (`kubectl kustomize --help`, kubectl v1.37.2) | 15 Nov 2026 | checked |
 
-A standalone `kustomize build` page was read as well (Z1). It lists no flag, so the flag names above come from `kubectl kustomize` (K34) and the plugin guide (Z2). Whether the standalone binary takes exactly the same flags is not shown (verify).
+A standalone `kustomize build` page was read as well (Z1). It lists no flag, so the flag names above come from `kubectl kustomize` (K34) and the plugin guide (Z2). Whether the standalone binary takes exactly the same flags is not shown (verify): no standalone `kustomize` binary is installed in this workspace, so only the one built into kubectl v1.37.2 (Kustomize v5.8.1) was read.
+
+What the local tools showed (checked, T2, kubectl v1.37.2 with Kustomize v5.8.1, 15 Nov 2026, run on small overlays under /tmp, none in the repository):
+
+- `kubectl kustomize --help` lists these flags: `--as-current-user`, `--enable-alpha-plugins`, `--enable-helm`, `-e` and `--env`, `--helm-api-versions`, `--helm-command`, `--helm-debug`, `--helm-kube-version`, `--load-restrictor`, `--mount`, `--network`, `--network-name`, and `-o` and `--output`. It does not list `--enable-exec`.
+- An overlay with a `helmCharts` entry and no flag fails with exit status 1, nothing on standard output, and `must specify --enable-helm` on standard error (`kubectl kustomize ov2`).
+- An overlay with a generator that carries an exec function annotation and no flag fails with exit status 1 and `external plugins disabled; unable to load external plugin` on standard error (`kubectl kustomize ov3`). The plugin did not run.
+- An overlay whose `resources` entry is `file:///` plus the path of a local Git repository builds with exit status 0 and no flag, so a remote-form base is cloned and read without any switch (`kubectl kustomize ov1`). That is the reason the reader refuses on the file text. The run used a local repository, so it made no network request. A real remote base was not run.
 
 ## Command section 2: when the reader refuses to render
 
@@ -648,7 +661,7 @@ The script puts `--namespace=<name>` after the verb, as one argument, so that a 
 
 | Step | Command | Columns it needs | Source | Read | Status |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `kubectl config current-context` | The context name, so the offer can name it | K29, K33 | 15 Nov 2026 | checked |
+| 1 | `kubectl config current-context` | The context name, so the offer can name it | K29, K33, T2 (`KUBECONFIG=/tmp/lc2/kc kubectl config current-context`, kubectl v1.37.2) | 15 Nov 2026 | checked |
 | 2 | `kubectl top pod --containers --namespace=<name> --no-headers` | The pod, the container, the CPU, and the memory in use. The column order is not on the page read, so the script and the stand-in must be written against a real run (verify) | K28 | 15 Nov 2026 | verify |
 | 3 | `kubectl get pods --namespace=<name> -o custom-columns=...` with the list below | See below | K30, K31, K1, K32 | 15 Nov 2026 | verify |
 | 4 | `kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> -o custom-columns=...` with the list below | See below | K30, K31, V1 | 15 Nov 2026 | verify |
@@ -656,8 +669,8 @@ The script puts `--namespace=<name>` after the verb, as one argument, so that a 
 
 What was read for each step:
 
-- **Step 1.** The documentation page gives the command a one-line description, and it does not say whether the command contacts the cluster (K29). The command's own source file reads the starting configuration through `ConfigAccess`, and writes `config.CurrentContext`. It builds no REST client and sends no request (K33, read from the project's source on the build date). That makes the context name a local read. The status is "checked" on the strength of the source file, and the documentation page is silent.
-- **Step 2.** The form is `kubectl top pod [NAME | -l label]`, with `--containers` (usage of the containers within a pod), `--namespace`, and `--no-headers` (K28). The page says metrics can be unavailable for a few minutes after a pod is created (K28). It does not name the Metrics Server. The VPA page says a metrics source, such as the Metrics Server, has to be installed (K10). A single sample is one moment in time, and the report labels it so.
+- **Step 1.** The documentation page gives the command a one-line description, and it does not say whether the command contacts the cluster (K29). The command's own source file reads the starting configuration through `ConfigAccess`, and writes `config.CurrentContext`. It builds no REST client and sends no request (K33, read from the project's source on the build date). That makes the context name a local read. The status is "checked" on the strength of the source file, and the documentation page is silent. The local run agrees (T2, kubectl v1.37.2, 15 Nov 2026): with a kubeconfig file that sets a context whose server address is not reachable, the command printed the context name and exited 0, and a trace of the process (`strace -f -e trace=connect,socket`) showed no socket or connect call. With an empty file or a missing file it exits 1 and prints `error: current-context is not set`, with nothing else.
+- **Step 2.** The form is `kubectl top pod [NAME | -l label]`, with `--containers` (usage of the containers within a pod), `--namespace`, and `--no-headers` (K28). The page says metrics can be unavailable for a few minutes after a pod is created (K28). The help text of kubectl v1.37.2 (`kubectl top pod --help`, T2) lists `-A`, `--containers`, `--field-selector`, `--no-headers`, `-l`, `--show-swap`, `--sort-by`, `--sum`, and `--use-protocol-buffers`. It gives no column order or sample output, and a cluster is needed to see one, so the column order stays "verify". `--namespace` is a global option (`kubectl options`). It does not name the Metrics Server. The VPA page says a metrics source, such as the Metrics Server, has to be installed (K10). A single sample is one moment in time, and the report labels it so.
 - **Step 3, columns.** Each is `HEADER:jsonpath`, and the list is comma separated, as in `-o custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion` (K31). The fixed list for pods:
 
 ```text
@@ -671,7 +684,7 @@ RESTARTS:.status.containerStatuses[*].restartCount
 LAST_END:.status.containerStatuses[*].lastState.terminated.reason
 ```
 
-The paths are the field paths in K1, K2, and K32. `restartCount` counts the restarts of the container, and `lastState` is not filled in while the container is still running with a restart count of 0 (K32). `reason` is a brief reason from the last termination (K1). The reason a container was killed for memory is shown on the Kubernetes pages as `OOMKilled` (K2). The page read for custom columns shows only an index such as `[0]` (K30, K31), so the use of `[*]` is "verify". It is the reason the status is "verify" for this step.
+The paths are the field paths in K1, K2, and K32. `restartCount` counts the restarts of the container, and `lastState` is not filled in while the container is still running with a restart count of 0 (K32). `reason` is a brief reason from the last termination (K1). The reason a container was killed for memory is shown on the Kubernetes pages as `OOMKilled` (K2). The page read for custom columns shows only an index such as `[0]` (K30, K31), and the help text of kubectl v1.37.2 shows only `[0]` as well (`kubectl get --help`, T2). A trial with `kubectl create --dry-run=client -o custom-columns` was refused, because that command does not print custom columns, and `kubectl get` needs a cluster. So the use of `[*]` is "verify". It is the reason the status is "verify" for this step. The `-o custom-columns` form and the type form `TYPE[.VERSION][.GROUP]` are in the help text of kubectl v1.37.2 (checked, T2).
 
 - **Step 4, columns.** The fixed list for VerticalPodAutoscalers, from the project's types file (V1):
 
@@ -747,7 +760,9 @@ The reader has no field for each of these, on purpose or because no check needs 
 - **Pod-level resources.** The resource management page says the `PodLevelResources` feature has been beta since v1.34 and is on by default, and that Kubernetes 1.37 supports pod-level requests or limits only for `cpu`, `memory`, and `hugepages` (K2). The Pod API reference marks `spec.resources` as alpha and says it needs the feature gate (K1). The two pages disagree. Both were read on 15 November 2026. The pod-level `cpu-request` and the other three rows are "verify", and R1 never counts a pod-level request as a container's own.
 - **Pod Security mode labels.** The label page lists six labels (K24 names them), and the admission page defines three modes (K19). The reader reads `enforce` and `warn` and the two version labels for them. The third mode's label is not read, because it does not decide K10.
 - **The `kubectl top pod` page and the Metrics Server.** The `top pod` page does not name a metrics source (K28). The VPA page says the VPA needs a metrics source, such as the Metrics Server add-on (K10). The cluster pass says `top` needs a metrics source, and cites the VPA page.
-- **`kubectl config current-context`.** The documentation page does not say whether the command contacts the cluster (K29). The command's source file shows it does not (K33). The row is "checked" on the source.
+- **`kubectl config current-context`.** The documentation page does not say whether the command contacts the cluster (K29). The command's source file shows it does not (K33), and a local run with a trace showed no connection (T2). The row is "checked" on the source and the run.
+- **`--enable-exec`.** The plugin guide names it (Z2). `kubectl kustomize` v1.37.2 (Kustomize v5.8.1) rejects it as an unknown flag. The reader never passes it, so the difference changes nothing. It may be a flag of the standalone binary only, which was not installed.
+- **`helm template --validate`.** The page read does not list it (H1). Helm v4.3.2 accepts it as a hidden, deprecated flag that stands for `--dry-run=server`. A bare `--dry-run` in helm v4.3.2 takes an optional string (`--dry-run string[="unset"]`), so the reader never passes `--dry-run` without `=client`. This file was compared with the helm v4.3.2 help only. No Helm 3 binary or Helm 3 help text was read, so differences from Helm 3 are known only against the page H1.
 - **LimitRange types.** The LimitRange API page describes the type only as the type of resource the limit applies to, and shows no list of values (K11). The concept page shows `Container` in its example and says the object kinds are Pod, Container, and PersistentVolumeClaim (K12). The `limit-type` row is "verify".
 - **`kustomize build` flags.** The standalone `kustomize build` page lists no flag (Z1). The `kubectl kustomize` page lists them (K34), and the plugin guide names `--enable-alpha-plugins` and `--enable-exec` (Z2). The flag list for the standalone binary is taken from the other two pages.
 - **Versions.** The Kubernetes pages read name v1.37 as the current version. The ContainerStatus definition was read in the v1.35 API reference (K32), because the Pod reference page did not carry the definition in the part of the page read.
@@ -827,3 +842,8 @@ Argo CD, `argo-cd.readthedocs.io`:
 - G3 ApplicationSet list generator: https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Generators-List/
 - G4 ApplicationSet generators: https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Generators/
 - G5 Helm: https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
+
+Local tools, run on 15 November 2026 in this workspace (installed at /usr/local/bin, each checked against its published checksum by the coordinator):
+
+- T1 `helm` v4.3.2 (`helm template --help`, `helm dependency --help`, `helm dependency build --help`, and `helm template` on two charts under /tmp)
+- T2 `kubectl` v1.37.2 with Kustomize v5.8.1 (`kubectl top pod --help`, `kubectl get --help`, `kubectl config current-context`, `kubectl kustomize --help`, and `kubectl kustomize` on three overlays under /tmp)
