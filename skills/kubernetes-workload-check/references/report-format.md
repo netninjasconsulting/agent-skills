@@ -15,7 +15,7 @@ This is a quick check. It is not a penetration test and it is not legal advice. 
 
 <Where it comes from: the Argo CD object and its file and line, the overlay, the values file, or "the plain manifests". Its namespaces.>
 
-<One sentence: the rule that decided the verdict, naming the checks that decided it. For an environment that is not fully seen and has no printed fail in K1, K4, K6, or K7, this line instead: "No verdict: <what was not rendered or not read>, so the repository does not show enough to give one.">
+<One sentence: the rule that decided the verdict, naming the checks that decided it. For an environment that is not fully seen and has no printed fail in K1, K4, K6, or K7, this line instead (no printed fault fails K1, K4, K6, or K7): "No verdict: <what was not rendered or not read>, so the repository does not show enough to give one.">
 
 - Sizing: N out of M confirmed in the repository (K to ask the team)
 - Security: N out of M confirmed in the repository (K to ask the team)
@@ -98,7 +98,7 @@ Names only. No value, and no part of one.
 - <Each file that was not read (exit code 4), by path, with the reason the reader gave.>
 - <Each manifest that holds only kinds the reader does not read, by path, as "a kind the reader does not read".>
 - <Each field that printed `other`, by file, line, and field.>
-- <Each chart or overlay that was not rendered, with its reason, and the checks it leaves at "ask the team" at best.>
+- <Each chart or overlay that was not rendered, and each file that was not read, with its reason, and the checks it leaves at "ask the team" with no question of their own.>
 - <Each inline values path of an Application, by file, line, and path, as a value the render left out. Each `source.<n>.kustomize=present` line.>
 - <Each Argo CD object that names no environment: another repository, or a generator the files cannot resolve.>
 - <The count of paths the list left out, when its exit code was 4.>
@@ -113,11 +113,11 @@ Checked with the Kubernetes workload check, a free skill from Net Ninjas Consult
 
 In each headline, for that environment and that score, N counts the checks marked "pass", K counts the checks marked "ask the team" (R8 included), and M counts the checks that apply, so "does not apply" is never in M. Sizing has 8 checks and security has 10, so M is at most 8 or 10. A team's answer and a figure from the cluster never change a headline.
 
-Each environment's verdict comes from the verdict table in SKILL.md, from its first-pass statuses only. An environment is fully seen when every chart and overlay that feeds it was rendered with success, and every manifest, values file, and Argo CD object that feeds it was read. One that is not fully seen gets "Not ready for production" when a printed field fails K1, K4, K6, or K7, and otherwise the "No verdict" line, which is not a verdict. "Ready after the first three" and "Ready from what the repository shows" are given only to an environment that is fully seen.
+Each environment's verdict comes from the verdict table in SKILL.md, from its first-pass statuses only. An environment is fully seen when every chart and overlay that feeds it was rendered with success, and every manifest, values file, and Argo CD object that feeds it was read (no exit code 4, and no render refusal). When the list exits with code 4, no environment is fully seen. In one that is not fully seen, no check passes and no check is "does not apply", whatever it would rest on (R8 where R1 fails excepted), and only a printed fault, as "The verdict" in SKILL.md lists them, makes a fail or a warn, with the evidence "read from `<file>`, not from a render". It gets "Not ready for production" when a printed fault fails K1, K4, K6, or K7, and otherwise the "No verdict" line, which is not a verdict. "Ready after the first three" and "Ready from what the repository shows" are given only to an environment that is fully seen.
 
-The counts still add up in an environment that is not fully seen. A check that would have passed or been "does not apply" from something absent is "ask the team", so it moves into K and stays in M. Every check then applies except R8 where R1 fails, so M is N plus K plus the checks marked warn or fail, as everywhere.
+The counts still add up in an environment that is not fully seen. Every check that is not a printed fault is "ask the team", so it counts in K and in M, and N is 0. Every check then applies except R8 where R1 fails, so M is N plus K plus the checks marked warn or fail, as everywhere. A check that is "ask the team" only because the environment is not fully seen gets no question: "Not checked" names the chart or overlay that was not rendered, or the file that was not read, in its place.
 
-Leave out "Also found" when there is nothing to put in it, and "Questions for the team" when no check other than R8 is marked "ask the team". When fewer than three checks qualify for an environment's first three, list those only. When none qualify, write "This check identifies no change." under that environment. When a check comes up in a second environment, point to its snippet above instead of printing it again.
+Leave out "Also found" when there is nothing to put in it, and "Questions for the team" when no check other than R8 is marked "ask the team". When fewer than three checks qualify for an environment's first three, list those only. When none qualify, write "This check identifies no change." under an environment that is fully seen, and "No change can be named from what was read." under one that is not. When a check comes up in a second environment, point to its snippet above instead of printing it again.
 
 A line number is the line in one file, read with one command, or the line of one render's output, written as "`<chart>` rendered with `<values file>`, output line N".
 
@@ -125,7 +125,7 @@ A line number is the line in one file, read with one command, or the line of one
 
 After the closing line, make each offer that applies, once, as the last lines of the reply, in this order. Nothing follows them.
 
-**1. The questions,** when any check other than R8 is marked "ask the team". Q is the number of questions under "Questions for the team", one for each such check in each environment. For several: "Q questions about the checks sit outside the repository. Shall I ask them? (yes or no)". For one: "1 question about a check sits outside the repository. Shall I ask it? (yes or no)".
+**1. The questions,** when any check other than R8 is marked "ask the team". Q is the number of questions under "Questions for the team", one for each such check in each environment. A check that is "ask the team" only because its environment is not fully seen has no question, and is not in Q. For several: "Q questions about the checks sit outside the repository. Shall I ask them? (yes or no)". For one: "1 question about a check sits outside the repository. Shall I ask it? (yes or no)".
 
 **2. The cluster pass,** when R8 is "ask the team" in an environment whose namespace is known, and the context name was read. The words, for one namespace and for several, are in "The offer" in [cluster-pass.md](cluster-pass.md).
 

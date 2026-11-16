@@ -41,7 +41,7 @@ One offer, made once, as the last lines of the reply, after the closing line of 
 
 The first sentences are the spec's, word for word. Put this line directly before the offer, so that the question stays last:
 
-"It reads these namespaces only. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing."
+"It reads only the namespaces named below. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing."
 
 For one namespace, write "for the namespace `<namespace>`" in the offer. `<list>` is the names joined with commas, each in backticks. With no answer, or a no, the report is the result, and R8 stays "ask the team".
 
