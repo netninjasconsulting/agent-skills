@@ -946,6 +946,27 @@ subjects:
     name: web
     namespace: web
 EOF
+  # A double-quoted name can spell a service account with an escape that
+  # YAML decodes, so a name in quotes that holds a backslash is "other".
+  cat > "$a/rbac-escaped.yaml" <<'EOF'
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: escaped
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: User
+    name: "system\u003aserviceaccount:prod:default"
+  - kind: User
+    name: "\x73ystem:serviceaccount:prod:default"
+  - kind: User
+    name: 'system\u003aserviceaccount:prod:default'
+  - kind: User
+    name: "alice@example.com"
+EOF
   cat > "$a/multi.yaml" <<'EOF'
 apiVersion: v1
 kind: Secret
@@ -1792,6 +1813,15 @@ EOF
   done
   expect_no "$out" 'subject\.(8|9|10)\.user-form|alice|SERVICEACCOUNT|serviceaccount:|=system' "attack User subjects"
 
+  att rbac-escaped.yaml
+  [ "$code" -eq 0 ] || fail "attack escaped User names: exit $code"
+  o="ClusterRoleBinding/-/escaped"
+  for want in "11:$o:-:subject.1.user-form=other" "13:$o:-:subject.2.user-form=other" \
+    "15:$o:-:subject.3.user-form=other" "17:$o:-:subject.4.user-form=plain"; do
+    expect_line "$out" "rbac-escaped.yaml:$want" "attack escaped User names"
+  done
+  expect_no "$out" 'alice|serviceaccount:|u003a|x73' "attack escaped User names"
+
   att multi.yaml
   [ "$code" -eq 0 ] || fail "attack multi-document: exit $code"
   expect_line "$out" "multi.yaml:2:Secret/-/first:-:object=present" "attack multi-document"
@@ -1961,6 +1991,21 @@ EOF
   [ -z "$out" ] || fail "symbolic link: a file reached through a linked directory printed output"
   rd --fields real/../real/sa.yaml
   [ "$code" -eq 0 ] || fail "a path with .. and no link: exit $code"
+
+  # A top-level key in quotes is a key --fields reads, so the list must
+  # list the file: a quoted kind never hides a workload.
+  mkdir "$work/quoted"
+  printf '"apiVersion": v1\n"kind": Pod\nmetadata:\n  name: dq\nspec:\n  hostNetwork: true\n' > "$work/quoted/dq.yaml"
+  printf "'apiVersion': v1\n'kind': Pod\nmetadata:\n  name: sq\nspec:\n  hostPID: true\n" > "$work/quoted/sq.yaml"
+  printf '"apiVersion": argoproj.io/v1alpha1\n"kind": "Application"\nmetadata:\n  name: app\n' > "$work/quoted/app.yaml"
+  cwd=$work/quoted
+  rd .
+  [ "$code" -eq 0 ] || fail "quoted top-level keys: the list exit $code"
+  expect_line "$out" "dq.yaml:manifest:no-git" "quoted top-level keys"
+  expect_line "$out" "sq.yaml:manifest:no-git" "quoted top-level keys"
+  expect_line "$out" "app.yaml:argo-application:no-git" "quoted top-level keys"
+  rd --fields dq.yaml
+  expect_line "$out" "dq.yaml:6:Pod/-/dq:-:host-network=true" "quoted top-level keys"
 
   # Usage.
   cwd=$repo
@@ -2700,6 +2745,8 @@ pins() {
   pin "a clear value in a sops Secret" '# a clear value in a sops Secret' '/# a clear value in a sops Secret$/s/c++/c = c/' attacks "missing line sops-fake.yaml:7:Secret/-/fake:-:sops-clear-count=1"
   pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
   pin "the form of a User name" '# the form of a User name' '/# the form of a User name$/s/== "system:serviceaccount:"/== "x"/' attacks "missing line rbac-users.yaml:11:ClusterRoleBinding/-/users:-:subject.1.user-form=service-account"
+  pin "a quoted User name with a backslash" '# the form of a User name' '/# the form of a User name$/s/ || (LQ\[0, k\] \&\& index(LVAL\[0, k\], "\\\\"))//' attacks "missing line rbac-escaped.yaml:11:ClusterRoleBinding/-/escaped:-:subject.1.user-form=other"
+  pin "a quoted top-level key in the list" '# a quoted top-level key' '/# a quoted top-level key$/s/(kind|"kind"|/(kind|/' links "missing line dq.yaml:manifest:no-git"
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
