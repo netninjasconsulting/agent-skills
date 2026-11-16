@@ -457,6 +457,15 @@ const kubernetesRulings = [
   "- **The `cluster-admin` binding.** A binding to `cluster-admin` fails K6 when any subject reaches a workload: a ServiceAccount (`subject.<n>.kind=ServiceAccount`, the `default` account included), a `User` in the service-account form (`subject.<n>.user-form=service-account`), or a group (`subject.<n>.kind=Group`). Kubernetes authenticates a ServiceAccount as the user `system:serviceaccount:<namespace>:<name>`, and RBAC matches a `User` subject by that name (verify). The reader prints no group name, so every group counts.",
   "- **The subject rule.** A subject that reaches a workload is one of the three above. A `User` with `user-form=plain` is a person or a system user, not a workload, and is not a K6 case. A `User` with `user-form=other` is \"ask the team\" in K6, and \"not found in the repository\" in the reach map. The subject rule decides two things only: the built-in roles (the `cluster-admin` fail, and the `admin` and `edit` warn), and the marks of the reach map. A Role or ClusterRole defined in the repository is judged on its own rules, whatever binds it.",
 ];
+// The subject rules of the reach map: what each subject reaches, and the order inside the cell.
+const kubernetesReachRules = [
+  "- A ServiceAccount subject (`subject.<n>.kind=ServiceAccount`) reaches exactly the account that its `subject.<n>.name` and `subject.<n>.namespace` give, whatever kind of binding holds it and wherever the binding lives.",
+  "- A `User` in the service-account form (`subject.<n>.user-form=service-account`) reaches the account of every workload of the environment, whatever the binding's kind or namespace. The reader never prints a `User` name, and the name can give an account in any namespace, so the reader cannot tie the subject to one account.",
+  "- A group (`subject.<n>.kind=Group`) reaches the account of every workload of the environment, whatever the binding's kind or namespace. The reader prints no group name, so every group counts.",
+  "A `User` with `user-form=other` may be a ServiceAccount in the user form, and the reader could not tell. Every workload of the environment, whatever the binding's kind or namespace, gets \"not found in the repository\" in this cell, with the reason. A `User` with `user-form=plain` is a person or a system user, and reaches no workload.",
+  "The kind of the binding decides only where the rights apply: a RoleBinding gives them inside its own namespace, and a ClusterRoleBinding gives them in the whole cluster. The cell says which. The cost of this rule is that workloads other than the one a binding names are marked too, because the reader does not print the name.",
+  "Where \"broad\" and \"not found in the repository\" both hold for the cell, the cell is \"broad\", and it still lists the reason for \"not found in the repository\".",
+];
 const kubernetesRule10 = "10. **A pass needs a field the reader printed.** A README, a comment, or a name never passes a check. A field that is \"not found\" can neither pass nor fail a check: the check is \"ask the team\" at best, and the field is listed under \"Not checked\". The one exception is the table \"Absent fields\" in `references/checks.md`: a key that is absent from an object the reader printed whole means the setting is not made, and the Kubernetes default applies. A field that prints `other`, or sits in a file that was not read, is never the default and never passes.";
 // The K7 table: one status for each case, every row of it.
 const kubernetesK7Rows = [
@@ -534,6 +543,9 @@ if (existsSync(kubernetesSkill)) {
   sameLines(skillFile, between(checksSection, "**Security**", null).filter(isCheck), security, "the security checks under Security");
   sameLines(checksFile, sectionLines(checksLines, "## Sizing").filter((line) => /^#+ [RK]\d+\. /.test(line)), sizing.map((check) => `### ${check}`), "the sizing check headings under Sizing");
   sameLines(checksFile, sectionLines(checksLines, "## Security").filter((line) => /^#+ [RK]\d+\. /.test(line)), security.map((check) => `### ${check}`), "the security check headings under Security");
+  const reachFile = path.join(kubernetesSkill, "references", "reach-map.md");
+  const reachLines = linesOf(reachFile);
+  kubernetesReachRules.forEach((rule) => sameLines(reachFile, reachLines.filter((line) => line === rule), [rule], "a subject rule of the reach map"));
   kubernetesRulings.forEach((rule) => sameLines(checksFile, checksLines.filter((line) => line === rule), [rule], "a ruled rule of checks.md"));
   sameLines(skillFile, skillLines.filter((line) => line === kubernetesRule10), [kubernetesRule10], "ground rule 10 with its pointer to the absent-fields table");
   sameLines(checksFile, between(checksLines, `### ${kubernetesChecks[14]}`, `### ${kubernetesChecks[15]}`).filter((line) => /^\| /.test(line)), kubernetesK7Rows, "every row of the K7 table");
