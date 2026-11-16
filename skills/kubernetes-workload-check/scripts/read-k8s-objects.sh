@@ -1410,9 +1410,21 @@ kfile_in() {
 
 # The paths a kustomization names, one "<field> <path>" line each, read
 # with the extractor and never printed. Exit 4 when the file is not read.
+# kustomize reads a key in any case, so each key of the list below is
+# judged by its lower-case form, and a kustomization that writes one in
+# another case is refused as well.
 kust_entries() {
   leaves=$(REMOTES='' extract leaves "" < "$1") || return 4
   printf '%s\n' "$leaves" | awk -F '\t' '
+    BEGIN {
+      n = split("helmCharts helmGlobals helmChartInflationGenerator generators transformers validators resources bases components crds configurations patchesStrategicMerge patches patchesJson6902 replacements path openapi configMapGenerator secretGenerator files envs env", w, " ")
+      for (i = 1; i <= n; i++) CANON[tolower(w[i])] = w[i]
+    }
+    {
+      n = split($2, s, ">"); p = ""
+      for (i = 1; i <= n; i++) { k = tolower(s[i]); if (k in CANON) s[i] = CANON[k]; p = (i == 1) ? s[i] : p ">" s[i] }
+      if (p != $2) { print "bad -"; $2 = p }  # a known key in another case
+    }
     $2 ~ /^(helmCharts|helmGlobals|helmChartInflationGenerator|generators|transformers|validators)(>|$)/ { print "plugin -"; next }
     $2 ~ /^((resources|bases|components|crds|configurations|patchesStrategicMerge)>#[0-9]+|(patches|patchesJson6902|replacements)>#[0-9]+>path|openapi>path|(configMapGenerator|secretGenerator)>#[0-9]+>((files|envs)>#[0-9]+|env))$/ && $1 != "scalar" { print "bad -"; next }  # an entry that is not a plain scalar
     $2 ~ /^(resources|bases|components|crds|configurations|patchesStrategicMerge)$/ && $1 != "none" && $1 != "flow" { print "bad -"; next }
@@ -1647,7 +1659,7 @@ $1" ;;
   deps=$(find "$cp_" \( -name Chart.yaml -o -name requirements.yaml \) -type f -print | while IFS= read -r cf; do
     cdir=$(dirname -- "$cf")
     leaves=$(REMOTES='' extract leaves "" < "$cf") || { echo bad; break; }
-    items=$(printf '%s\n' "$leaves" | awk -F '\t' '$2 ~ /^dependencies>#[0-9]+$/ { n++ } END { print n + 0 }')
+    items=$(printf '%s\n' "$leaves" | awk -F '\t' '$2 ~ /^dependencies>#[0-9]+$/ { n++ } tolower($2) ~ /^dependencies(>|$)/ && $2 !~ /^dependencies(>|$)/ { n = -1; exit } END { print n + 0 }')  # dependencies in another case
     names=$(printf '%s\n' "$leaves" | awk -F '\t' '$1 == "scalar" && $2 ~ /^dependencies>#[0-9]+>name$/ { print $3 }')
     [ "$(printf '%s\n' "$names" | awk 'NF { n++ } END { print n + 0 }')" -eq "$items" ] || { echo bad; break; }
     printf '%s\n' "$names" | while IFS= read -r dn; do

@@ -2444,6 +2444,11 @@ pins() {
   pin "a patch, a replacement, or a generator that is not a map" '# an item that is not a map' 's/{ print "bad -"; next }  # an item that is not a map/{ next }/' refusals "render an overlay with a patch that is not a map: the render tool ran before the refusal"
   pin "a kustomization entry that looks like a repository" '# an entry kustomize can take for a repository' 's/refuse "remote base"  # an entry kustomize can take for a repository/:/' refusals "render an overlay with a local directory named like a host: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a known key in another case is refused" '# a known key in another case' 's/{ print "bad -"; \$2 = p }  # a known key in another case/{ $2 = p }/' refusals "render an overlay with a local base under RESOURCES: the render tool ran before the refusal"
+  pin "a kustomization key judged by its lower-case form" 'if (k in CANON) s[i] = CANON[k]' 's/if (k in CANON) s\[i\] = CANON\[k\]; //' refusals "render an overlay that inflates a chart under HelmCharts: expected kc6:overlay:plugin or inflator needed"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "Chart.yaml dependencies in another case" '# dependencies in another case' '/# dependencies in another case$/s/tolower(\$2)/0 \&\& tolower($2)/' refusals "render a chart with a dependency under Dependencies: expected depcase:chart:dependencies not vendored"
+  # shellcheck disable=SC2016 # literal text, not an expansion
   pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L: the render tool ran before the refusal"
   pin "the allow shape of a flow item" '# the allow shape of a flow item' 's/^\( *\)ok = .*  # the allow shape of a flow item$/\1ok = 1/' attacks 'flow form table: [?"hostPort":22] expected exit 4, got 0'
   pin "a control character in a path argument" '# a control character in a path argument' 's/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/' refusals "render an overlay whose path holds a line break: expected exit 2"
