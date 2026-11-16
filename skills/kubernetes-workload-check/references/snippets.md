@@ -349,7 +349,7 @@ In a chart, many charts take the name of an existing Secret in a values key inst
 
 ```yaml
 # values-<environment>.yaml
-<section>:
+database:   # the section of the chart that takes the Secret: adapt it (verify)
   existingSecret: <secret made outside the repository>
 ```
 

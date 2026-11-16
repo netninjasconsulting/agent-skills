@@ -37,9 +37,13 @@ Run nothing else with `kubectl` before a yes, and nothing with `kubectl` outside
 
 One offer, made once, as the last lines of the reply, after the closing line of the report and after the offer of the questions when both are made. For several namespaces:
 
-"R8 needs measured use. I can read CPU and memory from the cluster context `<name>` with kubectl, read-only, for the namespaces `<list>` and no others. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing. Shall I? (yes or no)"
+"R8 needs measured use. I can read CPU and memory from the cluster context `<name>` with kubectl, read-only, for the namespaces `<list>`. Shall I? (yes or no)"
 
-For one namespace, "for the namespace `<namespace>` and no other". `<list>` is the names joined with commas, each in backticks. With no answer, or a no, the report is the result, and R8 stays "ask the team".
+The first sentences are the spec's, word for word. Put this line directly before the offer, so that the question stays last:
+
+"It reads these namespaces only. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing."
+
+For one namespace, write "for the namespace `<namespace>`" in the offer. `<list>` is the names joined with commas, each in backticks. With no answer, or a no, the report is the result, and R8 stays "ask the team".
 
 ## After a yes
 
@@ -108,10 +112,10 @@ A count above 0 in `# rows not placed` is never "nothing measured" either: name 
 
 ## Matching a row to the repository
 
-- **A container row.** A pod names no workload in these columns, so match a row to a workload by its namespace and its container name, and label the match as an assumption. When two workloads of one namespace have a container of the same name, say that the row matches either one.
+- **A container row.** A pod names no workload in these columns, so match a row to a workload by its namespace and its container name, and label the match as an assumption. When two workloads of one namespace have a container of the same name, say that the row matches either one. A row whose `CONTAINER` cell is `other` or `not-read` matches no workload: write "no workload matched", and its `-` cells are not "nothing measured", because the row itself was not read whole.
 - **A `vpa` row.** Match it by `TARGET_KIND` and `TARGET`, and a container by `CONTAINER`.
 - **An `hpa` row.** Match it by `TARGET_KIND` and `TARGET`. A `Rollout` can be its target.
-- **The repository's side.** Next to each row, give the `cpu-request` and `memory-request` of the matched container from the environment of that namespace, with the field line, or "not found in the repository".
+- **The repository's side.** Next to each row, give the `cpu-request`, `memory-request`, `cpu-limit`, and `memory-limit` of the matched container from the environment of that namespace, with the field lines, or "not found in the repository".
 
 ## What the block says, and what it never says
 
