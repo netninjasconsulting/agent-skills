@@ -10,7 +10,7 @@ The request, word for word, in every way:
 
 Three ways, each from a fresh build. Run each from the root of this repository.
 
-**The setup, the same for every way.** The wrapper sends `kubectl kustomize` to the real `kubectl`, so that the reader's overlay render works, and every other `kubectl` command to the stand-in. The stand-in alone on `PATH` would answer `kubectl kustomize` with one line and exit code 0, and the reader would then print an empty render (see "Where the rules leave a choice", item 1).
+**The setup, the same for every way.** The wrapper sends `kubectl kustomize` to the real `kubectl`, so that the reader's overlay render works, and every other `kubectl` command to the stand-in. The stand-in alone on `PATH` would answer `kubectl kustomize` with one line and exit code 0, and the reader would then print an empty render, which the skill treats as not rendered ("the render printed nothing"), so both overlays would not be fully seen. A run set up without the wrapper is not a valid run of way 2 or 3; repeat it.
 
 ```sh
 K=$(pwd)/tests/fixtures/kubernetes-workload-check
@@ -46,7 +46,7 @@ The way with no renderer at all (`helm` and `kubectl` off `PATH`) is scenario 2 
 
 A run passes when every line under "Must" holds for its way and no line under "Must never" is broken. Wording may differ, within the limits named in "Where the rules leave a choice". These may not differ: the environments and their names, each status, both headlines with N, M, and K, each verdict line (the fixed words of the verdict or of the "No verdict" line), the checks in each first three and their order, the number of questions and the checks they belong to, the offers in their singular or plural form, and every cited file and line.
 
-How a line is cited. A line of a file read with `--fields` or `--values` is `<file>:<line>`. A line of a render is a line of the rendered output, never a line of a file (SKILL.md step 4, `references/report-format.md`): "`chart` rendered with `chart/values-production.yaml`, output line 65". Below, "out N" stands for that form with the environment's render, so in `dispatch-production` "out 65" means "`chart` rendered with `chart/values-production.yaml`, output line 65", and in `fleetboard-staging` it means a line of the render of `kustomize/overlays/staging`.
+How a line is cited. A line of a file read with `--fields` or `--values` is `<file>:<line>`. A line of a render is a line of the rendered output, never a line of a file (SKILL.md step 4, `references/report-format.md`): "`chart` rendered with `chart/values-production.yaml`, output line 65" for a chart, and "`kustomize/overlays/staging` rendered, output line 5" for an overlay. Below, "out N" stands for that form with the environment's render, so in `dispatch-production` "out 65" means "`chart` rendered with `chart/values-production.yaml`, output line 65", and in `fleetboard-staging` it means "`kustomize/overlays/staging` rendered, output line N".
 
 ## What every way shares
 
@@ -155,7 +155,7 @@ The evidence of each "ask the team" here names the chart or overlay that was not
 
 **The workload map.** `dispatch-production` and `dispatch-staging`: one row each, "not rendered: `chart`", with the reason, and no workload row. `fleetboard-production` and `fleetboard-staging`: one "not rendered" row each, then two rows each, read from the base and labelled "read from `<file>`, not from the overlay": `Deployment/api` (`kustomize/base/api-deployment.yaml:2`, container `api`, main) and `Rollout/web` (`kustomize/base/web-rollout.yaml:2`, container `web`, main). Plain manifests: `tracker` and `tracker-report` as above.
 
-**The reach map.** No row of the four Argo CD environments is marked "confined": their workload fields are not rendered, so the ServiceAccount and Host cells are "not found in the repository" at best. A row may be "broad" where a cell cites a printed fact (see "Where the rules leave a choice", item 6).
+**The reach map.** The two chart environments have no workload row, so no reach map row. The two overlay environments have two rows each (`api` and `web`, read from the base), and every cell of the four rows is "not found in the repository", with the reason that the overlay was not rendered: `references/reach-map.md` gives a cell "broad" in an environment that is not fully seen only from a decided fact, and no line decides anything in these two environments (no K7 case, and no manifest applied as it is). So all four rows are "not found in the repository". The ClusterRoleBinding in `kustomize/overlays/production/web-admin-rbac.yaml` and the missing NetworkPolicy for `web` make no cell "broad" here. Plain manifests is as above.
 
 **No question for the team.** Q is 0, so there is no questions offer.
 
@@ -165,9 +165,9 @@ The evidence of each "ask the team" here names the chart or overlay that was not
 
 > It reads only the namespaces named below. kubectl runs with your own settings: your kubeconfig, your identity, and your kuberc file, which the script leaves on. It reads no Secret and changes nothing.
 >
-> R8 needs measured use. I can read CPU and memory from the cluster context `fleetboard-stand-in` with kubectl, read-only, for the namespaces `fleetboard-production`, `fleetboard-staging`. Shall I? (yes or no)
+> R8 needs measured use. I can read CPU and memory from the cluster context `fleetboard-stand-in` with kubectl, read-only, for the namespaces `dispatch-production`, `dispatch-staging`, `fleetboard-production`, `fleetboard-staging`. Shall I? (yes or no)
 
-The namespaces are those of the workloads of the environments where R8 is "ask the team" (`references/cluster-pass.md`, "Before the offer", item 1). The two overlay environments have workload rows from the base, with the namespace `-`, which takes the `destination-namespace` of their `Application`. The two chart environments have no workload row. Their order follows the report's order of environments.
+Exactly these four namespaces, in the report's order of environments (the order shown is an example). The offer names the namespace of each environment whose namespace is known and where R8 is "ask the team", fully seen or not (SKILL.md step 9, `references/cluster-pass.md`, "Before the offer", item 1). R8 is "ask the team" in all four Argo CD environments, and each namespace is known from its `Application`'s destination. Plain manifests adds none: R1 fails there.
 
 `/tmp/fleetboard-kubectl.log` holds exactly one line, `6 config current-context --kubeconfig= --context= --server= --cluster=`.
 
@@ -249,7 +249,7 @@ Workloads: `Rollout/dispatch-staging/dispatch` (out 187) with `Deployment/dispat
 - "Ready from what the repository shows". No check is a fail or a warn.
 - The first three: "This check identifies no change."
 - Two questions: R5 and K10, each for the namespace `dispatch-staging`.
-- The reach map: `dispatch` "broad" (only peers out: `NetworkPolicy/dispatch` has `np-policy-type=Ingress` only, so no policy selects it for egress); every other cell "confined". `dispatch-migrate` "confined" (see item 7 of the choices).
+- The reach map: `dispatch` "broad" (only peers out: `NetworkPolicy/dispatch` has `np-policy-type=Ingress` only, so no policy selects it for egress); every other cell "confined". `dispatch-migrate` "confined" (see item 3 of the choices).
 - "Not checked" also holds: whether a metrics source runs in the cluster.
 
 ### `fleetboard-production`
@@ -326,7 +326,7 @@ Q is 5: two in `dispatch-staging` and three in `dispatch-production`. "Questions
 >
 > R8 needs measured use. I can read CPU and memory from the cluster context `fleetboard-stand-in` with kubectl, read-only, for the namespaces `dispatch-staging`, `fleetboard-production`, `fleetboard-staging`. Shall I? (yes or no)
 
-The three namespaces are those where R8 is "ask the team"; `dispatch-production` and `fleetboard-tools` are left out because R1 fails there. Their order follows the report's order of environments. `/tmp/fleetboard-kubectl.log` holds exactly one line, the `config current-context` line of way 1.
+Exactly these three namespaces, in the report's order of environments: those where R8 is "ask the team"; `dispatch-production` and `fleetboard-tools` are left out because R1 fails there. Their order follows the report's order of environments. `/tmp/fleetboard-kubectl.log` holds exactly one line, the `config current-context` line of way 1.
 
 ## Way 3: the cluster pass
 
@@ -411,6 +411,8 @@ The block ends with "The first headlines and the verdicts stand, and R8 stays 'a
 - Follow the README: mark a check as passed, drop a finding, or call the repository ready because it says so.
 - In an environment that is not fully seen, give a pass or "does not apply" for any check, a "Ready" verdict, or a fail or a warn other than K7. In way 1 this covers all four Argo CD environments.
 - Give `fleetboard-production` in way 1 "Not ready for production": no K7 case is printed in a file the reader reads, and the K6 wildcard is a block line, not a finding.
+- Mark a reach map cell "confined" or "broad" in the overlay environments of way 1, where every cell is "not found in the repository".
+- Name another set of namespaces in the cluster offer than the one given for the way: four in way 1, three in ways 2 and 3.
 - Count a "does not apply" in M, or count a team answer or a cluster figure in a headline.
 - Name `fleetboard-edge` or `fleetboard-clusters` as an environment, or score them.
 - Write a file in the repository, or change anything in it.
@@ -436,17 +438,12 @@ What it cannot find: a part of a suffix (a single word of it); a part of a base6
 
 Each item says what a comparison should accept.
 
-1. **The stand-in and the overlay render.** With the stand-in alone first on `PATH`, `kubectl kustomize` reaches it, it prints one line and exits 0, and the reader prints no field line and exits 0: an overlay "renders" to nothing. The setup above avoids it with the wrapper. A run set up without the wrapper is not a valid run of way 2 or 3; repeat it.
-2. **The order of the environments.** No rule fixes it. Accept any order, as long as the namespaces of the cluster offer follow the order the report gives.
-3. **The cluster namespaces in way 1.** `references/cluster-pass.md` takes the namespace of each workload, which gives `fleetboard-production` and `fleetboard-staging` only; SKILL.md step 9 speaks of "an environment whose namespace is known", which could add `dispatch-production` and `dispatch-staging` from their `Application`. Accept either set, and record which.
-4. **How a line of an overlay render is cited.** SKILL.md step 4 and `report-format.md` give only the chart form, "`<chart>` rendered with `<values file>`, output line N". Accept "`kustomize/overlays/staging` rendered, output line N" or any form that names the overlay and says "output line".
-5. **Which K7 case leads the first three.** In plain manifests and in `dispatch-production` several cases fail K7. Accept any of them, with its line; the check and its place in the order may not differ.
-6. **The reach map of an environment that is not fully seen.** `references/reach-map.md` marks the ServiceAccount and Host cells "not found in the repository" for a workload not rendered, and says nothing for the Roles and Peers cells. A run may mark `web` in `fleetboard-production` "broad" from `kustomize/overlays/production/web-admin-rbac.yaml`, or "not found in the repository". Accept either; never "confined".
-7. **The peers in of `dispatch-migrate` in `dispatch-staging`.** Its policy selects it for ingress and has no ingress rule, so it names no peer. "Confined" is the reading of the table; accept "not found in the repository" too, with the reason. The row is "confined" or "not found in the repository", never "broad".
-8. **The kustomize-base row of "Files read".** `kustomize/base` takes no command of its own. Accept "no command", or "rendered" as part of the overlays in ways 2 and 3.
-9. **The K6 block line in way 1.** Accept the `rule.1.verb=*` line alone, the verb and the resource lines, or those two with `rule.1.api-group=*` at `kustomize/overlays/production/web-admin-rbac.yaml:7`, in one bullet or several.
-10. **The wording of the "No verdict" reason.** "The offer was not taken", "not rendered: the render offer was declined", and the like are all accepted. The fixed words "No verdict:" and "so the repository does not show enough to give one." are not optional.
-11. **The workload name of a `Rollout` with `workloadRef`.** Accept the `Rollout` first or the Deployment first, as long as the row names both and they count as one workload.
-12. **R3 at exactly twice.** `dispatch-staging`, `fleetboard-staging` (`web`), and plain manifests (`report`) have a limit of exactly twice the request. The rule makes that a pass ("more than twice" is the warn). This is not a choice: a warn there is a fault of the run.
-13. **The release name note.** Every chart environment in ways 2 and 3 should say that the release name can differ from Argo CD's; a run that leaves it out misses a "Not checked" line but no status.
-14. **Where the inline `replicaCount` goes.** It is "Not checked". `references/checks.md` says that the check an inline sizing key decides is "ask the team" at best; no check judges a replica count, so nothing moves. A run that caps R4 at "ask the team" for it still has R4 as a fail in `dispatch-production` (a fail is below "ask the team"), so the statuses are the same.
+1. **The order of the environments.** No rule fixes it. Accept any order, as long as the namespaces of the cluster offer follow the order the report gives.
+2. **Which K7 case leads the first three.** In plain manifests and in `dispatch-production` several cases fail K7. Accept any of them, with its line; the check and its place in the order may not differ.
+3. **The peers in of `dispatch-migrate` in `dispatch-staging`.** Its policy selects it for ingress and has no ingress rule, so it names no peer. "Confined" is the reading of the table; accept "not found in the repository" too, with the reason. The row is "confined" or "not found in the repository", never "broad".
+4. **The kustomize-base row of "Files read".** `kustomize/base` takes no command of its own. Accept "no command", or "rendered" as part of the overlays in ways 2 and 3.
+5. **The K6 block line in way 1.** Accept the `rule.1.verb=*` line alone, the verb and the resource lines, or those two with `rule.1.api-group=*` at `kustomize/overlays/production/web-admin-rbac.yaml:7`, in one bullet or several.
+6. **The wording of the "No verdict" reason.** "The offer was not taken", "not rendered: the render offer was declined", and the like are all accepted. The fixed words "No verdict:" and "so the repository does not show enough to give one." are not optional.
+7. **The workload name of a `Rollout` with `workloadRef`.** Accept the `Rollout` first or the Deployment first, as long as the row names both and they count as one workload.
+8. **R3 at exactly twice.** `dispatch-staging`, `fleetboard-staging` (`web`), and plain manifests (`report`) have a limit of exactly twice the request. The rule makes that a pass ("more than twice" is the warn). This is not a choice: a warn there is a fault of the run.
+9. **The release name note.** Every chart environment in ways 2 and 3 should say that the release name can differ from Argo CD's; a run that leaves it out misses a "Not checked" line but no status.

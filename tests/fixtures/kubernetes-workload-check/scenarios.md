@@ -6,6 +6,8 @@ Cases that the three ways of `EXPECTED.md` do not cover. Each one is run by a fr
 
 Each is judged by hand against `EXPECTED.md` and the lines below. Every scenario keeps the lines of "Must never" in `EXPECTED.md` that apply to it, runs the search in "Searching a report for planted values" there, and ends with an empty `git status --porcelain`. Where a scenario says "as in `EXPECTED.md`", the status, headline, verdict, line, and first three given there for the same environment hold, with the line numbers that the scenario names.
 
+Scenario 3: the plan expected the cluster offer to disappear when `api` loses its CPU request; the rules keep it for the namespaces where R8 is still "ask the team", and this file gives what the rules give.
+
 Scenarios 3 and 4 use the setup of `EXPECTED.md` ("How to run it"), which builds the fixture, puts the wrapper `kubectl` first on `PATH`, and sets `FAKE_KUBECTL_LOG`. Run it with the target directory each scenario names in place of `/tmp/fleetboard`, and the wrapper directory `/tmp/fleetboard-bin` made once.
 
 ## Scenario 1: a repository with no workload
@@ -136,12 +138,12 @@ The list prints 23 lines: the 29 of `EXPECTED.md` without the six under `argocd/
   - "Sizing: 2 out of 7 confirmed in the repository (1 to ask the team)"
   - "Security: 2 out of 9 confirmed in the repository (2 to ask the team)"
   - "Not ready for production", K1 and K7. The first three: K7, K1, K8.
-  - Three questions: R5, K5, and K10.
+  - Three questions: R5, K5, and K10. Where a question would name the namespace, it names the environment (`references/checks.md`, "The questions for the team"), for example: "Do the namespaces of the environment `chart/values-production.yaml` get a LimitRange or a ResourceQuota for CPU and memory from somewhere the repository does not show?"
 - `chart/values-staging.yaml`: as `dispatch-staging` in way 2, except that K8 is "ask the team" (its policies select every workload, and the namespace is unknown).
   - "Sizing: 6 out of 8 confirmed in the repository (2 to ask the team)"
   - "Security: 7 out of 9 confirmed in the repository (2 to ask the team)"
   - "Ready from what the repository shows". The first three: "This check identifies no change."
-  - Three questions: R5, K8, and K10.
+  - Three questions: R5, K8, and K10. R5 and K10 name the environment `chart/values-staging.yaml` in place of a namespace. K8 names the NetworkPolicies `dispatch` and `dispatch-migrate` and the two workloads, as its question always does ("Do the NetworkPolicies <list> select the pods of <workloads>?"); it names no namespace, so it reads the same whether the namespace is known or not.
 
 **The two overlay environments and plain manifests.** Every status, headline, verdict, line, and first three as `fleetboard-production`, `fleetboard-staging`, and plain manifests in way 2 of `EXPECTED.md`. The overlays carry their namespaces (`fleetboard-production`, `fleetboard-staging`) in their own renders.
 
@@ -151,7 +153,7 @@ The list prints 23 lines: the 29 of `EXPECTED.md` without the six under `argocd/
 
 > 6 questions about the checks sit outside the repository. Shall I ask them? (yes or no)
 
-The cluster offer names the namespaces where R8 is "ask the team" and the namespace is known: `fleetboard-production` and `fleetboard-staging`, in the report's order of environments. `chart/values-staging.yaml` has R8 at "ask the team" and an unknown namespace, so it adds none; `chart/values-production.yaml` and plain manifests have R1 as a fail.
+The cluster offer names exactly the namespaces of the environments where R8 is "ask the team" and the namespace is known: `fleetboard-production` and `fleetboard-staging`, in the report's order of environments. `chart/values-staging.yaml` has R8 at "ask the team" and an unknown namespace (its render was given no namespace), so it adds none; `chart/values-production.yaml` and plain manifests have R1 as a fail.
 
 Must never:
 

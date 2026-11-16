@@ -23,7 +23,7 @@ This is a quick check. It is not a penetration test and it is not legal advice. 
 
 Each line is what one file sets, not what the environment gets: another values file, a patch, or a template can replace it, so a line here is not a finding. A render can change, add, or remove any of these lines, and they change no status; rendering the environment is how to get a verdict.
 
-- <Check, or both checks>: `<field>=<value>` as the reader printed it, `<file>:<line>`<for a line from a `kustomize-base` directory: "; the reader does not show which overlay uses this base">
+- <Check, or both checks>: `<field>=<value>` as the reader printed it, `<file>:<line>`<for a line from a `kustomize-base` directory: "; the reader does not show which overlay uses this base". That ending is left out for a line from a base directory that an `Application` names as its path, in that `Application`'s environment, because that directory is itself the environment.>
 
 - Sizing: N out of M confirmed in the repository (K to ask the team)
 - Security: N out of M confirmed in the repository (K to ask the team)
@@ -127,7 +127,7 @@ The counts still add up in an environment that is not fully seen. Every check th
 
 Leave out "Also found" when there is nothing to put in it, and "Questions for the team" when Q is 0. When fewer than three checks qualify for an environment's first three, list those only. When none qualify, write "This check identifies no change." under an environment that is fully seen, and "No change can be named from what was read." under one that is not. For an environment that is not fully seen, the first three hold K7 when it fails and the fails and warns of a manifest applied as it is, and nothing from the block "Seen in the files, not confirmed by a render". When a check comes up in a second environment, point to its snippet above instead of printing it again.
 
-A line number is the line in one file, read with one command, or the line of one render's output, written as "`<chart>` rendered with `<values file>`, output line N".
+A line number is the line in one file, read with one command, or the line of one render's output, written as "`<chart>` rendered with `<values file>`, output line N" for a chart and "`<overlay>` rendered, output line N" for an overlay.
 
 ## The offers
 

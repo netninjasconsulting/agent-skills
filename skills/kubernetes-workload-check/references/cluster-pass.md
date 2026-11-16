@@ -15,7 +15,7 @@ The second pass reads measured CPU and memory from the cluster, read-only, after
 
 The offer is made only when R8 is "ask the team" in at least one environment whose namespace is known. R8 is "ask the team" when R1 is pass, warn, or "ask the team". When R1 fails, R8 does not apply, and that environment gives no reason to offer.
 
-1. **The namespaces.** Take the namespace of each workload in each environment where R8 is "ask the team". Leave out a namespace that is unknown (`-`). Write each name once, in the order the report gives the environments. These are the only namespaces the pass reads.
+1. **The namespaces.** The offer names the namespace of each environment whose namespace is known (from an `Application`'s destination or from a render) and where R8 is "ask the team", fully seen or not. Leave out a namespace that is unknown (`-`, or a chart render given no namespace). Write each name once, in the order the report gives the environments. These are the only namespaces the pass reads.
 2. **The context.** Run:
 
    ```sh
