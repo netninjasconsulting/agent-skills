@@ -318,7 +318,7 @@ conform() {
       if (o[3] != "-" && !fit(o[3], "dns-subdomain")) bad("name")
       if (cont != "-" && !fit(cont, "dns-label")) bad("container")
       g = f; gsub(/\.[0-9]+/, ".#", g)
-      sh = ""; ot = 0; key = ""
+      sh = ""; ot = 0; key = ""; pat = ""
       if (g in FS_) { sh = FS_[g]; ot = FO[g] }
       else for (j = 1; j <= NS; j++) if (substr(f, 1, length(SP[j])) == SP[j] || substr(g, 1, length(SP[j])) == SP[j]) {
         # The key part is taken from the field as printed.
@@ -382,7 +382,7 @@ suite() {
   }
   : > "$work/stdout.all"
   : > "$work/stderr.all"
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/links"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -686,7 +686,7 @@ spec:
             privileged: "true"
             runAsUser: 010
             capabilities:
-              add: [NET_ADMIN, FIXTUREVALUE]
+              add: [NET_ADMIN, FIXTUREVALUE-cap]
 EOF
   cat > "$a/flow.yaml" <<'EOF'
 apiVersion: apps/v1
@@ -916,7 +916,7 @@ metadata:
 spec:
   containers:
     - name: app
-      image: registry.example.com/team/aB3dE5gH7jK9mN1pQ3sT5vW7:1.0
+      image: registry.example.com/team/a1b2c3d4e5f6g7h8i9j0k1l2:1.0
       env:
         - name: A1B2C3D4E5F6G7H8I9J0K1
           value: FIXTUREVALUE-token-name
@@ -974,6 +974,46 @@ spec:
       destination:
         namespace: "{{ .ns }}"
 EOF
+  cat > "$a/kinds.yaml" <<'EOF'
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quota
+spec:
+  hard:
+    pods: "10"
+    count/secrets: "5"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: set
+spec:
+  generators:
+    - list:
+        elements:
+          - env: prod
+            apiKey: FIXTUREVALUE-element-key
+  template:
+    spec:
+      project: fleetboard
+      source:
+        repoURL: https://github.com/example-fleetboard/fleetboard.git
+        path: apps
+        helm:
+          valueFiles: ["values-{{env}}.yaml"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: user-binding
+subjects:
+  - kind: User
+    name: FIXTUREVALUE@example.com
+roleRef:
+  kind: ClusterRole
+  name: view
+EOF
   cat > "$a/values.yaml" <<'EOF'
 replicaCount: 3
 password: FIXTUREVALUE-values-password
@@ -1028,16 +1068,17 @@ spec:
 EOF
 
   cwd=$a
+  mkdir "$work/att-out"
   for f in "$a"/*.yaml; do
     b=${f##*/}
     case "$b" in values*.yaml) mode=--values ;; *) mode=--fields ;; esac
     rd "$mode" "$b"
     case "$code" in 0 | 4) ;; *) fail "attack $b: exit $code" ;; esac
     if [ "$code" -eq 4 ] && [ -n "$out" ]; then fail "attack $b: exit 4 with output"; fi
-    printf '%s\n' "$out" > "$a/$b.out"
-    echo "$code" > "$a/$b.code"
+    printf '%s\n' "$out" > "$work/att-out/$b.out"
+    echo "$code" > "$work/att-out/$b.code"
   done
-  att() { out=$(cat "$a/$1.out"); code=$(cat "$a/$1.code"); }
+  att() { out=$(cat "$work/att-out/$1.out"); code=$(cat "$work/att-out/$1.code"); }
 
   att bad-shapes.yaml
   [ "$code" -eq 0 ] || fail "attack bad-shapes: exit $code"
@@ -1120,6 +1161,16 @@ EOF
   expect_line "$out" "indentless.yaml:17:Deployment/-/indentless:-:volume-type=emptyDir" "attack indentless lists"
   expect_line "$out" "indentless.yaml:18:Deployment/-/indentless:-:volume-name=scratch" "attack indentless lists"
 
+  att kinds.yaml
+  [ "$code" -eq 0 ] || fail "attack other kinds: exit $code"
+  expect_line "$out" "kinds.yaml:7:ResourceQuota/-/quota:-:quota-hard.pods=10" "attack other kinds"
+  expect_line "$out" "kinds.yaml:6:ResourceQuota/-/quota:-:quota-other-count=1" "attack other kinds"
+  expect_line "$out" "kinds.yaml:18:ApplicationSet/-/set:-:list-element.1.1.env=prod" "attack other kinds"
+  expect_line "$out" "kinds.yaml:19:ApplicationSet/-/set:-:list-element.1.1.apiKey=present" "attack other kinds"
+  expect_line "$out" "kinds.yaml:27:ApplicationSet/-/set:-:source.1.value-file.1=values-{{env}}.yaml" "attack other kinds"
+  expect_line "$out" "kinds.yaml:34:RoleBinding/-/user-binding:-:subject.1.kind=User" "attack other kinds"
+  expect_no "$out" 'subject\.1\.name' "attack other kinds"
+
   att values.yaml
   [ "$code" -eq 0 ] || fail "attack values: exit $code"
   for want in "values.yaml:1:Values/-/-:-:values.replicaCount=3" \
@@ -1146,6 +1197,14 @@ EOF
   [ "$code" -eq 4 ] || fail "symbolic link: --values exit $code"
   rd .
   [ -z "$out" ] || fail "symbolic link: listed $out"
+  mkdir "$work/links/real"
+  printf 'apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: through-a-link\nautomountServiceAccountToken: false\n' > "$work/links/real/sa.yaml"
+  ln -s real "$work/links/dir"
+  rd --fields dir/sa.yaml
+  [ "$code" -eq 4 ] || fail "symbolic link: a file reached through a linked directory, exit $code"
+  [ -z "$out" ] || fail "symbolic link: a file reached through a linked directory printed output"
+  rd --fields real/../real/sa.yaml
+  [ "$code" -eq 0 ] || fail "a path with .. and no link: exit $code"
 
   # Usage.
   cwd=$repo
@@ -1160,7 +1219,7 @@ EOF
 
   # 7. Render cases.
   if [ "$have_helm" -eq 1 ]; then
-    for v in values-staging.yaml values-production.yaml; do
+    for v in values.yaml values-staging.yaml values-production.yaml; do
       rd --render helm chart "chart/$v"
       [ "$code" -eq 0 ] || fail "render chart $v: exit $code"
       printf '%s\n' "$out" | grep -q ':Deployment/[^/]*/dispatch:dispatch:container-kind=main$' ||

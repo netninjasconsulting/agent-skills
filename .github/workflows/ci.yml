@@ -36,6 +36,8 @@ jobs:
         run: sh tests/list-agent-config.test.sh
       - name: Test the serverless configuration reader
         run: sh tests/read-serverless-config.test.sh
+      - name: Test the Kubernetes object reader
+        run: sh tests/read-k8s-objects.test.sh
       - name: Test the names filter for env files
         run: sh tests/names-filter.test.sh
       - name: Lint the shell scripts
