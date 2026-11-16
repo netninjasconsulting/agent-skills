@@ -512,9 +512,11 @@ function sopsclear(    i, j, b, c, ch) {
   return c
 }
 
+# block is a parent map, whose keys print lines of their own, and
+# block-scalar a value written over several lines with | or >.
 function stateword(I, k,    t, v) {
   t = LT[I, k]; v = LVAL[I, k]
-  if (t == "block") return "block"
+  if (t == "block") return "block-scalar"  # a value over several lines
   if (t == "none") return LKIDS[I, k] > 0 ? "block" : "empty"
   if (t == "flow") return (v == "{}" || v == "[]") ? "empty" : "scalar"
   if (t == "scalar" && (v == "" || (!LQ[I, k] && (v == "null" || v == "~")))) return "empty"
@@ -1096,7 +1098,7 @@ BEGIN {
   }
   SRE["image-pin"] = "^(digest|tag|latest|none)$"; SMAX["image-pin"] = 6
   SRE["mount-mode"] = "^(read-only|read-write)$"; SMAX["mount-mode"] = 10
-  SRE["state-word"] = "^(scalar|empty|block|encrypted)$"; SMAX["state-word"] = 9
+  SRE["state-word"] = "^(scalar|empty|block|block-scalar|encrypted)$"; SMAX["state-word"] = 12
   SRE["user-form"] = "^(service-account|plain|other)$"; SMAX["user-form"] = 15
   SRE["selector-word"] = "^(all|labels)$"; SMAX["selector-word"] = 6
   SRE["generator-word"] = "^(list|other)$"; SMAX["generator-word"] = 5

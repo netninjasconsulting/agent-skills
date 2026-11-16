@@ -2535,6 +2535,7 @@ pins() {
     echo "skipped: the pin on the generation against kubectl (kubectl is not installed)"
   fi
   pin "a sops block map" '# a sops block map' '/# a sops block map$/s/p == "sops"/p == "x-no-sops"/' attacks "missing line sops.yaml:8:Secret/-/sops-secret:-:sops=present"
+  pin "a block scalar is a value" '# a value over several lines' 's/return "block-scalar"  # a value over several lines/return "block"/' attacks "missing line values-block.yaml:2:Values/-/-:-:values-key.database.password=block-scalar"
   pin "an empty env literal" '# an empty literal' '/# an empty literal$/s/== "empty"/== "never"/' attacks "missing line empties.yaml:9:Pod/-/empties:app:env.API_KEY=literal-empty"
   pin "an empty Secret key" '# an empty Secret key' '/# an empty Secret key$/s/== "empty"/== "never"/' attacks "missing line empties.yaml:23:Secret/-/empty-keys:-:secret-key.data-empty=empty-data"
   pin "an encrypted value ends with a bracket" '# looks encrypted' '/# looks encrypted$/s/ \&\& substr(v, length(v), 1) == "]"//' attacks "missing line sops-mixed.yaml:13:Secret/-/mixed:-:sops-clear-count=3"
