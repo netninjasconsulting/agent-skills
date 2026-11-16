@@ -17,7 +17,7 @@ spec:
         app: dispatch-migrate
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ .Values.serviceAccount.name }}
+      serviceAccountName: {{ .Values.serviceAccount.migrateName }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
       containers:
         - name: migrate

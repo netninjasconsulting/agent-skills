@@ -6,6 +6,7 @@ image:
 
 serviceAccount:
   name: dispatch
+  migrateName: dispatch-migrate
   automount: false
 
 podAnnotations: {}
