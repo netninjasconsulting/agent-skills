@@ -93,7 +93,7 @@ env-source 17 ^(literal|secretKeyRef|configMapKeyRef|fieldRef|resourceFieldRef|f
 scale-down 13 ^(never|onsuccess|progressively)$
 volume-type 14 ^(hostPath|emptyDir|secret|configMap|projected|downwardAPI)$
 container-kind 4 ^(main|init)$
-rel-path 128 ^[A-Za-z0-9._/{}$ -]+$
+rel-path 128 ^[$]?[A-Za-z0-9._/-]+$
 host-path 128 ^/[A-Za-z0-9._/-]*$
 element-key 32 ^[A-Za-z][A-Za-z0-9_-]*$
 values-path 200 ^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$
@@ -131,7 +131,7 @@ function leaf0(p) { return leaf(0, p) }
 # not one the reader can place).
 function cleanv(t,    q, i, n, c, qend) {
   CV = ""; CQ = 0
-  sub(/ +$/, "", t)
+  sub(/[ \t]+$/, "", t)
   if (t == "") { CT = "none"; return }
   q = substr(t, 1, 1)
   if (q == "\"" || q == "\047") {
@@ -150,8 +150,8 @@ function cleanv(t,    q, i, n, c, qend) {
     return
   }
   if (q == "#") { CT = "none"; return }
-  i = index(t, " #"); if (i) t = substr(t, 1, i - 1)
-  sub(/ +$/, "", t)
+  if (match(t, /[ \t]#/)) t = substr(t, 1, RSTART - 1)
+  sub(/[ \t]+$/, "", t)
   CV = t
   if (t == "") { CT = "none"; return }
   q = substr(t, 1, 1)
@@ -216,6 +216,18 @@ function flowitems(t,    inner, n, i, c, q, d, cur) {
   return NFI
 }
 
+# A flow map that is not empty, or a flow list that holds a map or a list:
+# what it holds is not read, so the file is not read.
+function flowmap(t, v,    n, i, sv, sq, st, r) {
+  if (t != "flow" || v == "{}" || v == "[]") return 0
+  if (substr(v, 1, 1) == "{") return 1
+  sv = CV; sq = CQ; st = CT; r = 0
+  n = flowitems(v)
+  for (i = 1; i <= n; i++) if (FIT[i] == "flow") r = 1
+  CV = sv; CQ = sq; CT = st
+  return r
+}
+
 # A key at the start of s: sets KEY and KVAL.
 function keyline(s,    q, k, rest, i) {
   q = substr(s, 1, 1)
@@ -249,6 +261,7 @@ function push(I, col, key, isitem, ln, vt,    d, seg, p, k, pk) {
   if ((I, p) in LIDX) { ERR[I] = 1; return 0 }
   cleanv(vt)
   if (CT == "err") { ERR[I] = 1; return 0 }
+  if (flowmap(CT, CV)) { ERR[I] = 1; return 0 }  # a flow collection that holds a map
   d++; D[I] = d
   Col[I, d] = col; CC[I, d] = -1; PT[I, d] = ""; NI[I, d] = 0; SPATH[I, d] = p
   IsItem[I, d] = isitem; Open[I, d] = (CT == "none")
@@ -270,7 +283,8 @@ function block_end(I) {
   if (I == 0 && BSN[0]) {
     BSN[0] = 0
     if (BS[1]) block_end(1)
-    if (!ERR[1] && NL[1] > 0) nested_values(BSK[0])
+    if (ERR[1]) NESTFAIL[BSK[0]] = 1
+    else if (NL[1] > 0) nested_values(BSK[0])
     ERR[1] = 0; reset(1)
   }
 }
@@ -281,6 +295,7 @@ function pline(I, raw, ln,    line, n, c, rest, sp) {
   if (substr(line, length(line), 1) == "\r") line = substr(line, 1, length(line) - 1)
   if (index(line, "\r")) { ERR[I] = 1; return }
   if (line ~ /[\001-\010\013\014\016-\037\177]/) { ERR[I] = 1; return }
+  if (index(line, "\302\205") || index(line, "\342\200\250") || index(line, "\342\200\251")) { ERR[I] = 1; return }  # a line break YAML takes from Unicode
   if (BS[I]) {
     if (line ~ /^ *$/) return
     match(line, /^ */); n = RLENGTH
@@ -332,13 +347,16 @@ function doc_end() {
   }
   reset(0)
   NPEND = 0
+  split("", NESTFAIL)
 }
 
 # ---- Shapes and names ----
 
 function fits(v, q, sid,    n) {
   if (!(sid in SRE)) return 0
-  if (length(v) > SMAX[sid] || v !~ SRE[sid]) return 0
+  if (length(v) > SMAX[sid]) return 0
+  if (sid == "rel-path") gsub(/[{][{] *[.]?[A-Za-z][A-Za-z0-9_.-]* *[}][}]/, "P", v)  # a generator parameter
+  if (v !~ SRE[sid]) return 0
   if ((sid == "bool" || sid == "int" || sid == "port") && q) return 0
   if ((sid == "int" || sid == "port") && length(v) > 1 && substr(v, 1, 1) == "0") return 0
   if (sid == "port" && v + 0 > 65535) return 0
@@ -381,9 +399,11 @@ function out(ln, cont, f, v) {
 }
 
 # Every value that prints goes through here: the field list, then the shape.
-function field(ln, cont, f, v, q, t, sid, miss) {
+# A key the reader saw and could not read prints other, so that it never
+# looks the same as a key that is absent.
+function field(ln, cont, f, v, q, t, sid) {
   if (!listed(f)) return
-  if (sid == "present") { out(ln, cont, f, "present"); return }
+  if (sid == "present") { out(ln, cont, f, (t == "unread") ? "other" : "present"); return }
   # A quota value is a quantity, which may be quoted.
   if (f == "quota-hard.pods") q = 0
   if (t == "scalar" && q && v == "") {
@@ -391,7 +411,7 @@ function field(ln, cont, f, v, q, t, sid, miss) {
     else if (sid == "secret-type") v = "Opaque"
   }
   if (t == "scalar" && fits(v, q, sid)) out(ln, cont, f, v)
-  else if (miss) out(ln, cont, f, "other")
+  else out(ln, cont, f, "other")  # a key seen and not read
 }
 
 function lastseg(p,    n, s) { n = split(p, s, ">"); return s[n] }
@@ -416,14 +436,14 @@ function simple(ctx, k, rel, cont,    g, w, i, n) {
   g = generic(rel)
   if ((ctx SUBSEP g) in SIMPLE) {
     split(SIMPLE[ctx SUBSEP g], w, " ")
-    field(LLN[0, k], cont, fname(w[1]), LVAL[0, k], LQ[0, k], LT[0, k], w[2], w[3] == "other")
+    field(LLN[0, k], cont, fname(w[1]), LVAL[0, k], LQ[0, k], LT[0, k], w[2])
     return 1
   }
   if ((ctx SUBSEP g ">#") in SIMPLE && LT[0, k] == "flow") {
     split(SIMPLE[ctx SUBSEP g ">#"], w, " ")
     n = flowitems(LVAL[0, k])
     NIX++
-    for (i = 1; i <= n; i++) { IX[NIX] = i; field(LLN[0, k], cont, fname(w[1]), FIV[i], FIQ[i], FIT[i], w[2], w[3] == "other") }
+    for (i = 1; i <= n; i++) { IX[NIX] = i; field(LLN[0, k], cont, fname(w[1]), FIV[i], FIQ[i], FIT[i], w[2]) }
     return 1
   }
   return 0
@@ -480,17 +500,17 @@ function fields_doc(    kk, k, p, i, ab, nm) {
     if (fields_leaf(k, p)) continue
     # Every other leaf reaches field() under its own key, and the field
     # list stops it.
-    field(LLN[0, k], "-", "unlisted." lastseg(p), LVAL[0, k], LQ[0, k], LT[0, k], "label-value", 0)
+    field(LLN[0, k], "-", "unlisted." lastseg(p), LVAL[0, k], LQ[0, k], LT[0, k], "label-value")
   }
   for (i = 1; i <= NDO; i++) OUT[++NOUT] = FILE ":" DOL[i] ":" KIND "/" NSP "/" NAME ":" DOC[i] ":" DOF[i]
 }
 
 function fields_leaf(k, p,    ln, rel) {
   ln = LLN[0, k]
-  if (p == "apiVersion") { field(ln, "-", "api-version", LVAL[0, k], LQ[0, k], LT[0, k], "api-version", 0); return 1 }
+  if (p == "apiVersion") { field(ln, "-", "api-version", LVAL[0, k], LQ[0, k], LT[0, k], "api-version"); return 1 }
   if ((p == "metadata>annotations" || (POD && p == TM ">annotations")) && !ANNDONE) {
     ANNDONE = 1
-    if (ANNCOUNT > 0) field(ln, "-", "annotation-credential-like-count", ANNCOUNT "", 0, "scalar", "int", 0)
+    if (ANNCOUNT > 0) field(ln, "-", "annotation-credential-like-count", ANNCOUNT "", 0, "scalar", "int")
     return 1
   }
   if (POD && substr(p, 1, length(P) + 1) == P ">") {
@@ -523,7 +543,7 @@ function podleaf(k, rel,    cp, crel, ckind) {
   }
   if (simple("pod", k, rel, "-")) return 1
   if (rel ~ /^volumes>#[0-9]+>[^>]+$/ && lastseg(rel) != "name") {
-    field(LLN[0, k], "-", "volume-type", lastseg(rel), 0, "scalar", "volume-type", 1)
+    field(LLN[0, k], "-", "volume-type", lastseg(rel), 0, "scalar", "volume-type")
     return 1
   }
   return 0
@@ -531,19 +551,19 @@ function podleaf(k, rel,    cp, crel, ckind) {
 
 function contleaf(k, cp, crel, cont, ckind,    ln, n) {
   ln = LLN[0, k]
-  if (crel == "") { field(ln, cont, "container-kind", ckind, 0, "scalar", "container-kind", 0); return 1 }
+  if (crel == "") { field(ln, cont, "container-kind", ckind, 0, "scalar", "container-kind"); return 1 }
   if (simple("c", k, crel, cont)) return 1
   if (crel == "image") { image(k, cont); return 1 }
   if (crel == "env") {
     n = envother(cp)
-    if (n > 0) field(ln, cont, "env-other-count", n "", 0, "scalar", "int", 0)
+    if (n > 0) field(ln, cont, "env-other-count", n "", 0, "scalar", "int")
     return 1
   }
   if (crel ~ /^env>#[0-9]+$/) { envitem(k, cp ">" crel, cont); return 1 }
   if ((crel == "args" || crel == "command") && !(cp in ARGDONE)) {
     ARGDONE[cp] = 1
     n = argcount(cp)
-    if (n > 0) field(ln, cont, "args-credential-like-count", n "", 0, "scalar", "int", 0)
+    if (n > 0) field(ln, cont, "args-credential-like-count", n "", 0, "scalar", "int")
     return 1
   }
   if (crel ~ /^volumeMounts>#[0-9]+$/) { mountitem(k, cp ">" crel, cont); return 1 }
@@ -554,8 +574,8 @@ function contleaf(k, cp, crel, cont, ckind,    ln, n) {
 function image(k, cont,    ln, v, s, dg, reg, i, last, tag, repo, n, seg, sg, pin) {
   ln = LLN[0, k]; v = LVAL[0, k]
   if (LT[0, k] != "scalar" || !fits(v, LQ[0, k], "image-ref")) {
-    field(ln, cont, "image-registry", "", 0, "none", "image-registry", 1)
-    field(ln, cont, "image-repository", "", 0, "none", "image-repository", 1)
+    field(ln, cont, "image-registry", "", 0, "none", "image-registry")
+    field(ln, cont, "image-repository", "", 0, "none", "image-repository")
     return
   }
   s = v; dg = ""
@@ -572,9 +592,9 @@ function image(k, cont,    ln, v, s, dg, reg, i, last, tag, repo, n, seg, sg, pi
   n = split(s, sg, "/"); repo = ""
   for (i = 1; i <= n; i++) repo = repo (i > 1 ? "/" : "") (tok20(sg[i]) ? "other" : sg[i])
   pin = (dg != "") ? "digest" : (tag == "latest") ? "latest" : (tag == "") ? "none" : "tag"
-  field(ln, cont, "image-registry", reg, 0, "scalar", "image-registry", 1)
-  field(ln, cont, "image-repository", repo, 0, "scalar", "image-repository", 1)
-  field(ln, cont, "image-pin", pin, 0, "scalar", "image-pin", 0)
+  field(ln, cont, "image-registry", reg, 0, "scalar", "image-registry")
+  field(ln, cont, "image-repository", repo, 0, "scalar", "image-repository")
+  field(ln, cont, "image-pin", pin, 0, "scalar", "image-pin")
 }
 
 function envname(ip,    k) {
@@ -609,10 +629,10 @@ function envitem(k, ip, cont,    nm, src, rk) {
   if (!envname(ip)) return
   nm = ENVNAME; src = envsrc(ip)
   if (src == "") return
-  field(LLN[0, k], cont, "env." nm, src, 0, "scalar", "env-source", 1)
+  field(LLN[0, k], cont, "env." nm, src, 0, "scalar", "env-source")
   if (src == "secretKeyRef" || src == "configMapKeyRef") {
     rk = leaf0(ip ">valueFrom>" src ">name")
-    if (rk) field(LLN[0, rk], cont, "env-ref." nm, LVAL[0, rk], LQ[0, rk], LT[0, rk], "dns-subdomain", 0)
+    if (rk) field(LLN[0, rk], cont, "env-ref." nm, LVAL[0, rk], LQ[0, rk], LT[0, rk], "dns-subdomain")
   }
 }
 
@@ -647,8 +667,8 @@ function mountitem(k, ip, cont,    nk, rk, m) {
   rk = leaf0(ip ">readOnly")
   if (!rk) m = "read-write"
   else if (LT[0, rk] == "scalar" && fits(LVAL[0, rk], LQ[0, rk], "bool")) m = (LVAL[0, rk] == "true") ? "read-only" : "read-write"
-  else return
-  field(LLN[0, k], cont, "mount." LVAL[0, nk], m, 0, "scalar", "mount-mode", 0)
+  else m = ""
+  field(LLN[0, k], cont, "mount." LVAL[0, nk], m, 0, "scalar", "mount-mode")
 }
 
 function labelleaf(k, p,    key, i, c, ck) {
@@ -658,12 +678,12 @@ function labelleaf(k, p,    key, i, c, ck) {
       ck = LCH[0, k, i]
       if (!(lastseg(LPATH[0, ck]) in LABELKEYS)) c++
     }
-    if (c > 0) field(LLN[0, k], "-", "pod-label-other-count", c "", 0, "scalar", "int", 0)
+    if (c > 0) field(LLN[0, k], "-", "pod-label-other-count", c "", 0, "scalar", "int")
     return 1
   }
   key = substr(p, length(TMLAB) + 2)
   if (!(key in LABELKEYS)) return 0
-  field(LLN[0, k], "-", "pod-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value", 0)
+  field(LLN[0, k], "-", "pod-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value")
   return 1
 }
 
@@ -699,27 +719,27 @@ function npleaf(k, p,    ln, w, n, dir, r, fk, rest, base, key, s, x) {
   ln = LLN[0, k]
   if (p == "spec>podSelector") {
     w = selword(k)
-    if (w != "") field(ln, "-", "np-pod-selector", w, 0, "scalar", "selector-word", 0)
+    field(ln, "-", "np-pod-selector", w, 0, "scalar", "selector-word")
     n = selother(k)
-    if (n > 0) field(ln, "-", "np-pod-label-other-count", n "", 0, "scalar", "int", 0)
+    if (n > 0) field(ln, "-", "np-pod-label-other-count", n "", 0, "scalar", "int")
     return 1
   }
   if (substr(p, 1, 29) == "spec>podSelector>matchLabels>") {
     key = substr(p, 30)
     if (!(key in LABELKEYS)) return 0
-    field(ln, "-", "np-pod-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value", 0)
+    field(ln, "-", "np-pod-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value")
     return 1
   }
   if (p == "spec>ingress" || p == "spec>egress") {
     n = listcount(0, k)
-    if (n >= 0) field(ln, "-", "np-" substr(p, 6) "-rules", n "", 0, "scalar", "int", 0)
+    field(ln, "-", "np-" substr(p, 6) "-rules", n "", 0, "scalar", "int")
     return 1
   }
   if (p ~ /^spec>(ingress|egress)>#[0-9]+$/) {
     split(p, s, ">"); dir = s[2]; r = substr(s[3], 2)
     fk = leaf0(p ">" (dir == "ingress" ? "from" : "to"))
     n = fk ? listcount(0, fk) : 0
-    if (n >= 0) field(ln, "-", "np-" dir "." r ".peers", n "", 0, "scalar", "int", 0)
+    field(ln, "-", "np-" dir "." r ".peers", n "", 0, "scalar", "int")
     return 1
   }
   if (p ~ /^spec>(ingress>#[0-9]+>from|egress>#[0-9]+>to)>#[0-9]+>/) {
@@ -728,28 +748,28 @@ function npleaf(k, p,    ln, w, n, dir, r, fk, rest, base, key, s, x) {
     rest = p; for (x = 1; x <= 5; x++) rest = substr(rest, index(rest, ">") + 1)
     if (rest == "podSelector" || rest == "namespaceSelector") {
       w = selword(k)
-      if (w != "") field(ln, "-", base (rest == "podSelector" ? "pod-selector" : "namespace-selector"), w, 0, "scalar", "selector-word", 0)
+      field(ln, "-", base (rest == "podSelector" ? "pod-selector" : "namespace-selector"), w, 0, "scalar", "selector-word")
       return 1
     }
     if (substr(rest, 1, 24) == "podSelector>matchLabels>") {
       key = substr(rest, 25)
       if (!(key in LABELKEYS)) return 0
-      field(ln, "-", base "pod-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value", 0)
+      field(ln, "-", base "pod-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value")
       return 1
     }
     if (substr(rest, 1, 30) == "namespaceSelector>matchLabels>") {
       key = substr(rest, 31)
       if (!(key in LABELKEYS) && key != "kubernetes.io/metadata.name") return 0
-      field(ln, "-", base "namespace-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value", 0)
+      field(ln, "-", base "namespace-label." key, LVAL[0, k], LQ[0, k], LT[0, k], "label-value")
       return 1
     }
     if (rest == "ipBlock>cidr") {
-      field(ln, "-", base "ip-block", LVAL[0, k], LQ[0, k], LT[0, k], fits(LVAL[0, k], LQ[0, k], "cidr-v4") ? "cidr-v4" : "cidr-v6", 0)
+      field(ln, "-", base "ip-block", LVAL[0, k], LQ[0, k], LT[0, k], fits(LVAL[0, k], LQ[0, k], "cidr-v4") ? "cidr-v4" : "cidr-v6")
       return 1
     }
     if (rest == "ipBlock>except") {
       n = listcount(0, k)
-      if (n >= 0) field(ln, "-", base "ip-block-except-count", n "", 0, "scalar", "int", 0)
+      field(ln, "-", base "ip-block-except-count", n "", 0, "scalar", "int")
       return 1
     }
   }
@@ -759,10 +779,10 @@ function npleaf(k, p,    ln, w, n, dir, r, fk, rest, base, key, s, x) {
 function roleleaf(k, p,    n, s) {
   if (p ~ /^rules>#[0-9]+>(resourceNames|nonResourceURLs)$/) {
     split(p, s, ">"); n = listcount(0, k)
-    if (n >= 0) field(LLN[0, k], "-", "rule." substr(s[2], 2) (s[3] == "resourceNames" ? ".resource-names-count" : ".non-resource-urls-count"), n "", 0, "scalar", "int", 0)
+    field(LLN[0, k], "-", "rule." substr(s[2], 2) (s[3] == "resourceNames" ? ".resource-names-count" : ".non-resource-urls-count"), n "", 0, "scalar", "int")
     return 1
   }
-  if (p == "aggregationRule" && KIND == "ClusterRole") { field(LLN[0, k], "-", "aggregation-rule", "", 0, "none", "present", 0); return 1 }
+  if (p == "aggregationRule" && KIND == "ClusterRole") { field(LLN[0, k], "-", "aggregation-rule", "", 0, "none", "present"); return 1 }
   return 0
 }
 
@@ -771,19 +791,19 @@ function bindleaf(k, p,    s, kk) {
   split(p, s, ">")
   kk = leaf0("subjects>" s[2] ">kind")
   if (!kk || LT[0, kk] != "scalar" || LVAL[0, kk] != "ServiceAccount") return 0
-  field(LLN[0, k], "-", "subject." substr(s[2], 2) ".name", LVAL[0, k], LQ[0, k], LT[0, k], "dns-subdomain", 0)
+  field(LLN[0, k], "-", "subject." substr(s[2], 2) ".name", LVAL[0, k], LQ[0, k], LT[0, k], "dns-subdomain")
   return 1
 }
 
 function secretleaf(k, p,    ln, key, f, sv) {
   ln = LLN[0, k]
-  if (p == "type") { field(ln, "-", "secret-type", LVAL[0, k], LQ[0, k], LT[0, k], "secret-type", 1); return 1 }
+  if (p == "type") { field(ln, "-", "secret-type", LVAL[0, k], LQ[0, k], LT[0, k], "secret-type"); return 1 }
   if (p ~ /^(data|stringData)>[^>]+$/) {
     key = lastseg(p)
     f = (substr(p, 1, 1) == "d") ? "secret-key.data" : "secret-key.string-data"
     sv = key  # names only: secret
     if (tok20(sv)) sv = "other"
-    field(ln, "-", f, sv, 0, "scalar", "key-name", 1)
+    field(ln, "-", f, sv, 0, "scalar", "key-name")
     return 1
   }
   return 0
@@ -792,17 +812,16 @@ function secretleaf(k, p,    ln, key, f, sv) {
 function cmleaf(k, p,    key) {
   if (p !~ /^(data|binaryData)>[^>]+$/) return 0
   key = lastseg(p)
-  if (!fits(key, 0, "key-name")) return 1
-  if (tok20(key)) key = "other"
-  if (substr(p, 1, 1) == "d") field(LLN[0, k], "-", "configmap-data." key, stateword(0, k), 0, "scalar", "state-word", 0)
-  else field(LLN[0, k], "-", "configmap-binary." key, "", 0, "none", "present", 0)
+  if (!fits(key, 0, "key-name") || tok20(key)) key = "other"
+  if (substr(p, 1, 1) == "d") field(LLN[0, k], "-", "configmap-data." key, stateword(0, k), 0, "scalar", "state-word")
+  else field(LLN[0, k], "-", "configmap-binary." key, "", 0, "none", "present")
   return 1
 }
 
 function quotaleaf(k,    i, c) {
   c = 0
   for (i = 1; i <= LKIDS[0, k]; i++) if (!(("ResourceQuota" SUBSEP "spec>hard>" lastseg(LPATH[0, LCH[0, k, i]])) in SIMPLE)) c++
-  if (c > 0) field(LLN[0, k], "-", "quota-other-count", c "", 0, "scalar", "int", 0)
+  if (c > 0) field(LLN[0, k], "-", "quota-other-count", c "", 0, "scalar", "int")
   return 1
 }
 
@@ -845,16 +864,15 @@ function argoleaf(k, p,    ln, s, i, rel, key, v, val) {
     if (simple("ApplicationSet", k, p, "-")) return 1
     if (p ~ /^spec>generators>#[0-9]+>[^>]+$/) {
       split(p, s, ">")
-      field(ln, "-", "generator." substr(s[3], 2), (s[4] == "list") ? "list" : "other", 0, "scalar", "generator-word", 0)
+      field(ln, "-", "generator." substr(s[3], 2), (s[4] == "list") ? "list" : "other", 0, "scalar", "generator-word")
       return 1
     }
     if (p ~ /^spec>generators>#[0-9]+>list>elements>#[0-9]+>[^>]+$/) {
       split(p, s, ">"); key = s[7]
-      if (!fits(key, 0, "element-key")) return 1
       val = "present"; v = LVAL[0, k]
-      if (tok20(key)) key = "other"
+      if (!fits(key, 0, "element-key") || tok20(key)) key = "other"
       else if (!credlike(key) && (key in REFKEYS) && LT[0, k] == "scalar" && fits(v, LQ[0, k], "short-name")) val = v
-      field(ln, "-", "list-element." substr(s[3], 2) "." substr(s[6], 2) "." key, val, LQ[0, k], "scalar", (val == "present") ? "present" : "short-name", 0)
+      field(ln, "-", "list-element." substr(s[3], 2) "." substr(s[6], 2) "." key, val, LQ[0, k], "scalar", (val == "present") ? "present" : "short-name")
       return 1
     }
   }
@@ -870,21 +888,21 @@ function srcleaf(k, srel,    ln, v, user, w, i, n, nk, vk, pre) {
   ln = LLN[0, k]; pre = "source." SRCN "."
   if (srel == "repoURL") {
     v = LVAL[0, k]
-    if (LT[0, k] != "scalar") { field(ln, "-", pre "repo", "unknown", 0, "scalar", "repo-word", 0); return 1 }
+    if (LT[0, k] != "scalar") { field(ln, "-", pre "repo", "unknown", 0, "scalar", "repo-word"); return 1 }
     user = (v ~ /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\/@]*@/ || v ~ /^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:/) ? "true" : "false"
     w = (NREMOTES == 0) ? "unknown" : "other"
     for (i = 1; i <= NREMOTES; i++) if (urlnorm(REMOTE[i]) == urlnorm(v)) w = "this"
-    field(ln, "-", pre "repo", w, 0, "scalar", "repo-word", 0)
-    field(ln, "-", pre "url-has-user-part", user, 0, "scalar", "bool", 0)
+    field(ln, "-", pre "repo", w, 0, "scalar", "repo-word")
+    field(ln, "-", pre "url-has-user-part", user, 0, "scalar", "bool")
     return 1
   }
   if (simple("src", k, srel, "-")) return 1
   if (srel == "chart" || srel == "helm>valuesObject" || srel == "kustomize") {
-    field(ln, "-", pre (srel == "chart" ? "chart" : srel == "kustomize" ? "kustomize" : "helm-values-object"), "", 0, "none", "present", 0)
+    field(ln, "-", pre (srel == "chart" ? "chart" : srel == "kustomize" ? "kustomize" : "helm-values-object"), "", 0, "none", "present")
     return 1
   }
   if (srel == "helm>values") {
-    field(ln, "-", pre "helm-values", "", 0, "none", "present", 0)
+    field(ln, "-", pre "helm-values", "", 0, (k in NESTFAIL) ? "unread" : "none", "present")
     for (i = 1; i <= NPEND; i++) if (PENDK[i] == k) { NDO++; DOL[NDO] = PENDL[i]; DOC[NDO] = "-"; DOF[NDO] = PENDF[i] }
     return 1
   }
@@ -894,7 +912,7 @@ function srcleaf(k, srel,    ln, v, user, w, i, n, nk, vk, pre) {
   }
   if (srel == "helm>parameters") {
     n = listcount(0, k)
-    if (n >= 0) field(ln, "-", pre "helm-parameter-count", n "", 0, "scalar", "int", 0)
+    field(ln, "-", pre "helm-parameter-count", n "", 0, "scalar", "int")
     return 1
   }
   if (srel ~ /^helm>parameters>#[0-9]+$/) {
@@ -916,7 +934,8 @@ function vleaf(I, k, p,    n, s, i, last, prev, pp, j) {
     n = split(p, s, ">")
     if (substr(s[n], 1, 1) == "#" && n >= 3 && s[n - 2] == "capabilities" && (s[n - 1] == "drop" || s[n - 1] == "add") && index(substr(p, 1, length(p) - length(s[n])), "#") == 0) {
       pp = s[1]; for (j = 2; j < n; j++) pp = pp "." s[j]
-      if (vpathok(pp)) field(LLN[I, k], "-", "values." vprint(pp), LVAL[I, k], LQ[I, k], LT[I, k], "cap-name", 0)
+      for (j = 1; j < n; j++) if (credlike(s[j])) return
+      if (vpathok(pp)) field(LLN[I, k], "-", "values." vprint(pp), LVAL[I, k], LQ[I, k], LT[I, k], "cap-name")
       return
     }
     if (substr(s[n], 1, 1) == "#") return
@@ -945,9 +964,9 @@ function vunread(ln) { VUNR++; if (!VUNRL) VUNRL = ln }
 function vkey(I, ln, p, k,    pp, n, s, last, prev, sid, v, q, t, i, w) {
   pp = p; gsub(/>/, ".", pp)
   if (!vpathok(pp)) { vunread(ln); return }
-  field(ln, "-", "values-key." vprint(pp), stateword(I, k), 0, "scalar", "state-word", 0)
+  field(ln, "-", "values-key." vprint(pp), stateword(I, k), 0, "scalar", "state-word")
   n = split(pp, s, "."); last = s[n]; prev = (n > 1) ? s[n - 1] : ""
-  if (credlike(last)) return
+  for (i = 1; i <= n; i++) if (credlike(s[i])) return  # a credential-like key or parent
   v = LVAL[I, k]; q = LQ[I, k]; t = LT[I, k]; sid = ""
   if (last == "cpu" && (prev == "requests" || prev == "limits")) sid = "qty-cpu"
   else if (last == "memory" && (prev == "requests" || prev == "limits")) sid = "qty-mem"
@@ -955,23 +974,24 @@ function vkey(I, ln, p, k,    pp, n, s, last, prev, sid, v, q, t, i, w) {
   else if (last ~ /^(runAsUser|runAsGroup|replicaCount|replicas|minReplicas|maxReplicas)$/) sid = "int"
   else if ((last == "drop" || last == "add") && prev == "capabilities" && t == "flow") {
     w = flowitems(v)
-    for (i = 1; i <= w; i++) field(ln, "-", "values." vprint(pp), FIV[i], FIQ[i], FIT[i], "cap-name", 0)
+    for (i = 1; i <= w; i++) field(ln, "-", "values." vprint(pp), FIV[i], FIQ[i], FIT[i], "cap-name")
     return
   } else if (last == "tag" && prev == "image") {
-    if (t == "scalar" && v == "latest") field(ln, "-", "values." vprint(pp), "latest", 0, "scalar", "image-pin", 0)
-    else if (t == "scalar" && fits(v, q, "image-tag")) field(ln, "-", "values." vprint(pp), "tag", 0, "scalar", "image-pin", 0)
+    w = (t == "scalar" && v == "latest") ? "latest" : (t == "scalar" && fits(v, q, "image-tag")) ? "tag" : ""
+    field(ln, "-", "values." vprint(pp), w, 0, "scalar", "image-pin")
     return
   } else if (last == "digest" && prev == "image") {
-    if (t == "scalar" && fits(v, q, "image-digest")) field(ln, "-", "values." vprint(pp), "digest", 0, "scalar", "image-pin", 0)
+    w = (t == "scalar" && fits(v, q, "image-digest")) ? "digest" : ""
+    field(ln, "-", "values." vprint(pp), w, 0, "scalar", "image-pin")
     return
   }
-  if (sid != "") field(ln, "-", "values." vprint(pp), v, q, t, sid, 0)
+  if (sid != "") field(ln, "-", "values." vprint(pp), v, q, t, sid)
 }
 
 function vtree(I,    k) {
   VUNR = 0; VUNRL = 0
   for (k = 1; k <= NL[I]; k++) vleaf(I, k, LPATH[I, k])
-  if (VUNR > 0) field(VUNRL, "-", "values-key-unreadable-count", VUNR "", 0, "scalar", "int", 0)
+  if (VUNR > 0) field(VUNRL, "-", "values-key-unreadable-count", VUNR "", 0, "scalar", "int")
 }
 
 function values_doc(    i) {
@@ -1072,8 +1092,8 @@ BEGIN {
   for (i = 1; i <= n; i++) PODKINDS[L[i]] = 1
   ARGO["Application"] = 1; ARGO["ApplicationSet"] = 1
 
-  # The simple fields: context, path ("#" for an item), field, shape, and
-  # "other" when the field prints other on a miss. Context pod is a path
+  # The simple fields: context, path ("#" for an item), field, and shape.
+  # Context pod is a path
   # below the pod spec, c below a container, argo below the Application
   # spec, src below one source, and a kind name below the object.
   n = split("" \
@@ -1089,7 +1109,7 @@ BEGIN {
     "pod|volumes>#>emptyDir>sizeLimit|emptydir-size-limit|qty-mem;" \
     "pod|volumes>#>secret>secretName|secret-volume-name|dns-subdomain;" \
     "pod|volumes>#>configMap>name|configmap-volume-name|dns-subdomain;" \
-    "c|imagePullPolicy|image-pull-policy|pull-policy|other;" \
+    "c|imagePullPolicy|image-pull-policy|pull-policy;" \
     "c|resources>requests>cpu|cpu-request|qty-cpu;c|resources>requests>memory|memory-request|qty-mem;" \
     "c|resources>limits>cpu|cpu-limit|qty-cpu;c|resources>limits>memory|memory-limit|qty-mem;" \
     "c|resources>requests>ephemeral-storage|ephemeral-storage-request|qty-mem;" \
@@ -1099,21 +1119,21 @@ BEGIN {
     "c|securityContext>readOnlyRootFilesystem|read-only-root-fs|bool;" \
     "c|securityContext>runAsNonRoot|run-as-non-root|bool;c|securityContext>runAsUser|run-as-user|int;" \
     "c|securityContext>runAsGroup|run-as-group|int;" \
-    "c|securityContext>capabilities>drop>#|cap-drop|cap-name|other;" \
-    "c|securityContext>capabilities>add>#|cap-add|cap-name|other;" \
+    "c|securityContext>capabilities>drop>#|cap-drop|cap-name;" \
+    "c|securityContext>capabilities>add>#|cap-add|cap-name;" \
     "c|ports>#>hostPort|host-port|port;" \
     "c|envFrom>#>secretRef>name|env-from-secret|dns-subdomain;" \
     "c|envFrom>#>configMapRef>name|env-from-configmap|dns-subdomain;" \
     "Deployment|spec>replicas|replicas|int;StatefulSet|spec>replicas|replicas|int;" \
     "Rollout|spec>replicas|replicas|int;Rollout|spec>workloadRef>kind|workload-ref-kind|kind-name;" \
     "Rollout|spec>workloadRef>name|workload-ref-name|dns-subdomain;" \
-    "Rollout|spec>workloadRef>scaleDown|workload-ref-scale-down|scale-down|other;" \
+    "Rollout|spec>workloadRef>scaleDown|workload-ref-scale-down|scale-down;" \
     "Job|spec>activeDeadlineSeconds|active-deadline-seconds|int;Job|spec>backoffLimit|backoff-limit|int;" \
     "Job|spec>ttlSecondsAfterFinished|ttl-seconds-after-finished|int;" \
     "CronJob|spec>jobTemplate>spec>activeDeadlineSeconds|active-deadline-seconds|int;" \
     "CronJob|spec>jobTemplate>spec>backoffLimit|backoff-limit|int;" \
     "CronJob|spec>jobTemplate>spec>ttlSecondsAfterFinished|ttl-seconds-after-finished|int;" \
-    "CronJob|spec>concurrencyPolicy|concurrency-policy|concurrency-policy|other;" \
+    "CronJob|spec>concurrencyPolicy|concurrency-policy|concurrency-policy;" \
     "CronJob|spec>startingDeadlineSeconds|starting-deadline-seconds|int;" \
     "CronJob|spec>successfulJobsHistoryLimit|history-limit-successful|int;" \
     "CronJob|spec>failedJobsHistoryLimit|history-limit-failed|int;" \
@@ -1122,15 +1142,15 @@ BEGIN {
     "HorizontalPodAutoscaler|spec>scaleTargetRef>name|scale-target-name|dns-subdomain;" \
     "HorizontalPodAutoscaler|spec>minReplicas|min-replicas|int;" \
     "HorizontalPodAutoscaler|spec>maxReplicas|max-replicas|int;" \
-    "HorizontalPodAutoscaler|spec>metrics>#>type|metric-type|metric-type|other;" \
-    "HorizontalPodAutoscaler|spec>metrics>#>resource>name|metric-resource|metric-resource|other;" \
-    "HorizontalPodAutoscaler|spec>metrics>#>resource>target>type|metric-target-type|metric-target-type|other;" \
+    "HorizontalPodAutoscaler|spec>metrics>#>type|metric-type|metric-type;" \
+    "HorizontalPodAutoscaler|spec>metrics>#>resource>name|metric-resource|metric-resource;" \
+    "HorizontalPodAutoscaler|spec>metrics>#>resource>target>type|metric-target-type|metric-target-type;" \
     "HorizontalPodAutoscaler|spec>metrics>#>resource>target>averageUtilization|metric-average-utilization|int;" \
     "VerticalPodAutoscaler|spec>targetRef>apiVersion|scale-target-api-version|api-version;" \
     "VerticalPodAutoscaler|spec>targetRef>kind|scale-target-kind|kind-name;" \
     "VerticalPodAutoscaler|spec>targetRef>name|scale-target-name|dns-subdomain;" \
-    "VerticalPodAutoscaler|spec>updatePolicy>updateMode|update-mode|update-mode|other;" \
-    "LimitRange|spec>limits>#>type|limit-type|limit-type|other;" \
+    "VerticalPodAutoscaler|spec>updatePolicy>updateMode|update-mode|update-mode;" \
+    "LimitRange|spec>limits>#>type|limit-type|limit-type;" \
     "LimitRange|spec>limits>#>default>cpu|limit-default.cpu|qty-cpu;" \
     "LimitRange|spec>limits>#>default>memory|limit-default.memory|qty-mem;" \
     "LimitRange|spec>limits>#>defaultRequest>cpu|limit-default-request.cpu|qty-cpu;" \
@@ -1151,31 +1171,31 @@ BEGIN {
     "ResourceQuota|spec>hard>limits.ephemeral-storage|quota-hard.limits.ephemeral-storage|qty-mem;" \
     "ResourceQuota|spec>hard>ephemeral-storage|quota-hard.ephemeral-storage|qty-mem;" \
     "ResourceQuota|spec>hard>pods|quota-hard.pods|int;" \
-    "Namespace|metadata>labels>pod-security.kubernetes.io/enforce|psa-enforce|psa-level|other;" \
+    "Namespace|metadata>labels>pod-security.kubernetes.io/enforce|psa-enforce|psa-level;" \
     "Namespace|metadata>labels>pod-security.kubernetes.io/enforce-version|psa-enforce-version|psa-version;" \
-    "Namespace|metadata>labels>pod-security.kubernetes.io/warn|psa-warn|psa-level|other;" \
+    "Namespace|metadata>labels>pod-security.kubernetes.io/warn|psa-warn|psa-level;" \
     "Namespace|metadata>labels>pod-security.kubernetes.io/warn-version|psa-warn-version|psa-version;" \
     "ServiceAccount|automountServiceAccountToken|automount-sa-token|bool;" \
-    "Role|rules>#>verbs>#|rule.#1.verb|rbac-verb|other;" \
-    "Role|rules>#>resources>#|rule.#1.resource|rbac-resource|other;" \
-    "Role|rules>#>apiGroups>#|rule.#1.api-group|rbac-group|other;" \
-    "ClusterRole|rules>#>verbs>#|rule.#1.verb|rbac-verb|other;" \
-    "ClusterRole|rules>#>resources>#|rule.#1.resource|rbac-resource|other;" \
-    "ClusterRole|rules>#>apiGroups>#|rule.#1.api-group|rbac-group|other;" \
-    "RoleBinding|roleRef>kind|role-ref-kind|role-ref-kind|other;RoleBinding|roleRef>name|role-ref-name|role-name;" \
-    "RoleBinding|subjects>#>kind|subject.#1.kind|subject-kind|other;" \
+    "Role|rules>#>verbs>#|rule.#1.verb|rbac-verb;" \
+    "Role|rules>#>resources>#|rule.#1.resource|rbac-resource;" \
+    "Role|rules>#>apiGroups>#|rule.#1.api-group|rbac-group;" \
+    "ClusterRole|rules>#>verbs>#|rule.#1.verb|rbac-verb;" \
+    "ClusterRole|rules>#>resources>#|rule.#1.resource|rbac-resource;" \
+    "ClusterRole|rules>#>apiGroups>#|rule.#1.api-group|rbac-group;" \
+    "RoleBinding|roleRef>kind|role-ref-kind|role-ref-kind;RoleBinding|roleRef>name|role-ref-name|role-name;" \
+    "RoleBinding|subjects>#>kind|subject.#1.kind|subject-kind;" \
     "RoleBinding|subjects>#>namespace|subject.#1.namespace|dns-label;" \
-    "ClusterRoleBinding|roleRef>kind|role-ref-kind|role-ref-kind|other;" \
+    "ClusterRoleBinding|roleRef>kind|role-ref-kind|role-ref-kind;" \
     "ClusterRoleBinding|roleRef>name|role-ref-name|role-name;" \
-    "ClusterRoleBinding|subjects>#>kind|subject.#1.kind|subject-kind|other;" \
+    "ClusterRoleBinding|subjects>#>kind|subject.#1.kind|subject-kind;" \
     "ClusterRoleBinding|subjects>#>namespace|subject.#1.namespace|dns-label;" \
-    "NetworkPolicy|spec>policyTypes>#|np-policy-type|policy-type|other;" \
+    "NetworkPolicy|spec>policyTypes>#|np-policy-type|policy-type;" \
     "NetworkPolicy|spec>ingress>#>ports>#>port|np-ingress.#1.port|port;" \
     "NetworkPolicy|spec>ingress>#>ports>#>endPort|np-ingress.#1.end-port|port;" \
-    "NetworkPolicy|spec>ingress>#>ports>#>protocol|np-ingress.#1.protocol|protocol|other;" \
+    "NetworkPolicy|spec>ingress>#>ports>#>protocol|np-ingress.#1.protocol|protocol;" \
     "NetworkPolicy|spec>egress>#>ports>#>port|np-egress.#1.port|port;" \
     "NetworkPolicy|spec>egress>#>ports>#>endPort|np-egress.#1.end-port|port;" \
-    "NetworkPolicy|spec>egress>#>ports>#>protocol|np-egress.#1.protocol|protocol|other;" \
+    "NetworkPolicy|spec>egress>#>ports>#>protocol|np-egress.#1.protocol|protocol;" \
     "Secret|immutable|secret-immutable|bool;ConfigMap|immutable|configmap-immutable|bool;" \
     "argo|project|app-project|dns-subdomain;argo|destination>namespace|destination-namespace|dns-label;" \
     "src|path|source.#S.path|rel-path;src|ref|source.#S.ref|element-key;" \
@@ -1183,7 +1203,7 @@ BEGIN {
     "ApplicationSet|spec>goTemplate|go-template|bool", L, ";")
   for (i = 1; i <= n; i++) {
     split(L[i], w, "|")
-    SIMPLE[w[1] SUBSEP w[2]] = w[3] " " w[4] " " w[5]
+    SIMPLE[w[1] SUBSEP w[2]] = w[3] " " w[4]
   }
   reset(0); reset(1)
 }
@@ -1205,8 +1225,11 @@ extract() {
 }
 
 # A file holds a control character or a NUL: it is not text.
-not_text() {
-  sed -n l "$1" | awk '
+# NEL (\302\205), LS, and PS (\342\200\250, \342\200\251) are line breaks
+# to a YAML 1.1 reader, so a line the reader takes for a comment can hold a
+# key for Kubernetes.
+not_text() {  # not text
+  sed -n l < "$1" | awk '
     { n = length($0)
       for (i = 1; i <= n; i++) {
         c = substr($0, i, 1)
@@ -1214,7 +1237,13 @@ not_text() {
         d = substr($0, i + 1, 1)
         if (d == "\\") { i++; continue }
         if (d ~ /[abfv]/) bad = 1
-        if (d ~ /[0-7]/) { o = substr($0, i + 1, 3); if (o < "040" || o == "177") bad = 1; i += 3 }
+        if (d ~ /[0-7]/) {
+          o = substr($0, i + 1, 3)
+          if (o < "040" || o == "177") bad = 1
+          if (o == "302" && substr($0, i + 4, 4) == "\\205") bad = 1
+          if (o == "342" && (substr($0, i + 4, 8) == "\\200\\250" || substr($0, i + 4, 8) == "\\200\\251")) bad = 1
+          i += 3
+        }
       } }
     END { exit !bad }'
 }
@@ -1283,6 +1312,8 @@ kust_entries() {
   leaves=$(REMOTES='' extract leaves "" < "$1") || return 4
   printf '%s\n' "$leaves" | awk -F '\t' '
     $2 ~ /^(helmCharts|helmGlobals|helmChartInflationGenerator|generators|transformers|validators)(>|$)/ { print "plugin -"; next }
+    $2 ~ /^((resources|bases|components|crds|configurations|patchesStrategicMerge)>#[0-9]+|(patches|patchesJson6902|replacements)>#[0-9]+>path|openapi>path|(configMapGenerator|secretGenerator)>#[0-9]+>((files|envs)>#[0-9]+|env))$/ && $1 != "scalar" { print "bad -"; next }  # an entry that is not a plain scalar
+    $2 ~ /^(resources|bases|components|crds|configurations|patchesStrategicMerge)$/ && $1 != "none" && $1 != "flow" { print "bad -"; next }
     $1 != "scalar" { next }
     $2 ~ /^(resources|bases|components)>#[0-9]+$/ { print "res " $3; next }
     $2 ~ /^(crds|configurations|patchesStrategicMerge)>#[0-9]+$/ { print "path " $3; next }
@@ -1292,36 +1323,102 @@ kust_entries() {
   '
 }
 
+# An entry kustomize can take for a repository, whether or not a local
+# path of that name exists: an address form, a character no plain local
+# path needs, or a first part with a dot (a host) on a path with more parts
+# or on a directory. $1 = the entry, $2 = the directory of the kustomization.
+repo_like() {
+  case "$1" in
+    *://* | *//* | *'?'* | *git::* | *gh:* | *_git* | *.git | *.git/* | *@* | *:* | *\\* | /*) return 0 ;;
+  esac
+  first=${1%%/*}
+  case "$first" in . | ..) return 1 ;; esac
+  case "$first" in
+    *.*) if [ "$first" != "$1" ] || [ -d "$2/$1" ]; then return 0; fi ;;
+  esac
+  return 1
+}
+
+# The directory of a path: "." for a path with no "/".
+dir_of() {
+  case "$1" in */*) printf '%s\n' "${1%/*}" ;; *) echo . ;; esac
+}
+
+# A path as a list line prints it: "./" in front of one that starts with
+# "-", so that it is never read as an option.
+shown() {
+  case "$1" in -*) printf './%s\n' "$1" ;; *) printf '%s\n' "$1" ;; esac
+}
+
+# $1 is inside chart $2: under its templates, crds, or charts directory.
+in_chart() {
+  if [ "$2" = . ]; then
+    case "$1" in templates/* | crds/* | charts/*) return 0 ;; esac
+  else
+    case "$1" in "$2"/templates/* | "$2"/crds/* | "$2"/charts/*) return 0 ;; esac
+  fi
+  return 1
+}
+
 # ---- Modes ----
 
 list_mode() {
   LROOT=$1
   [ -d "$LROOT" ] || die2 "not a directory: $LROOT"
-  if [ -L "$LROOT" ]; then echo "$me: not read, a symbolic link: $LROOT" >&2; exit 4; fi
-  cd "$LROOT" || exit 2
+  if [ -L "${LROOT%/}" ] || ! plain_path "$LROOT" dots; then  # the list root: no link in any part
+    echo "$me: not read, a symbolic link in the path: $LROOT" >&2
+    exit 4
+  fi
+  cd -- "$LROOT" || exit 2
   LROOT=.
   ROOTP=$(pwd -P)
-  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) -print | sed 's#^\./##' | sort)
-  charts=$(printf '%s\n' "$files" | grep -E '(^|/)Chart\.yaml$' | sed -e 's#/Chart\.yaml$##' -e 's#^Chart\.yaml$#.#')
-  # Only a chart that is not inside another chart is listed.
+  # Only paths of letters, digits, and . _ / @ + - are listed, so no path
+  # in a list line can split, expand, or hide a line break. Any other path
+  # is counted and reported, and the run ends with exit code 4.
+  set -f
+  unsafe=0
+  files=
+  raw=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) -print)
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      ./*[!A-Za-z0-9._/@+-]* | [!.]* | .[!/]*) unsafe=$((unsafe + 1)); continue ;;  # a path the list cannot carry
+    esac
+    [ -f "$line" ] || { unsafe=$((unsafe + 1)); continue; }
+    files="$files
+${line#./}"
+  done <<EOF
+$raw
+EOF
+  files=$(printf '%s\n' "$files" | sed '/^$/d' | sort)
+  charts=
+  for f in $files; do
+    case "$f" in Chart.yaml) charts="$charts ." ;; */Chart.yaml) charts="$charts ${f%/Chart.yaml}" ;; esac
+  done
+  # A chart under another chart's templates, crds, or charts is not listed.
   top=
   for c in $charts; do
-    inner=0
+    sub=0
     for o in $charts; do
-      [ "$o" != "$c" ] || continue
-      case "$c" in "$o"/*) inner=1 ;; esac
-      [ "$o" = . ] && inner=1
+      if [ "$o" != "$c" ] && in_chart "$c/Chart.yaml" "$o"; then sub=1; fi
     done
-    [ "$inner" -eq 1 ] || top="$top $c"
+    [ "$sub" -eq 1 ] || top="$top $c"
   done
-  kdirs=$(printf '%s\n' "$files" | grep -E '(^|/)(kustomization\.ya?ml|Kustomization)$' | sed -e 's#/[^/]*$##' -e 's#^[^/]*$#.#' | sort -u)
+  kdirs=
+  for f in $files; do
+    case "${f##*/}" in kustomization.yaml | kustomization.yml | Kustomization) ;; *) continue ;; esac
+    skip=0
+    for c in $top; do if in_chart "$f" "$c"; then skip=1; fi; done
+    [ "$skip" -eq 1 ] || kdirs="$kdirs $(dir_of "$f")"
+  done
+  kdirs=$(for kd in $kdirs; do printf '%s\n' "$kd"; done | sort -u)
   bases=$(for kd in $kdirs; do
     kf=$(kfile_in "$kd")
     [ -n "$kf" ] || continue
     entries=$(kust_entries "$kf") || continue
     printf '%s\n' "$entries" | while IFS=' ' read -r what target; do
       [ "$what" = res ] || continue
-      case "$target" in *://* | git@* | ssh:*) continue ;; esac
+      if repo_like "$target" "$kd"; then continue; fi
       t="$kd/$target"
       [ -d "$t" ] && [ ! -L "$t" ] || continue
       pp=$(phys "$t") || continue
@@ -1332,41 +1429,45 @@ list_mode() {
   done | sort -u)
   {
     for c in $top; do
-      printf '%s:chart:%s\n' "$c" "$(git_state "$c/Chart.yaml")"
+      printf '%s:chart:%s\n' "$(shown "$c")" "$(git_state "$c/Chart.yaml")"
     done
     for kd in $kdirs; do
       kf=$(kfile_in "$kd")
       [ -n "$kf" ] || continue
       kind=overlay
       if printf '%s\n' "$bases" | grep -qxF -e "$kd"; then kind=kustomize-base; fi
-      printf '%s:%s:%s\n' "$kd" "$kind" "$(git_state "$kf")"
+      printf '%s:%s:%s\n' "$(shown "$kd")" "$kind" "$(git_state "$kf")"
     done
-    printf '%s\n' "$files" | while IFS= read -r f; do
-      [ -n "$f" ] || continue
+    for f in $files; do
       base=${f##*/}
-      case "$base" in kustomization.yaml | kustomization.yml | Kustomization) continue ;; esac
-      kind=
-      inchart=
+      case "$base" in kustomization.yaml | kustomization.yml | Kustomization | Chart.yaml) continue ;; esac
+      skip=0; home=
       for c in $top; do
-        case "$f" in "$c"/*) inchart=$c ;; esac
-        [ "$c" = . ] && inchart=.
+        if in_chart "$f" "$c"; then skip=1; fi
+        [ "$(dir_of "$f")" = "$c" ] && home=$c
       done
-      if [ -n "$inchart" ]; then
-        dir=$(dirname -- "$f")
-        case "$base" in values*.yaml | values*.yml) [ "$dir" = "$inchart" ] && kind='chart-values' ;; esac
-      elif grep -q '^kind:' "$f" 2>/dev/null && grep -q '^apiVersion:' "$f" 2>/dev/null; then
-        if grep -Eq '^kind:[[:space:]]*["'"'"']?(Application|ApplicationSet)["'"'"']?[[:space:]]*$' "$f" &&
-          grep -Eq '^apiVersion:[[:space:]]*["'"'"']?argoproj\.io/' "$f"; then
+      [ "$skip" -eq 0 ] || continue
+      kind=
+      if [ -n "$home" ]; then
+        case "$base" in values*.yaml | values*.yml) kind='chart-values' ;; esac
+      fi
+      if [ -z "$kind" ] && grep -q -- '^kind:' "$f" && grep -q -- '^apiVersion:' "$f"; then
+        if grep -Eq -- '^kind:[[:space:]]*["'"'"']?(Application|ApplicationSet)["'"'"']?[[:space:]]*$' "$f" &&
+          grep -Eq -- '^apiVersion:[[:space:]]*["'"'"']?argoproj\.io/' "$f"; then
           kind=argo-application
         else
           kind=manifest
         fi
-      else
+      elif [ -z "$kind" ]; then
         case "$base" in values*.yaml | values*.yml) kind='chart-values' ;; esac
       fi
-      [ -n "$kind" ] && printf '%s:%s:%s\n' "$f" "$kind" "$(git_state "$f")"
+      [ -n "$kind" ] && printf '%s:%s:%s\n' "$(shown "$f")" "$kind" "$(git_state "$f")"
     done
   } | sort
+  if [ "$unsafe" -gt 0 ]; then
+    echo "$me: not listed: $unsafe paths with a character other than letters, digits, and . _ / @ + -, or with a line break" >&2
+    exit 4
+  fi
 }
 
 read_file_mode() {
@@ -1442,12 +1543,13 @@ $1" ;;
     nv=$((nv + 1))
   done
   [ "$nv" -le 2 ] || die2 "--render helm takes one or two values files"
-  [ -z "$(find "$chart" -type l -print | sed -n 1p)" ] || refuse "symbolic link inside"
+  cp_=$(phys "$chart")
+  [ -z "$(find "$cp_" -type l -print | sed -n 1p)" ] || refuse "symbolic link inside"
   # shellcheck disable=SC2016 # the text $ref and $id, not expansions
-  if [ -n "$(find "$chart" -type f -name values.schema.json -exec grep -lF -e '$ref' -e '$id' {} + | sed -n 1p)" ]; then
+  if [ -n "$(find "$cp_" -type f -name values.schema.json -exec grep -lF -e '$ref' -e '$id' {} + | sed -n 1p)" ]; then
     refuse "remote schema ref"
   fi
-  deps=$(find "$chart" \( -name Chart.yaml -o -name requirements.yaml \) -type f -print | while IFS= read -r cf; do
+  deps=$(find "$cp_" \( -name Chart.yaml -o -name requirements.yaml \) -type f -print | while IFS= read -r cf; do
     cdir=$(dirname -- "$cf")
     leaves=$(REMOTES='' extract leaves "" < "$cf") || { echo bad; break; }
     items=$(printf '%s\n' "$leaves" | awk -F '\t' '$2 ~ /^dependencies>#[0-9]+$/ { n++ } END { print n + 0 }')
@@ -1466,13 +1568,12 @@ $1" ;;
   [ -z "$deps" ] || refuse "dependencies not vendored"
   release=$(basename -- "$(phys "$chart")")
   printf '%s\n' "$release" | grep -Eqx '([a-z]|[a-z][-a-z0-9]*[a-z0-9])' && [ ${#release} -le 53 ] || release=release
-  cp_=$(phys "$chart")
   set -- template "$release" "$cp_" --skip-schema-validation
   for v in $vlist; do set -- "$@" --values "$(phys "$v")"; done
   set -- "$@" --namespace "$ns"
   REMOTES=$(remotes_of "$ROOTP")
   status=0
-  rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C helm "$@" 2>/dev/null) || status=$?
+  rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C helm "$@" 2>/dev/null) || status=$?  # helm: drop standard error
   if [ "$status" -ne 0 ]; then
     echo "$me: helm template exited with status $status" >&2
     refuse "render failed"
@@ -1510,12 +1611,13 @@ $d"
       exit 4
     }
     if printf '%s\n' "$entries" | grep -q '^plugin '; then refuse "plugin or inflator needed"; fi
+    if printf '%s\n' "$entries" | grep -q '^bad '; then refuse "remote base"; fi
     while IFS=' ' read -r what target; do
       [ -n "$what" ] || continue
-      case "$target" in *://* | git@* | ssh:* | *@*:*) refuse "remote base" ;; esac
+      if repo_like "$target" "$d"; then refuse "remote base"  # an entry kustomize can take for a repository
+      fi
       t="$d/$target"
       [ -e "$t" ] || refuse "remote base"
-      case "$target" in /*) refuse "remote base" ;; esac
       rest=$target; acc=$d
       while [ -n "$rest" ]; do
         part=${rest%%/*}
@@ -1537,9 +1639,9 @@ EOF
   dp=$(phys "$dir")
   status=0
   if [ "$tool" = kustomize ]; then
-    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C kustomize build "$dp" 2>/dev/null) || status=$?
+    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C kustomize build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
   else
-    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C kubectl kustomize "$dp" 2>/dev/null) || status=$?
+    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C kubectl kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
   fi
   if [ "$status" -ne 0 ]; then
     echo "$me: $tool exited with status $status" >&2

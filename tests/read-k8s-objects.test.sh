@@ -1091,7 +1091,8 @@ EOF
   printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: nel\nspec:\n  containers:\n    - name: c1\n      image: nginx #\302\205      securityContext:\302\205        privileged: true\n' > "$a/nel.yaml"
   printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ls\nspec:\n  dnsPolicy: Default #\342\200\250  hostNetwork: true\n' > "$a/ls.yaml"
   printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ps\nspec:\n  dnsPolicy: Default #\342\200\251  hostNetwork: true\n' > "$a/ps.yaml"
-  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: nul\nspec:\n  hostNetwork: true\000FIXTUREVALUE\n' > "$a/nul.yaml"
+  # A NUL ends the line for some copies of awk, so the value would read as true.
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: nul\nspec:\n  hostNetwork: true\000\n' > "$a/nul.yaml"
   cat > "$a/sentence.yaml" <<'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -1282,7 +1283,7 @@ EOF
   expect_line "$out" "argo.yaml:22:$o:-:source.1.path=apps/{{.cluster}}" "attack ApplicationSet"
   expect_line "$out" "argo.yaml:24:$o:-:source.1.helm-values=other" "attack ApplicationSet"
   expect_no "$out" 'values-key\.|:values\.' "attack ApplicationSet"
-  expect_no "$out" 'destination-namespace=' "attack ApplicationSet"
+  expect_line "$out" "argo.yaml:28:$o:-:destination-namespace=other" "attack ApplicationSet"
 
   att indentless.yaml
   [ "$code" -eq 0 ] || fail "attack indentless lists: exit $code"
