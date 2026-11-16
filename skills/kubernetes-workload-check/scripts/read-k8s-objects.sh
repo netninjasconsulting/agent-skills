@@ -854,7 +854,8 @@ function bindleaf(k, p,    s, kk, w) {
   kk = leaf0("subjects>" s[2] ">kind")
   # A User subject: the form of its name in three fixed words, never the name.
   if (kk && LT[0, kk] == "scalar" && LVAL[0, kk] == "User") {
-    w = (LT[0, k] != "scalar" || LVAL[0, k] == "") ? "other" : (substr(LVAL[0, k], 1, 22) == "system:serviceaccount:") ? "service-account" : "plain"  # the form of a User name
+    # A quoted name with a backslash may spell another name once decoded.
+    w = (LT[0, k] != "scalar" || LVAL[0, k] == "" || (LQ[0, k] && index(LVAL[0, k], "\\"))) ? "other" : (substr(LVAL[0, k], 1, 22) == "system:serviceaccount:") ? "service-account" : "plain"  # the form of a User name
     field(LLN[0, k], "-", "subject." substr(s[2], 2) ".user-form", w, 0, "scalar", "user-form")
     return 1
   }
@@ -1563,9 +1564,12 @@ list_mode() {
       if [ -n "$home" ]; then
         case "$base" in values*.yaml | values*.yml) kind='chart-values' ;; esac
       fi
-      if [ -z "$kind" ] && grep -q -- '^kind:' "$f" && grep -q -- '^apiVersion:' "$f"; then
-        if grep -Eq -- '^kind:[[:space:]]*["'"'"']?(Application|ApplicationSet)["'"'"']?[[:space:]]*$' "$f" &&
-          grep -Eq -- '^apiVersion:[[:space:]]*["'"'"']?argoproj\.io/' "$f"; then
+      # A top-level key may be written bare, in double quotes, or in single
+      # quotes: the same forms --fields reads (keyline).
+      if [ -z "$kind" ] && grep -Eq -- '^(kind|"kind"|'"'"'kind'"'"'):' "$f" &&  # a quoted top-level key
+        grep -Eq -- '^(apiVersion|"apiVersion"|'"'"'apiVersion'"'"'):' "$f"; then
+        if grep -Eq -- '^(kind|"kind"|'"'"'kind'"'"'):[[:space:]]*["'"'"']?(Application|ApplicationSet)["'"'"']?[[:space:]]*$' "$f" &&
+          grep -Eq -- '^(apiVersion|"apiVersion"|'"'"'apiVersion'"'"'):[[:space:]]*["'"'"']?argoproj\.io/' "$f"; then
           kind=argo-application
         else
           kind=manifest
