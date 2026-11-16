@@ -48,11 +48,11 @@ CR=$(printf '\r')
 
 # The fixed command list of references/fields.md, held here on its own. The
 # test checks that fields.md and the script carry the same list.
-T_CMDS='kubectl config current-context
-kubectl top pod --containers --namespace=<name> --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s
-kubectl get pods --namespace=<name> --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
-kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
-kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
+T_CMDS='kubectl config current-context --kubeconfig= --context= --server= --cluster=
+kubectl top pod --containers --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s
+kubectl get pods --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
+kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
+kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 
 # The shape block of the cluster script in references/fields.md. A shape
 # that the reader's block holds as well must be the same line there.
@@ -104,6 +104,7 @@ allowed_lines() {
       *'<name>'*)
         for n in "$@"; do
           l=${c%%'<name>'*}$n${c#*'<name>'}
+          l=${l%%'<context>'*}fleetboard-stand-in${l#*'<context>'}
           words=$(printf '%s\n' "$l" | awk '{ print NF - 1 }')
           printf '%s %s\n' "$words" "${l#kubectl }"
         done
@@ -146,8 +147,9 @@ log_only() {  # $1 = label; the rest are the namespaces given
     # Every top and get carries the explicit neutral values that keep a
     # kuberc default from removing or changing rows.
     case $line in
-      *' top pod '*) need='--selector= --field-selector= --all-namespaces=false --show-swap=false --sum=false' ;;
-      *' get '*) need='--selector= --field-selector= --watch-only=false --ignore-not-found=false --output-watch-events=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --all-namespaces=false --watch=false' ;;
+      *' top pod '*) need='--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --selector= --field-selector= --all-namespaces=false --show-swap=false --sum=false' ;;
+      *' get '*) need='--context=fleetboard-stand-in --kubeconfig= --server= --cluster= --selector= --field-selector= --watch-only=false --ignore-not-found=false --output-watch-events=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --all-namespaces=false --watch=false' ;;
+      *' config current-context '*) need='--kubeconfig= --context= --server= --cluster=' ;;
       *) need= ;;
     esac
     for f in $need; do
@@ -156,6 +158,9 @@ log_only() {  # $1 = label; the rest are the namespaces given
     for w in $line; do
       case $w in
         -l | -l?* | --selector=?* | --field-selector=?* | -L | -L?* | --label-columns=?*) fail "$ll: the log holds a selector or label column with a value: $line" ;;
+        --kubeconfig=?* | --server=?* | -s | -s?* | --cluster=?*) fail "$ll: the log holds a kubeconfig, server, or cluster with a value: $line" ;;
+        --context=fleetboard-stand-in) ;;
+        --context=?*) fail "$ll: the log holds a context the script did not read: $line" ;;
       esac
     done
     for v in apply create delete patch replace edit scale rollout label annotate set drain cordon taint port-forward cp attach; do
@@ -227,9 +232,13 @@ suite() {
   # --context logs only config current-context.
   run "$s" "" --context
   [ "$rc" -eq 0 ] || fail "context: expected exit 0, got $rc"
-  [ "$(log_text)" = "2 config current-context" ] || fail "context: the log holds more than config current-context"
+  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "context: the log holds more than config current-context"
   [ "$(cat "$work/out")" = "fleetboard-stand-in" ] || fail "context: the output is not the context name"
   no_marker "context"
+  run "$s" "odd-context" fleetboard-production
+  [ "$rc" -eq 5 ] || fail "a context name that is not a name, namespace mode: expected exit 5, got $rc"
+  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "a context name that is not a name, namespace mode: a command ran after the context"
+  no_marker "odd context, namespace mode"
   run "$s" "odd-context" --context
   [ "$(cat "$work/out")" = "other" ] || fail "context: a context name that is not a name printed as it came"
   no_marker "odd context"
@@ -237,7 +246,7 @@ suite() {
   [ "$rc" -eq 5 ] || fail "no context: expected exit 5, got $rc"
   grep -q "kubectl config current-context failed" "$work/err" || fail "no context: the message does not name the failed command"
   if grep -q "no current context" "$work/err"; then fail "no context: the message guesses a cause"; fi
-  [ "$(log_text)" = "2 config current-context" ] || fail "no context: the log holds more than config current-context"
+  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "no context: the log holds more than config current-context"
   no_marker "no context"
   run "$s" "empty-context" --context
   [ "$rc" -eq 5 ] || fail "an empty context answer: expected exit 5, got $rc"
@@ -246,7 +255,7 @@ suite() {
   [ "$rc" -eq 5 ] || fail "a context answer of spaces: expected exit 5, got $rc"
   run "$s" "no-context" fleetboard-production
   [ "$rc" -eq 5 ] || fail "no context, namespace mode: expected exit 5, got $rc"
-  [ "$(log_text)" = "2 config current-context" ] || fail "no context, namespace mode: a command ran after the context failed"
+  [ "$(log_text)" = "6 config current-context --kubeconfig= --context= --server= --cluster=" ] || fail "no context, namespace mode: a command ran after the context failed"
   no_marker "no context, namespace mode"
 
   # kubectl missing: exit 5.
@@ -410,6 +419,53 @@ EOF
 
 suite "$real_script" || total=$((total + sf))
 
+# ---- Every flag is classified ----
+# fields.md classifies every flag of kubectl get, kubectl top pod, kubectl
+# config current-context, and the global options. This reads the help of the
+# installed kubectl and fails on a flag that fields.md does not classify, or
+# classifies twice. It runs where kubectl is installed, with HOME,
+# KUBECONFIG, and KUBERC in the work directory, and under "unshare -n" where
+# that works. The stand-in is not on PATH here.
+classify_check() {
+  kc=$(PATH=$(printf '%s' "$PATH" | sed "s#$fake:##") command -v kubectl 2>/dev/null) || kc=
+  if [ -z "$kc" ]; then echo "skipped: the flag classification against kubectl (kubectl is not installed)"; return; fi
+  mkdir -p "$work/khome"
+  printf 'apiVersion: kubectl.config.k8s.io/v1beta1\nkind: Preference\n' > "$work/khome/kuberc"
+  net=
+  if unshare -n true 2>/dev/null; then net="unshare -n"; elif unshare -rn true 2>/dev/null; then net="unshare -rn"; fi
+  : > "$work/flags"
+  for c in "get --help" "top pod --help" "config current-context --help" "options"; do
+    # shellcheck disable=SC2086 # the words of a fixed help command
+    $net env -i PATH=/usr/bin:/bin HOME="$work/khome" KUBECONFIG="$work/khome/none" KUBERC="$work/khome/kuberc" "$kc" $c < /dev/null 2>/dev/null |
+      sed -n 's/^ *\(-[A-Za-z], \)\{0,1\}--\([a-z0-9-]*\)=.*/\2/p' >> "$work/flags"
+  done
+  sort -u "$work/flags" -o "$work/flags"
+  [ -s "$work/flags" ] || { echo "FAIL: classification: no flag was read from the kubectl help"; total=$((total + 1)); return; }
+  classified "$fields_md" > "$work/missing"
+  if [ -s "$work/missing" ]; then
+    sed 's/^/FAIL: classification: /' "$work/missing"
+    total=$((total + $(grep -c . "$work/missing")))
+  fi
+  nclass=$(grep -c . "$work/classified")
+  # The control: a copy of fields.md without the row of --raw must fail.
+  # shellcheck disable=SC2016 # backticks of a Markdown table, not an expansion
+  grep -v '^| `--raw` |' "$fields_md" > "$work/fields-cut.md"
+  classified "$work/fields-cut.md" > "$work/missing-cut"
+  grep -qxF -e "the flag --raw is not classified in fields.md" "$work/missing-cut" || { echo "FAIL: classification: a copy of fields.md without --raw passed"; total=$((total + 1)); }
+  echo "classification: $(grep -c . "$work/flags") flags of kubectl $("$kc" version --client 2>/dev/null | sed -n 's/^Client Version: //p') read, $nclass classified in fields.md"
+}
+# classified FILE: print a line for each flag of $work/flags that FILE does
+# not classify, and for each flag it classifies twice.
+classified() {
+  # shellcheck disable=SC2016 # backticks of a Markdown table, not an expansion
+  sed -n -E 's/^\| `--([a-z0-9-]+)` \| [^|]* \| (set by the fixed command|left to the user|identity and transport) \|.*/\1/p' "$1" | sort > "$work/classified"
+  uniq -d "$work/classified" | sed 's/^\(.*\)$/the flag --\1 is classified twice/'
+  while IFS= read -r f; do
+    grep -qxF -e "$f" "$work/classified" || echo "the flag --$f is not classified in fields.md"
+  done < "$work/flags"
+}
+classify_check
+
 # ---- Pins ----
 # A copy of the script with one safeguard switched off must fail on the
 # check named for that safeguard. The control case: a copy must still parse
@@ -514,6 +570,10 @@ pins() {
   pin "an empty field selector on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --field-selector= /\1 /' "a command lacks the neutral flag --field-selector="
   pin "no watch-only on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --watch-only=false /\1 /' "a command lacks the neutral flag --watch-only=false"
   pin "no ignore-not-found on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --ignore-not-found=false /\1 /' "a command lacks the neutral flag --ignore-not-found=false"
+  pin "the context read is passed on" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --context=<context> /\1 /' "a command lacks the neutral flag --context=fleetboard-stand-in"
+  pin "an empty kubeconfig on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --kubeconfig= /\1 /' "a command lacks the neutral flag --kubeconfig="
+  pin "an empty template on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --template= /\1 /' "a command lacks the neutral flag --template="
+  pin "a context name out of shape stops the run" '# a context name out of shape: exit 5' 's/^\(.*\) || die 5 .*  # a context name out of shape: exit 5$/:/' "a context name that is not a name, namespace mode: expected exit 5"
   pin "the fixed command list" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^CMD_VPA=.kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> /CMD_VPA='"'"'kubectl get secrets --all-namespaces /' "the fixed command list of the script differs from fields.md"
 }
 copy_works "$real_script" || { echo "FAIL: the control case fails on the script itself"; total=$((total + 1)); }
