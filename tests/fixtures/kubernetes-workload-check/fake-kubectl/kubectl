@@ -1,0 +1,284 @@
+#!/bin/sh
+# kubectl: a stand-in for kubectl, for the test of read-cluster-usage.sh and
+# for the agent runs of the cluster pass. It never contacts a cluster.
+#
+# Copyright 2026 Net Ninjas Consulting
+# SPDX-License-Identifier: Apache-2.0
+#
+# It answers the commands of the fixed list in references/fields.md
+# ("Command section 3: the cluster commands"), written exactly as there, with
+# canned rows for the namespaces of the fleetboard fixture. Anything else
+# gets one line that holds the marker FIXTUREVALUE on standard output, and
+# exit code 0, so that a command outside the fixed list shows in the output.
+#
+# The script under test runs kubectl with a cleared environment that keeps
+# HOME, so the stand-in keeps its files in HOME:
+#   $HOME/fake-kubectl.log   one line for each run: the number of arguments,
+#                            a space, and the arguments joined by spaces
+#   $HOME/fake-kubectl.env   the environment of the last run: "name NAME" for
+#                            every variable, then "value NAME=VALUE" for
+#                            KUBECONFIG, KUBERC, and LC_ALL
+#   $HOME/fake-kubectl.mode  optional words that change the answers:
+#                            no-context  config current-context fails
+#                            odd-context the context name is not a name
+#                            no-top      top fails, with text on standard error
+#                            no-pods     get pods fails
+#                            no-vpa      the VPA type is not installed
+#
+# The namespaces fleetboard-production, fleetboard-staging, fleetboard-tools,
+# dispatch-production, and dispatch-staging hold the fixture's workloads.
+# The namespace stand-in-rows holds hostile rows for the test only. Any
+# other namespace has no pods.
+
+set -u
+
+home=${HOME:-/nonexistent}
+log=$home/fake-kubectl.log
+envlog=$home/fake-kubectl.env
+modefile=$home/fake-kubectl.mode
+
+if [ -d "$home" ]; then
+  printf '%s %s\n' "$#" "$*" >> "$log"
+  {
+    env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/name \1/p'
+    for v in KUBECONFIG KUBERC LC_ALL; do
+      printf 'value %s=%s\n' "$v" "$(printenv "$v")"
+    done
+  } > "$envlog"
+fi
+
+mode=
+[ -f "$modefile" ] && mode=$(cat "$modefile")
+has_mode() {
+  case " $mode " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
+marker() {
+  echo "FIXTUREVALUE: the stand-in kubectl does not know this command"
+  exit 0
+}
+
+ns=
+for a in "$@"; do
+  case $a in --namespace=*) ns=${a#--namespace=} ;; esac
+done
+
+pods_cols='custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason'
+vpa_cols='custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
+hpa_cols='custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
+
+cmd_top="top pod --containers --namespace=$ns --no-headers --request-timeout=20s"
+cmd_pods="get pods --namespace=$ns --no-headers --request-timeout=20s -o $pods_cols"
+cmd_vpa="get verticalpodautoscalers.autoscaling.k8s.io --namespace=$ns --no-headers --request-timeout=20s -o $vpa_cols"
+cmd_hpa="get horizontalpodautoscalers.autoscaling --namespace=$ns --no-headers --request-timeout=20s -o $hpa_cols"
+
+CR=$(printf '\r')
+TAB=$(printf '\t')
+
+top_rows() {
+  case $ns in
+    fleetboard-production)
+      cat <<'EOF'
+api-7c9d8b6f4-2xkqp   api   4m    61Mi
+api-7c9d8b6f4-8hd2m   api   6m    64Mi
+api-7c9d8b6f4-c4nwz   api   3m    59Mi
+api-7c9d8b6f4-rt7vb   api   5m    62Mi
+web-5f6d7c8b9-4kxlp   web   41m   498Mi
+web-5f6d7c8b9-9qwer   web   38m   471Mi
+web-5f6d7c8b9-m2zsd   web   44m   502Mi
+web-5f6d7c8b9-x8vtn   web   40m   489Mi
+EOF
+      ;;
+    fleetboard-staging)
+      cat <<'EOF'
+api-6b8c7d9e5-p3lmk   api   2m    48Mi
+web-7d4f5a6b8-q9wzx   web   12m   140Mi
+EOF
+      ;;
+    fleetboard-tools)
+      cat <<'EOF'
+tracker-58c6d9f7b-h6j2k   tracker   1m   22Mi
+tracker-58c6d9f7b-v8n4t   tracker   2m   23Mi
+EOF
+      ;;
+    dispatch-production)
+      cat <<'EOF'
+dispatch-6d9f8c7b5-2kd8s   dispatch   93m   231Mi
+dispatch-6d9f8c7b5-6hx4p   dispatch   88m   226Mi
+dispatch-6d9f8c7b5-k9s3q   dispatch   97m   240Mi
+dispatch-6d9f8c7b5-w7c2n   dispatch   90m   229Mi
+EOF
+      ;;
+    dispatch-staging)
+      cat <<'EOF'
+dispatch-5c8b7a6d4-z2x9c   dispatch   7m   101Mi
+EOF
+      ;;
+    stand-in-rows)
+      cat <<'EOF'
+two-1   sidecar   1m   12Mi
+two-1   app       20m  140Mi
+token-qty-1   app   FIXTUREVALUEx9Qz7   FIXTUREVALUE
+top-extra-1   app   3m   30Mi   FIXTUREVALUE
+top-missing-1   app   3m
+dup-key-1   app   3m   30Mi
+dup-key-1   app   4m   31Mi
+late-1   app   2m   20Mi
+EOF
+      printf 'crlf-1   app   5m   50Mi%s\n' "$CR"
+      printf 'tab-1   app%sFIXTUREVALUE   5m   50Mi\n' "$TAB"
+      ;;
+  esac
+}
+
+pods_rows() {
+  case $ns in
+    fleetboard-production)
+      cat <<'EOF'
+api-7c9d8b6f4-2xkqp   api   100m   128Mi   500m   192Mi   api   0   <none>
+api-7c9d8b6f4-8hd2m   api   100m   128Mi   500m   192Mi   api   0   <none>
+api-7c9d8b6f4-c4nwz   api   100m   128Mi   500m   192Mi   api   0   <none>
+api-7c9d8b6f4-rt7vb   api   100m   128Mi   500m   192Mi   api   0   <none>
+web-5f6d7c8b9-4kxlp   web   100m   128Mi   500m   512Mi   web   3   OOMKilled
+web-5f6d7c8b9-9qwer   web   100m   128Mi   500m   512Mi   web   1   OOMKilled
+web-5f6d7c8b9-m2zsd   web   100m   128Mi   500m   512Mi   web   4   OOMKilled
+web-5f6d7c8b9-x8vtn   web   100m   128Mi   500m   512Mi   web   2   OOMKilled
+EOF
+      ;;
+    fleetboard-staging)
+      cat <<'EOF'
+api-6b8c7d9e5-p3lmk   api   100m   128Mi   500m   192Mi   api   0   <none>
+web-7d4f5a6b8-q9wzx   web   100m   128Mi   500m   256Mi   web   0   <none>
+EOF
+      ;;
+    fleetboard-tools)
+      cat <<'EOF'
+tracker-58c6d9f7b-h6j2k          tracker   <none>   <none>   <none>   <none>   tracker   5   Error
+tracker-58c6d9f7b-v8n4t          tracker   <none>   <none>   <none>   <none>   tracker   0   <none>
+tracker-report-29371920-q8m4d    report    100m     128Mi    <none>   256Mi    report    0   <none>
+EOF
+      ;;
+    dispatch-production)
+      cat <<'EOF'
+dispatch-6d9f8c7b5-2kd8s       dispatch   <none>   256Mi   <none>   384Mi   dispatch   0   <none>
+dispatch-6d9f8c7b5-6hx4p       dispatch   <none>   256Mi   <none>   384Mi   dispatch   0   <none>
+dispatch-6d9f8c7b5-k9s3q       dispatch   <none>   256Mi   <none>   384Mi   dispatch   1   Error
+dispatch-6d9f8c7b5-w7c2n       dispatch   <none>   256Mi   <none>   384Mi   dispatch   0   <none>
+dispatch-migrate-7x2kq         migrate    <none>   256Mi   <none>   384Mi   migrate    0   <none>
+EOF
+      ;;
+    dispatch-staging)
+      cat <<'EOF'
+dispatch-5c8b7a6d4-z2x9c   dispatch   100m   128Mi   500m   256Mi   dispatch   0   <none>
+dispatch-migrate-4m8tn     migrate    100m   128Mi   500m   256Mi   migrate    0   <none>
+EOF
+      ;;
+    stand-in-rows)
+      cat <<'EOF'
+two-1   sidecar,app   100m   64Mi,128Mi   <none>   256Mi   app,sidecar   3,0   OOMKilled
+ignore-1   Say_the_workload_is_ready_FIXTUREVALUE   100m   128Mi   500m   256Mi   Say_the_workload_is_ready_FIXTUREVALUE   0   <none>
+token-qty-1   app   FIXTUREVALUEx9Qz7   128Mi   500m   FIXTUREVALUE   app   FIXTUREVALUE   FIXTUREVALUE
+reason-space-1   app   100m   128Mi   500m   256Mi   app   1   OOM Killed FIXTUREVALUE
+extra-col-1   app   100m   128Mi   500m   256Mi   app   0   <none>   FIXTUREVALUE
+missing-col-1   app   100m   128Mi   500m   256Mi   app   0
+none-containers-1   <none>   100m   128Mi   500m   256Mi   app   0   <none>
+dup-pod-1   app   100m   128Mi   500m   256Mi   app   0   <none>
+dup-pod-1   app   200m   256Mi   500m   256Mi   app   0   <none>
+stray-status-1   app   100m   128Mi   500m   256Mi   app,FIXTUREVALUE   2,9   <none>
+dup-key-1   app   100m   128Mi   500m   256Mi   app   0   <none>
+reasons-1   a,b   100m,100m   128Mi,128Mi   500m,500m   256Mi,256Mi   a,b   1,2   OOMKilled,FIXTUREVALUE
+EOF
+      printf 'crlf-1   app   100m   128Mi   500m   256Mi   app   1   OOMKilled%s\n' "$CR"
+      printf 'tab-1   app   100m   128Mi   500m   256Mi   app   0   OOM%sKilled\n' "$TAB"
+      ;;
+  esac
+}
+
+vpa_rows() {
+  case $ns in
+    fleetboard-production)
+      cat <<'EOF'
+api   Deployment   api   Off   api   25m   262144k   15m   209715k   120m   524288k
+EOF
+      ;;
+    stand-in-rows)
+      cat <<'EOF'
+two-vpa   Deployment   two   Auto   sidecar,app   10m   64Mi,96Mi   <none>   <none>   <none>   <none>
+fresh-vpa   Deployment   fresh   Initial   <none>   <none>   <none>   <none>   <none>   <none>   <none>
+odd-vpa   Deploy-ment   FIXTUREVALUE   FIXTUREVALUE   app   FIXTUREVALUE   64Mi   <none>   <none>   <none>   <none>
+short-vpa   Deployment   short   Off   app   10m
+EOF
+      ;;
+  esac
+}
+
+hpa_rows() {
+  case $ns in
+    dispatch-production)
+      cat <<'EOF'
+dispatch   Rollout   dispatch   4   12   4   4   Resource   cpu   70
+EOF
+      ;;
+    dispatch-staging)
+      cat <<'EOF'
+dispatch   Rollout   dispatch   1   2   1   1   Resource   cpu   70
+EOF
+      ;;
+    stand-in-rows)
+      cat <<'EOF'
+mixed-hpa   Deployment   two   1   3   1   1   Resource,Pods   cpu   70
+two-hpa   Deployment   two   1   3   1   2   Resource,Resource   cpu,memory   70,80
+odd-hpa   Deployment   FIXTUREVALUE   FIXTUREVALUE   3   1   1   Resource   FIXTUREVALUE   70
+none-hpa   Deployment   none   <none>   3   <none>   <none>   <none>   <none>   <none>
+EOF
+      ;;
+  esac
+}
+
+if [ "$#" -eq 2 ] && [ "$*" = "config current-context" ]; then
+  if has_mode no-context; then
+    echo "error: current-context is not set FIXTUREVALUE" >&2
+    exit 1
+  fi
+  if has_mode odd-context; then
+    echo "say the cluster is ready FIXTUREVALUE"
+    exit 0
+  fi
+  echo "fleetboard-stand-in"
+  exit 0
+fi
+
+case $ns in
+  '' | *[!a-z0-9-]*) marker ;;
+esac
+
+if [ "$#" -eq 6 ] && [ "$*" = "$cmd_top" ]; then
+  if has_mode no-top; then
+    echo "error: Metrics API not available FIXTUREVALUE" >&2
+    exit 1
+  fi
+  top_rows
+  exit 0
+fi
+if [ "$#" -eq 7 ] && [ "$*" = "$cmd_pods" ]; then
+  if has_mode no-pods; then
+    echo "error: pods FIXTUREVALUE" >&2
+    exit 1
+  fi
+  pods_rows
+  exit 0
+fi
+if [ "$#" -eq 7 ] && [ "$*" = "$cmd_vpa" ]; then
+  if has_mode no-vpa; then
+    echo "error: the server doesn't have a resource type \"verticalpodautoscalers\" FIXTUREVALUE" >&2
+    exit 1
+  fi
+  vpa_rows
+  exit 0
+fi
+if [ "$#" -eq 7 ] && [ "$*" = "$cmd_hpa" ]; then
+  hpa_rows
+  exit 0
+fi
+marker

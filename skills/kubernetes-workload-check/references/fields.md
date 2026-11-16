@@ -678,73 +678,90 @@ A refusal never stops the first pass. The agent reads the files as they are and 
 
 ## Command section 3: the cluster commands
 
-The cluster script runs these commands and no others. It takes only namespace names, each of which has to fit `dns-label`. It builds every command itself from the fixed text below. It never passes an argument it did not write, and an argument that does not fit `dns-label` stops the run.
+The cluster script runs these commands and no others. It takes only namespace names, and it builds every command itself from the fixed list below. It never passes an argument it did not write.
 
-The script puts `--namespace=<name>` after the verb, as one argument, so that a name cannot be read as a flag. A `dns-label` name cannot start with `-`.
+**The front door.** Every argument is tested before any other work, and before `kubectl` is looked for. A namespace name must be a DNS label in the namespace sense: lower case letters, digits, and `-`, at most 63 characters, starting and ending with a letter or a digit (K22). Any other argument, including an empty one, one that starts with `-`, one with a space, a `;`, a `/`, a `.`, a capital letter, or a control character, and one that ends in a line break, stops the run with exit code 2, and no command runs. The message names no argument. `--context` must be the only argument. The test for a namespace is the script's own shell test, and not the `dns-label` shape, because a namespace may start with a digit.
+
+The script puts `--namespace=<name>` after the verb, as one argument, so that a name cannot be read as a flag.
 
 | Step | Command | Columns it needs | Source | Read | Status |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `kubectl config current-context` | The context name, so the offer can name it | K29, K33, T2 (`KUBECONFIG=/tmp/lc2/kc kubectl config current-context`, kubectl v1.37.2) | 15 Nov 2026 | checked |
-| 2 | `kubectl top pod --containers --namespace=<name> --no-headers` | The pod, the container, the CPU, and the memory in use. The column order is not on the page read, so the script and the stand-in must be written against a real run (verify) | K28 | 15 Nov 2026 | verify |
-| 3 | `kubectl get pods --namespace=<name> -o custom-columns=...` with the list below | See below | K30, K31, K1, K32 | 15 Nov 2026 | verify |
-| 4 | `kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> -o custom-columns=...` with the list below | See below | K30, K31, V1 | 15 Nov 2026 | verify |
-| 5 | `kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> -o custom-columns=...` with the list below | See below | K30, K31, K9 | 15 Nov 2026 | verify |
+| 2 | `kubectl top pod --containers --namespace=<name> --no-headers --request-timeout=20s` | The pod, the container, the CPU, and the memory in use. The column order is not on the page read, so the script and the stand-in must be written against a real run (verify) | K28 | 15 Nov 2026 | verify |
+| 3 | `kubectl get pods --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=...` with the list below | See below | K30, K31, K1, K32 | 15 Nov 2026 | verify |
+| 4 | `kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=...` with the list below | See below | K30, K31, V1 | 15 Nov 2026 | verify |
+| 5 | `kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=...` with the list below | See below | K30, K31, K9 | 15 Nov 2026 | verify |
+
+The fixed command list of the cluster script, one command on each line. The script holds the same lines, between `# BEGIN the fixed command list` and `# END the fixed command list`, and replaces `<name>` with each namespace it was given. The test of the script checks that the two are the same, and the stand-in `kubectl` answers only these lines.
+
+```text
+kubectl config current-context
+kubectl top pod --containers --namespace=<name> --no-headers --request-timeout=20s
+kubectl get pods --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason
+kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
+kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization
+```
+
+The order of the runs: step 1 once, then steps 2 to 5 for each namespace in the order given. With `--context`, step 1 only.
+
+**How `kubectl` runs.** Every command runs as `env -i PATH=... HOME=... [KUBECONFIG=...] KUBERC=off LC_ALL=C kubectl ...`, with its standard error dropped. The environment is cleared except for what the kubeconfig lookup needs: `PATH` (to find `kubectl` and any credential plugin the kubeconfig names), `HOME` (for `~/.kube/config` when `KUBECONFIG` is not set), and `KUBECONFIG` when it is set and not empty, so the user's current context still works. `KUBERC=off` stops `kubectl` from reading a preferences file (`~/.kube/kuberc`), whose aliases and default flags could change a command of the list. A local run showed both: with a `kuberc` file in `HOME`, `kubectl config current-context` read it, and with `KUBERC=off` it did not (checked, T2, kubectl v1.37.2, 15 Nov 2026). `--request-timeout=20s` bounds each request (`kubectl options`, T2). A stated limit: a credential plugin that reads other variables (for example `AWS_PROFILE`, or a cloud tool's settings outside `HOME`), and a proxy set only in the environment, do not reach `kubectl`. The command then fails, and the script stops with exit code 5 or 6, or prints `not read`. It never falls back to another context. Nothing `kubectl` writes to standard error reaches the user. The script prints its own plain message instead.
 
 What was read for each step:
 
-- **Step 1.** The documentation page gives the command a one-line description, and it does not say whether the command contacts the cluster (K29). The command's own source file reads the starting configuration through `ConfigAccess`, and writes `config.CurrentContext`. It builds no REST client and sends no request (K33, read from the project's source on the build date). That makes the context name a local read. The status is "checked" on the strength of the source file, and the documentation page is silent. The local run agrees (T2, kubectl v1.37.2, 15 Nov 2026): with a kubeconfig file that sets a context whose server address is not reachable, the command printed the context name and exited 0, and a trace of the process (`strace -f -e trace=connect,socket`) showed no socket or connect call. With an empty file or a missing file it exits 1 and prints `error: current-context is not set`, with nothing else.
-- **Step 2.** The form is `kubectl top pod [NAME | -l label]`, with `--containers` (usage of the containers within a pod), `--namespace`, and `--no-headers` (K28). The page says metrics can be unavailable for a few minutes after a pod is created (K28). The help text of kubectl v1.37.2 (`kubectl top pod --help`, T2) lists `-A`, `--containers`, `--field-selector`, `--no-headers`, `-l`, `--show-swap`, `--sort-by`, `--sum`, and `--use-protocol-buffers`. It gives no column order or sample output, and a cluster is needed to see one, so the column order stays "verify". `--namespace` is a global option (`kubectl options`). It does not name the Metrics Server. The VPA page says a metrics source, such as the Metrics Server, has to be installed (K10). A single sample is one moment in time, and the report labels it so.
-- **Step 3, columns.** Each is `HEADER:jsonpath`, and the list is comma separated, as in `-o custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion` (K31). The fixed list for pods:
+- **Step 1.** The documentation page gives the command a one-line description, and it does not say whether the command contacts the cluster (K29). The command's own source file reads the starting configuration through `ConfigAccess`, and writes `config.CurrentContext`. It builds no REST client and sends no request (K33, read from the project's source on the build date). That makes the context name a local read. The status is "checked" on the strength of the source file, and the documentation page is silent. The local run agrees (T2, kubectl v1.37.2, 15 Nov 2026): with a kubeconfig file that sets a context whose server address is not reachable, the command printed the context name and exited 0, and a trace of the process (`strace -f -e trace=connect,socket`) showed no socket or connect call. With an empty file or a missing file it exits 1 and prints `error: current-context is not set`, with nothing else. The script prints the name when it fits `context-name`, and `other` when it does not. A failure or an empty answer is exit code 5.
+- **Step 2.** The form is `kubectl top pod [NAME | -l label]`, with `--containers` (usage of the containers within a pod), `--namespace`, and `--no-headers` (K28). The page says metrics can be unavailable for a few minutes after a pod is created (K28). The help text of kubectl v1.37.2 (`kubectl top pod --help`, T2) lists `-A`, `--containers`, `--field-selector`, `--no-headers`, `-l`, `--show-swap`, `--sort-by`, `--sum`, and `--use-protocol-buffers`. It gives no column order or sample output, and a cluster is needed to see one, so the column order stays "verify". The script reads four columns, in the order pod, container, CPU, and memory. `--namespace` is a global option (`kubectl options`). It does not name the Metrics Server. The VPA page says a metrics source, such as the Metrics Server, has to be installed (K10). A single sample is one moment in time, and the output says so. When this step fails, the script stops with exit code 6 and the message "no metrics", and the tables of the namespaces before it stay printed.
+- **Step 3, columns.** Each is `HEADER:jsonpath`, and the list is comma separated, as in `-o custom-columns=NAME:.metadata.name,RSRC:.metadata.resourceVersion` (K31). The fixed list for pods is in the command above: `POD`, `CONTAINERS`, `CPU_REQ`, `MEM_REQ`, `CPU_LIM`, `MEM_LIM`, `STATUS_NAMES`, `RESTARTS`, and `LAST_END`. The paths are the field paths in K1, K2, and K32. Only `containers` are read. Init containers and ephemeral containers are not.
+
+**One value for each container.** A path with `[*]` gives one value for each list item that has the field, joined with commas, and it skips an item that lacks the field. A local run showed this with the JSONPath output of kubectl v1.37.2 on a pod whose first container has no requests: `{.spec.containers[*].resources.requests.cpu}` printed only the request of the second container (checked, T2, 15 Nov 2026, `unshare -n kubectl set env --local -f FILE X=1 -o jsonpath=...`, which needs no cluster). That `custom-columns` uses the same JSONPath rule is "verify", because `kubectl get` needs a cluster. A column read by position could therefore give one container's request to another. The script never does that. `CONTAINERS` has one value for each container, because a container name is required. For each of `CPU_REQ`, `MEM_REQ`, `CPU_LIM`, and `MEM_LIM`, the script compares the number of values with the number of containers. When they are the same, each container has the field and the values are in container order. When the column is `<none>`, no container has the field, and each prints `-`. When the numbers differ, the script cannot tell which container lacks the field, and that column prints `not-read` for every container of the pod. An index such as `[1]` is no way round this: on a pod with fewer containers, the same local run gave the error `array index out of bounds`, and in a `custom-columns` list that error would stop the whole command.
+
+`CONTAINERS` comes from the spec and `STATUS_NAMES` from the status, and the two lists are not guaranteed to be in the same order, so the script matches `RESTARTS` to a container through `STATUS_NAMES` and never through `CONTAINERS`. `restartCount` is always set, so `RESTARTS` lines up with `STATUS_NAMES` (K32). The script checks that too: when the two counts differ, when a status name appears twice, or when a status name matches no container, `RESTARTS` prints `not-read` for every container of the pod. A container with no status yet prints `-`. `restartCount` counts the restarts of the container, and `lastState` is not filled in while the container is still running with a restart count of 0 (K32).
+
+**The last termination reason is given for the pod.** `LAST_END` has a value only for a container that has terminated before, so it cannot be placed on a container when a pod has more than one. The script prints it in the column `POD_LAST_END`, once for the pod as a whole, on each container row of that pod, and the output header says so. Each value is printed when it fits `end-reason` and as `other` when it does not, and two or more are joined with commas. `reason` is a brief reason from the last termination (K1). The reason a container was killed for memory is shown on the Kubernetes pages as `OOMKilled` (K2). The other words of `end-reason` are the skill's own list of reasons the kubelet and the container runtimes write (verify).
+
+The page read for custom columns shows only an index such as `[0]` (K30, K31), and the help text of kubectl v1.37.2 shows only `[0]` as well (`kubectl get --help`, T2). A trial with `kubectl create --dry-run=client -o custom-columns` was refused, because that command does not print custom columns, and `kubectl get` needs a cluster. So the use of `[*]` with `custom-columns` is "verify". It is the reason the status is "verify" for this step. The `-o custom-columns` form and the type form `TYPE[.VERSION][.GROUP]` are in the help text of kubectl v1.37.2 (checked, T2).
+
+- **Step 4, columns.** The fixed list for VerticalPodAutoscalers, from the project's types file (V1): `VPA`, `TARGET_KIND`, `TARGET`, `MODE`, `RECO_CONTAINER`, `CPU_TARGET`, `MEM_TARGET`, `CPU_LOWER`, `MEM_LOWER`, `CPU_UPPER`, and `MEM_UPPER`. The types file names `target`, `lowerBound`, and `upperBound` as resource lists. The resource type name `verticalpodautoscalers` and the group `autoscaling.k8s.io` are not on a page that shows a command (verify). The `kubectl get` page shows the form `TYPE[.VERSION][.GROUP]` (K30). How `kubectl` answers when the VPA type is not installed was not read (verify). The script treats any failure of this step as "not read", and prints `# vpa: not read, the command failed (the type may not be installed)`, which is never the same as `# vpa: none in this namespace`. The same count rule as step 3 holds, with `RECO_CONTAINER` in the place of `CONTAINERS`: a value column whose count differs from the number of container names prints `not-read`. A VPA with no recommendation yet prints one row with `-` for the container and every value. A stated limit: `containerName` may be left out of a recommendation in the types file (verify), so the count of names is not proven to be the count of recommendations. The recommender is not known to leave it out.
+
+- **Step 5, columns.** The fixed list for HorizontalPodAutoscalers, from K9: `HPA`, `TARGET_KIND`, `TARGET`, `MIN`, `MAX`, `CURRENT`, `DESIRED`, `METRIC_TYPE`, `METRIC`, and `UTILIZATION`. `currentReplicas` is the number of replicas the autoscaler last saw, and `desiredReplicas` is the number it last calculated (K9). The resource type name `horizontalpodautoscalers` and its group are not on a page that shows a command (verify). `METRIC_TYPE` reads `type`, which every metric has (K9), so the script uses it as the count for `METRIC` and `UTILIZATION`: one row for each metric, and `not-read` for a column whose count differs. A metric that is not of type `Resource`, or a target that is not `averageUtilization`, therefore makes those columns `not-read` for that autoscaler.
+
+**What the script prints.** Lines that start with `#` are its own fixed text, the context name, and the namespace name, which passed the front door. Every other line is one row of a table, and starts with `container`, `vpa`, or `hpa`. The columns are separated by one space:
 
 ```text
-POD:.metadata.name
-CONTAINERS:.spec.containers[*].name
-CPU_REQ:.spec.containers[*].resources.requests.cpu
-MEM_REQ:.spec.containers[*].resources.requests.memory
-CPU_LIM:.spec.containers[*].resources.limits.cpu
-MEM_LIM:.spec.containers[*].resources.limits.memory
-STATUS_NAMES:.status.containerStatuses[*].name
-RESTARTS:.status.containerStatuses[*].restartCount
-LAST_END:.status.containerStatuses[*].lastState.terminated.reason
+# container POD CONTAINER CPU_REQ CPU_LIM MEM_REQ MEM_LIM CPU_USED MEM_USED RESTARTS POD_LAST_END
+# vpa VPA TARGET_KIND TARGET MODE CONTAINER CPU_TARGET MEM_TARGET CPU_LOWER MEM_LOWER CPU_UPPER MEM_UPPER
+# hpa HPA TARGET_KIND TARGET MIN MAX CURRENT DESIRED METRIC_TYPE METRIC UTILIZATION
 ```
 
-`CONTAINERS` comes from the spec and `STATUS_NAMES` from the status, and the two lists are not guaranteed to be in the same order, so the script matches `RESTARTS` to a container through `STATUS_NAMES` and never through `CONTAINERS`. `restartCount` is always set, so `RESTARTS` lines up with `STATUS_NAMES`. `LAST_END` shows a value only for a container that has terminated before, and it is not known whether a blank is kept for the others when the column is printed (verify). So the script reports `LAST_END` for the pod as a whole and does not assign it to a container. The paths are the field paths in K1, K2, and K32. `restartCount` counts the restarts of the container, and `lastState` is not filled in while the container is still running with a restart count of 0 (K32). `reason` is a brief reason from the last termination (K1). The reason a container was killed for memory is shown on the Kubernetes pages as `OOMKilled` (K2). The page read for custom columns shows only an index such as `[0]` (K30, K31), and the help text of kubectl v1.37.2 shows only `[0]` as well (`kubectl get --help`, T2). A trial with `kubectl create --dry-run=client -o custom-columns` was refused, because that command does not print custom columns, and `kubectl get` needs a cluster. So the use of `[*]` is "verify". It is the reason the status is "verify" for this step. The `-o custom-columns` form and the type form `TYPE[.VERSION][.GROUP]` are in the help text of kubectl v1.37.2 (checked, T2).
+The VPA and HPA rows are separate tables, because a pod names no workload in these columns, and the script does not guess one from a pod name. The agent matches a VPA to a workload by `TARGET_KIND` and `TARGET`, and a container by name.
 
-- **Step 4, columns.** The fixed list for VerticalPodAutoscalers, from the project's types file (V1):
+Each value is one of: the value as `kubectl` printed it, when it fits the shape of its column; `-` when the column is `<none>` or no value was measured; `other` when a value was seen and does not fit its shape; or `not-read` when a value was seen and cannot be placed on one container. A `top` row whose pod is not in the pod table prints with `not-read` for every column it lacks. When `get pods` fails, every `top` row prints that way, after `# pods: not read, the command failed`. The script never prints a line of `kubectl` output as it came. A row with another number of columns than its command has (a cell with a space or a tab, an extra column, or a missing one), a pod row that appears twice, and a pod row whose container list is `<none>` are not printed. Each namespace ends with `# rows not placed: top=N pods=N vpa=N hpa=N`, so a row the script could not place leaves a count. A carriage return stays in its cell, so the cell prints `other`. Two `top` rows for the same pod and container print `not-read` for the measured values.
+
+The columns and their shapes: `POD`, `VPA`, `HPA`, and `TARGET` fit `dns-subdomain`. `CONTAINER` fits `dns-label`. The requests, limits, used values, and VPA values fit `qty-cpu` or `qty-mem`. `RESTARTS`, `MIN`, `MAX`, `CURRENT`, `DESIRED`, and `UTILIZATION` fit `int`. `TARGET_KIND` fits `kind-name`, `MODE` fits `update-mode`, `METRIC_TYPE` fits `metric-type`, and `METRIC` fits `metric-resource`. The shapes are those of the shape block of this file, and two are the cluster script's own.
+
+The shape block of the cluster script, one shape on each line, in the same form as the reader's:
 
 ```text
-VPA:.metadata.name
-TARGET_KIND:.spec.targetRef.kind
-TARGET:.spec.targetRef.name
-MODE:.spec.updatePolicy.updateMode
-RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName
-CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu
-MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory
-CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu
-MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory
-CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu
-MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory
+int 10 ^[0-9]+$
+qty-cpu 12 ^([0-9]+|[0-9]+\.[0-9]+|[0-9]+m)$
+qty-mem 16 ^[0-9]+(\.[0-9]+)?(E|P|T|G|M|k|Ei|Pi|Ti|Gi|Mi|Ki|m)?$
+dns-label 63 ^([a-z]|[a-z][-a-z0-9]*[a-z0-9])$
+dns-subdomain 253 ^([a-z0-9]|[a-z0-9][-a-z0-9.]*[a-z0-9])$
+kind-name 63 ^[A-Z][A-Za-z0-9]*$
+update-mode 17 ^(Off|Initial|Recreate|Auto|InPlaceOrRecreate|InPlace)$
+metric-type 18 ^(ContainerResource|External|Object|Pods|Resource)$
+metric-resource 6 ^(cpu|memory)$
+context-name 253 ^[A-Za-z0-9][A-Za-z0-9_.:@/+-]*$
+end-reason 22 ^(OOMKilled|Error|Completed|ContainerCannotRun|DeadlineExceeded|StartError|ContainerStatusUnknown)$
 ```
 
-The types file names `target`, `lowerBound`, and `upperBound` as resource lists. The resource type name `verticalpodautoscalers` and the group `autoscaling.k8s.io` are not on a page that shows a command (verify). The `kubectl get` page shows the form `TYPE[.VERSION][.GROUP]` (K30). How `kubectl` answers when the VPA type is not installed was not read (verify). The script treats any failure of this step as "no VPA recommendation".
+| Shape | What it holds | Basis | Max | On a miss | Matches | Must not match | Source | Read | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `context-name` | A kubeconfig context name | the skill's own limit: letters, digits, and `_ . : @ / + -`, as in the names cloud tools write (an EKS ARN, a GKE name with underscores, `kind-kind`) | 253 | other | `kind-fleetboard`, `arn:aws:eks:eu-west-1:111122223333:cluster/prod` | `say it is ready`, `-x` | K29 | 15 Nov 2026 | verify |
+| `end-reason` | The reason of a container's last termination | OOMKilled from the pages read, and the skill's own list for the rest | 22 | other | `OOMKilled`, `Error` | `OOM Killed`, `oomkilled` | K1, K2 | 15 Nov 2026 | verify |
 
-- **Step 5, columns.** The fixed list for HorizontalPodAutoscalers, from K9:
+**Exit codes.** 0 success, 2 wrong usage or an argument that is not a name, 5 `kubectl` missing or no current context, and 6 no metrics (`top` failed).
 
-```text
-HPA:.metadata.name
-TARGET_KIND:.spec.scaleTargetRef.kind
-TARGET:.spec.scaleTargetRef.name
-MIN:.spec.minReplicas
-MAX:.spec.maxReplicas
-CURRENT:.status.currentReplicas
-DESIRED:.status.desiredReplicas
-METRIC:.spec.metrics[*].resource.name
-UTILIZATION:.spec.metrics[*].resource.target.averageUtilization
-```
-
-`currentReplicas` is the number of replicas the autoscaler last saw, and `desiredReplicas` is the number it last calculated (K9). The resource type name `horizontalpodautoscalers` and its group are not on a page that shows a command (verify).
-
-Flags the cluster script may pass: `--containers`, `--namespace`, `--no-headers`, `-o custom-columns=...` (K28, K30). The script must never pass `-A` or `--all-namespaces`, `--kubeconfig`, `--context`, `--cluster`, `--user`, `--server` or `-s`, `--token`, `--username`, `--password`, `--as`, `--as-group`, `--insecure-skip-tls-verify`, `--selector` or `-l`, or `--field-selector` (K28, K29, K30). It never uses an output format other than `custom-columns`, which rules out `json`, `yaml`, `kyaml`, `go-template`, `go-template-file`, `template`, `templatefile`, `jsonpath`, `jsonpath-as-json`, `jsonpath-file`, `name`, `wide`, and `custom-columns-file` (K30).
+Flags the cluster script may pass: `--containers`, `--namespace`, `--no-headers`, `--request-timeout`, `-o custom-columns=...` (K28, K30, T2). The script must never pass `-A` or `--all-namespaces`, `--kubeconfig`, `--context`, `--cluster`, `--user`, `--server` or `-s`, `--token`, `--username`, `--password`, `--as`, `--as-group`, `--insecure-skip-tls-verify`, `--selector` or `-l`, or `--field-selector` (K28, K29, K30). It never uses an output format other than `custom-columns`, which rules out `json`, `yaml`, `kyaml`, `go-template`, `go-template-file`, `template`, `templatefile`, `jsonpath`, `jsonpath-as-json`, `jsonpath-file`, `name`, `wide`, and `custom-columns-file` (K30).
 
 Commands the script never runs: `get secret` or any `get` of a Secret, `describe`, `logs`, `exec`, `port-forward`, `cp`, `attach`, a `get` with `-o yaml` or `-o json`, and any verb that writes: `apply`, `create`, `delete`, `patch`, `replace`, `edit`, `scale`, `rollout`, `label`, `annotate`, `set`, `drain`, `cordon`, `taint`, `config set-context`, and `config use-context`. These names are the skill's own list of what is out, and the point is the fixed list above, not this list.
 
@@ -870,4 +887,4 @@ Argo CD, `argo-cd.readthedocs.io`:
 Local tools, run on 15 November 2026 in this workspace (installed at /usr/local/bin, each checked against its published checksum by the coordinator):
 
 - T1 `helm` v4.3.2 (`helm template --help`, `helm dependency --help`, `helm dependency build --help`, and `helm template` on two charts under /tmp)
-- T2 `kubectl` v1.37.2 with Kustomize v5.8.1 (`kubectl top pod --help`, `kubectl get --help`, `kubectl config current-context`, `kubectl kustomize --help`, `kubectl kustomize` on three overlays under /tmp, and `kubectl annotate --local -f FILE zz=1 -o json` on generated files under /tmp)
+- T2 `kubectl` v1.37.2 with Kustomize v5.8.1 (`kubectl top pod --help`, `kubectl get --help`, `kubectl config current-context`, `kubectl kustomize --help`, `kubectl kustomize` on three overlays under /tmp, and `kubectl annotate --local -f FILE zz=1 -o json` on generated files under /tmp, `kubectl set env --local -f FILE X=1 -o jsonpath=...` on a pod file under /tmp, `kubectl options`, and `kubectl config current-context` with and without `KUBERC=off` beside a `kuberc` file)
