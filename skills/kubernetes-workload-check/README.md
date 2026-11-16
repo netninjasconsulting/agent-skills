@@ -99,7 +99,7 @@ With no answer, or a no, R8 stays "ask the team" and no cluster command runs.
 - **The inline values of an `Application` are not sized.** A render takes values files only, so the skill lists every inline path under "Not checked". K7 still judges each inline line.
 - **The cluster pass is one sample.** `kubectl top` gives one moment in time, and a new pod can have no metrics yet. The script reads containers and not init containers. A pod does not name its workload in these columns, so the match by namespace and container name is an assumption. When `kubectl top pod` fails for a namespace, the script stops with exit code 6, and the namespaces after it are not read.
 - **A file is not the cluster.** An admission controller, a default from a LimitRange in another repository, or a manual change can make the running pod differ. The report says so at the top.
-- **23 Kubernetes and Helm facts are marked "verify".** `references/fields.md` holds 265 rows with a status. I read 242 of them on 15 and 16 November 2026, in the project's own documentation, in its source, or in the output of a local tool. I marked the other 23 "verify", because I didn't confirm them on those dates. Field names and limits move between Kubernetes versions.
+- **22 Kubernetes and Helm facts are marked "verify".** `references/fields.md` holds 266 rows with a status. I read 244 of them on 15 and 16 November 2026, in the project's own documentation, in its source, or in the output of a local tool. I marked the other 22 "verify", because I didn't confirm them on those dates. Field names and limits move between Kubernetes versions.
 - **No size, no saving, and no cost.** The first pass says if a setting is explicit, and where. It never says what a request should be.
 
 ## Install
