@@ -213,6 +213,7 @@ rule.#.api-group rbac-group other
 rule.#.resource-names-count int
 rule.#.non-resource-urls-count int
 aggregation-rule present
+sops present
 role-ref-kind role-ref-kind other
 role-ref-name role-name
 subject.#.kind subject-kind other
@@ -792,6 +793,28 @@ spec:
           value: |
             FIXTUREVALUE-block-env
             cpu: 100m
+EOF
+  cat > "$a/sops.yaml" <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sops-secret
+type: Opaque
+stringData:
+  password: ENC[AES256_GCM,data:FIXTUREVALUE-sops-data,type:str]
+sops:
+  mac: ENC[AES256_GCM,data:FIXTUREVALUE-sops-mac,type:str]
+  lastmodified: "2026-11-16T10:00:00Z"
+  unencrypted_suffix: _unencrypted
+  version: 3.9.0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sops-scalar
+data:
+  key: plain
+sops: FIXTUREVALUE-sops-scalar
 EOF
   cat > "$a/multi.yaml" <<'EOF'
 apiVersion: v1
@@ -1461,6 +1484,13 @@ EOF
   expect_line "$out" "block.yaml:9:ConfigMap/-/block-scalars:-:configmap-data.folded=block" "attack block scalars"
   expect_line "$out" "block.yaml:25:Pod/-/block-pod:app:env.LONG=literal" "attack block scalars"
   expect_no "$out" ':cpu-request=|Secret/' "attack block scalars"
+
+  att sops.yaml
+  [ "$code" -eq 0 ] || fail "attack SOPS: exit $code"
+  expect_line "$out" "sops.yaml:2:Secret/-/sops-secret:-:object=present" "attack SOPS"
+  expect_line "$out" "sops.yaml:7:Secret/-/sops-secret:-:secret-key.string-data=password" "attack SOPS"
+  expect_line "$out" "sops.yaml:8:Secret/-/sops-secret:-:sops=present" "attack SOPS"
+  expect_no "$out" 'sops-scalar:-:sops=|:(mac|lastmodified|version|unencrypted_suffix)=' "attack SOPS"
 
   att multi.yaml
   [ "$code" -eq 0 ] || fail "attack multi-document: exit $code"
@@ -2236,6 +2266,7 @@ pins() {
   else
     echo "skipped: the pin on the generation against kubectl (kubectl is not installed)"
   fi
+  pin "a sops block map" '# a sops block map' '/# a sops block map$/s/p == "sops"/p == "x-no-sops"/' attacks "missing line sops.yaml:8:Secret/-/sops-secret:-:sops=present"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion

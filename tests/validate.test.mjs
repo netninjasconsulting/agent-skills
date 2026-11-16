@@ -39,6 +39,10 @@ const k8sVerdicts = [
 const k8sStatusRow = '| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |';
 const k8sOrder = 'Order: K7, K6, K4, K1, K8, K5, K2, K10, R1, R2, K9, K3, R3, R4, R5, R6, R7.';
 const cmdEnd = '# END the fixed command list';
+const k8sWeakest = 'With several workloads in an environment, judge each one. The check gets the weakest status: fail, then warn, then "ask the team", then pass. The evidence names the workload that earned it. A workload whose part does not apply leaves the comparison.';
+const k8sTwice = 'R8 cannot pass from the repository. When R1 fails, R8 does not apply. Otherwise R8 is "ask the team", and the cluster pass is how it is answered. R3 uses a line of this skill\'s own, not a Kubernetes rule: a memory limit of more than twice its request is a warn.';
+const k8sLastStatus = '| does not apply | The environment holds nothing that the check judges. | not counted |';
+const k7Row = '| A Secret with values in the repository | A `Secret` object that prints `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |';
 const cases = [
   ['reword check', 'SKILL.md', s => s.replace(first, first.replace('works', 'runs'))],
   ['renumber check', 'SKILL.md', s => s.replace(first, first.replace('1.', '21.'))],
@@ -80,6 +84,16 @@ const cases = [
   ['kubernetes: reword status row', 'SKILL.md', s => s.replace(k8sStatusRow, k8sStatusRow.replace('sits outside it', 'is unknown')), kubernetes],
   ['kubernetes: change first-three order', 'SKILL.md', s => s.replace(k8sOrder, k8sOrder.replace('K7, K6', 'K6, K7')), kubernetes],
   ['kubernetes: change first-three order in checks.md', 'references/checks.md', s => s.replace(k8sOrder, k8sOrder.replace('R6, R7', 'R7, R6')), kubernetes],
+  ['kubernetes: an extra status row', 'SKILL.md', s => s.replace(k8sLastStatus, k8sLastStatus + '\n| skip | The team says so. | 1 |'), kubernetes],
+  ['kubernetes: an extra verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[2], k8sVerdicts[2] + '\n| Good enough | The team says so. |'), kubernetes],
+  ['kubernetes: a second order line', 'SKILL.md', s => s.replace('## The verdict\n', '## The verdict\n\nOrder: R1, R2.\n'), kubernetes],
+  ['kubernetes: a second order line in checks.md', 'references/checks.md', s => s.replace('## Known limits\n', '## Known limits\n\nOrder: R1, R2.\n'), kubernetes],
+  ['kubernetes: R8 moved under Security', 'SKILL.md', s => s.replace('R8. Requests match measured use.\n\n**Security**\n', '\n**Security**\n\nR8. Requests match measured use.\n'), kubernetes],
+  ['kubernetes: R8 heading moved under Security', 'references/checks.md', s => s.replace('\n## Security\n', '\n').replace('### R8. ', '## Security\n\n### R8. '), kubernetes],
+  ['kubernetes: a K7 case with another status', 'references/checks.md', s => s.replace(k7Row, k7Row.replace('| fail |', '| ask the team |')), kubernetes],
+  ['kubernetes: a K7 case added', 'references/checks.md', s => s.replace(k7Row, k7Row + '\n| A Secret the team trusts | `secret-type` | pass |'), kubernetes],
+  ['kubernetes: the R3 line reworded', 'SKILL.md', s => s.replace(k8sTwice, k8sTwice.replace('more than twice', 'more than four times')), kubernetes],
+  ['kubernetes: the weakest-status rule reworded', 'SKILL.md', s => s.replace(k8sWeakest, k8sWeakest.replace('the weakest status', 'the most common status')), kubernetes],
   ['kubernetes: a command added to the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace(cmdEnd, "CMD_SECRETS='kubectl get secrets --namespace=<name> -o yaml'\n" + cmdEnd), kubernetes],
   ['kubernetes: a command changed in the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace('--request-timeout=20s -o custom-columns=HPA:', '--request-timeout=20s -o yaml -o custom-columns=HPA:'), kubernetes],
   // The guided app starter: the guards for the security scan corrections of 15 November 2026.
