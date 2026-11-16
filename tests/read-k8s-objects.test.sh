@@ -305,7 +305,7 @@ conform() {
       }
       RE["image-pin"] = "^(digest|tag|latest|none)$"; MX["image-pin"] = 6
       RE["mount-mode"] = "^(read-only|read-write)$"; MX["mount-mode"] = 10
-      RE["state-word"] = "^(scalar|empty|block|encrypted)$"; MX["state-word"] = 9
+      RE["state-word"] = "^(scalar|empty|block|block-scalar|encrypted)$"; MX["state-word"] = 12
       RE["user-form"] = "^(service-account|plain|other)$"; MX["user-form"] = 15
       RE["selector-word"] = "^(all|labels)$"; MX["selector-word"] = 6
       RE["generator-word"] = "^(list|other)$"; MX["generator-word"] = 5
@@ -1409,6 +1409,45 @@ securityContext:
   capabilities:
     add: [NET_ADMIN, token: FIXTUREVALUE]
 EOF
+  # A value written as a block scalar is a value, never a parent: a secret
+  # written that way is a K7 case, so it prints its own state word.
+  cat > "$a/values-block.yaml" <<'EOF'
+database:
+  password: |
+    FIXTUREVALUE-values-block
+  privateKey: |-
+    FIXTUREVALUE-values-pem
+  options:
+    poolSize: 4
+EOF
+  cat > "$a/cm-block.yaml" <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-block
+data:
+  db-password: |
+    FIXTUREVALUE-cm-block
+  settings: >
+    FIXTUREVALUE-cm-folded
+EOF
+  cat > "$a/app-block.yaml" <<'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-block
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/example-fleetboard/fleetboard.git
+    path: chart
+    helm:
+      values: |
+        smtp:
+          password: |
+            FIXTUREVALUE-app-block
+          host: mail.example.com
+EOF
   cat > "$a/values.yaml" <<'EOF'
 replicaCount: 3
 password: FIXTUREVALUE-values-password
@@ -1609,8 +1648,8 @@ EOF
 
   att block.yaml
   [ "$code" -eq 0 ] || fail "attack block scalars: exit $code"
-  expect_line "$out" "block.yaml:6:ConfigMap/-/block-scalars:-:configmap-data.config=block" "attack block scalars"
-  expect_line "$out" "block.yaml:9:ConfigMap/-/block-scalars:-:configmap-data.folded=block" "attack block scalars"
+  expect_line "$out" "block.yaml:6:ConfigMap/-/block-scalars:-:configmap-data.config=block-scalar" "attack block scalars"
+  expect_line "$out" "block.yaml:9:ConfigMap/-/block-scalars:-:configmap-data.folded=block-scalar" "attack block scalars"
   expect_line "$out" "block.yaml:25:Pod/-/block-pod:app:env.LONG=literal" "attack block scalars"
   expect_no "$out" ':cpu-request=|Secret/' "attack block scalars"
 
@@ -1776,6 +1815,23 @@ EOF
     expect_line "$out" "$want" "attack values"
   done
   expect_no "$out" ':values\.password' "attack values"
+
+  att values-block.yaml
+  [ "$code" -eq 0 ] || fail "attack block scalars in a values file: exit $code"
+  expect_line "$out" "values-block.yaml:1:Values/-/-:-:values-key.database=block" "attack block scalars in a values file"
+  expect_line "$out" "values-block.yaml:2:Values/-/-:-:values-key.database.password=block-scalar" "attack block scalars in a values file"
+  expect_line "$out" "values-block.yaml:4:Values/-/-:-:values-key.database.privateKey=block-scalar" "attack block scalars in a values file"
+  expect_line "$out" "values-block.yaml:6:Values/-/-:-:values-key.database.options=block" "attack block scalars in a values file"
+  att cm-block.yaml
+  [ "$code" -eq 0 ] || fail "attack block scalars in a ConfigMap: exit $code"
+  expect_line "$out" "cm-block.yaml:6:ConfigMap/-/cm-block:-:configmap-data.db-password=block-scalar" "attack block scalars in a ConfigMap"
+  expect_line "$out" "cm-block.yaml:8:ConfigMap/-/cm-block:-:configmap-data.settings=block-scalar" "attack block scalars in a ConfigMap"
+  att app-block.yaml
+  [ "$code" -eq 0 ] || fail "attack block scalars in inline values: exit $code"
+  o="Application/argocd/app-block"
+  expect_line "$out" "app-block.yaml:12:$o:-:values-key.smtp=block" "attack block scalars in inline values"
+  expect_line "$out" "app-block.yaml:13:$o:-:values-key.smtp.password=block-scalar" "attack block scalars in inline values"
+  expect_line "$out" "app-block.yaml:15:$o:-:values-key.smtp.host=scalar" "attack block scalars in inline values"
 
   fi
 
