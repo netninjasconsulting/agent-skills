@@ -38,11 +38,11 @@ NL='
 me=read-cluster-usage
 
 # BEGIN the fixed command list
-CMD_CONTEXT='kubectl config current-context'
-CMD_TOP='kubectl top pod --containers --namespace=<name> --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s'
-CMD_PODS='kubectl get pods --namespace=<name> --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason'
-CMD_VPA='kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
-CMD_HPA='kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
+CMD_CONTEXT='kubectl config current-context --kubeconfig= --context= --server= --cluster='
+CMD_TOP='kubectl top pod --containers --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s'
+CMD_PODS='kubectl get pods --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason'
+CMD_VPA='kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory'
+CMD_HPA='kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization'
 # END the fixed command list
 
 # The shape block of the cluster script in references/fields.md: id,
@@ -81,8 +81,9 @@ is_ns() {  # a namespace is a DNS label
 }
 
 # Run one command of the fixed list. $1 = the command, $2 = the namespace
-# that replaces <name>. The command's words hold no space and no glob that
-# could expand, and the namespace passed is_ns. kubectl runs in the
+# that replaces <name>; CTX, the context name read in this run, replaces
+# <context>. The command's words hold no space and no glob that could
+# expand, the namespace passed is_ns, and CTX fits context-name. kubectl runs in the
 # caller's environment, with no input and its standard error dropped. Its
 # output goes to KOUT with every NUL turned into the control character 1,
 # so that the tag sees it; the exit status of kubectl is the last line of
@@ -90,6 +91,7 @@ is_ns() {  # a namespace is a DNS label
 kube() {
   c=$1
   case $c in *'<name>'*) c=${c%%'<name>'*}$2${c#*'<name>'} ;; esac
+  case $c in *'<context>'*) c=${c%%'<context>'*}$CTX${c#*'<context>'} ;; esac
   set -f
   # shellcheck disable=SC2086 # the words of a fixed command
   set -- $c
@@ -334,6 +336,11 @@ if [ "$mode" = context ]; then
   printf '%s\n' "$ctx"
   exit 0
 fi
+
+# The tables come from the context the header names: the name read above
+# is passed on as --context. A name outside its shape stops the run.
+[ "$ctx" = "$raw" ] || die 5 "the current context name does not fit the shape the script passes on"  # a context name out of shape: exit 5
+CTX=$ctx
 
 echo "# context $ctx"
 echo "# Measured in the cluster: one sample from kubectl top, which is one moment in time."
