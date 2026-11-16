@@ -323,7 +323,7 @@ conform() {
     /^$/ { next }
     {
       line = $0
-      if (line ~ /^[^:]+:(manifest|chart|chart-values|overlay|kustomize-base|argo-application):(tracked|untracked|ignored|no-git|tool not installed|not a local file|symbolic link inside|remote schema ref|dependencies not vendored|remote base|plugin or inflator needed|render failed|not read)$/) next
+      if (line ~ /^[^:]+:(manifest|chart|chart-values|overlay|kustomize-base|argo-application):(tracked|untracked|ignored|no-git|tool not installed|not a local file|symbolic link inside|remote schema ref|dependencies not vendored|remote base|plugin or inflator needed|render failed|render printed nothing|not read)$/) next
       if (line !~ /^[^:]+:[0-9]+:[^:\/]+\/[^:\/]+\/[^:\/]+:[^:]+:[^=:]+=/) { bad("not a list line or a field line"); next }
       i = index(line, ":"); rest = substr(line, i + 1)
       i = index(rest, ":"); rest = substr(rest, i + 1)
@@ -1068,6 +1068,28 @@ items:
     stringData:
       token: FIXTUREVALUE-list
 EOF
+  cat > "$a/list-deploy.yaml" <<'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: before-the-list
+---
+apiVersion: apps/v1
+kind: DeploymentList
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: in-list
+    spec:
+      template:
+        spec:
+          hostNetwork: true
+          containers:
+            - name: app
+              securityContext:
+                privileged: true
+EOF
   cat > "$a/tokens.yaml" <<'EOF'
 apiVersion: v1
 kind: Secret
@@ -1758,9 +1780,14 @@ EOF
   expect_no "$out" ':values\.(passwordPolicy|auth|apiToken)\.' "attack values under a credential-like parent"
   expect_line "$out" "values-cred.yaml:7:Values/-/-:-:values.resources.requests.cpu=100m" "attack values under a credential-like parent"
 
+  # A List holds objects the reader does not follow, so the file is not
+  # read: exit 4, never an empty pass.
   att list-kind.yaml
-  [ "$code" -eq 0 ] || [ "$code" -eq 4 ] || fail "attack List kind: exit $code"
+  [ "$code" -eq 4 ] || fail "attack List kind: expected exit 4, got $code"
   [ -z "$out" ] || fail "attack List kind: printed $out"
+  att list-deploy.yaml
+  [ "$code" -eq 4 ] || fail "attack DeploymentList kind: expected exit 4, got $code"
+  [ -z "$out" ] || fail "attack DeploymentList kind: printed $out"
 
   att tokens.yaml
   [ "$code" -eq 0 ] || fail "attack token-like names: exit $code"
@@ -1848,6 +1875,8 @@ EOF
   [ "$code" -eq 4 ] || fail "symbolic link: --values exit $code"
   rd .
   [ -z "$out" ] || fail "symbolic link: listed $out"
+  [ "$code" -eq 4 ] || fail "symbolic link: the list of a tree with a linked manifest, expected exit 4, got $code"
+  grep -q 'not listed: 1 path' "$work/err" || fail "symbolic link: the list does not say that a linked manifest was not listed"
   mkdir "$work/links/real"
   printf 'apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: through-a-link\nautomountServiceAccountToken: false\n' > "$work/links/real/sa.yaml"
   ln -s real "$work/links/dir"
@@ -1939,6 +1968,12 @@ EOF
     rd --render helm nelchart nelchart/values.yaml
     [ "$code" -eq 4 ] || fail "render a chart with a line separator: expected exit 4, got $code"
     [ "$out" = "nelchart:chart:not read" ] || fail "render a chart with a line separator: printed $out"
+    # A render that prints no object is not a render that succeeded.
+    mkdir -p "$rr/emptychart/templates"
+    printf 'apiVersion: v2\nname: emptychart\nversion: 0.1.0\n' > "$rr/emptychart/Chart.yaml"
+    printf 'replicaCount: 1\n' > "$rr/emptychart/values.yaml"
+    refuse "emptychart:chart:render printed nothing" "render a chart that prints no object" \
+      --render helm emptychart emptychart/values.yaml
   fi
   if [ "$have_kustomize" -eq 1 ]; then
     mkdir -p "$rr/kfail"
@@ -1958,6 +1993,12 @@ replacements:
 EOF
     refuse "kfail:overlay:render failed" "render an overlay that fails inside the tool" \
       --render kustomize kfail
+    mkdir -p "$rr/emptyov" "$rr/widgetov"
+    printf 'resources: []\n' > "$rr/emptyov/kustomization.yaml"
+    refuse "emptyov:overlay:render printed nothing" "render an overlay that prints no object" --render kustomize emptyov
+    printf 'apiVersion: example.com/v1\nkind: Widget\nmetadata:\n  name: w\n' > "$rr/widgetov/widget.yaml"
+    printf 'resources:\n  - widget.yaml\n' > "$rr/widgetov/kustomization.yaml"
+    refuse "widgetov:overlay:render printed nothing" "render an overlay that prints only a kind the reader does not read" --render kustomize widgetov
   fi
   fi
 
@@ -2329,6 +2370,20 @@ $out"
   [ "$out" = "ok.yaml:manifest:no-git
 zz.yaml:manifest:no-git" ] || fail "list with a line break that repeats a name: printed
 $out"
+  # A symbolic link inside the tree, to a manifest or to a directory, is
+  # counted with the paths the list cannot carry: exit 4, never left out
+  # in silence.
+  mkdir -p "$lx/f/real"
+  printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: dep\nspec:\n  template:\n    spec:\n      hostNetwork: true\n' > "$lx/f/real/dep.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$lx/f/ok.yaml"
+  ln -s real/dep.yaml "$lx/f/linked.yaml"
+  ln -s real "$lx/f/linkdir"
+  rd f
+  [ "$code" -eq 4 ] || fail "list with a linked manifest and a linked directory: expected exit 4, got $code"
+  [ "$out" = "ok.yaml:manifest:no-git
+real/dep.yaml:manifest:no-git" ] || fail "list with a linked manifest and a linked directory: printed
+$out"
+  grep -q 'not listed: 2 paths' "$work/err" || fail "list with a linked manifest and a linked directory: standard error does not count the links"
   ln -s a "$lx/alink"
   rd alink/
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list through a symbolic link with a trailing slash: exit $code"
