@@ -95,6 +95,8 @@ const cases = [
   ['kubernetes: the R3 line reworded', 'SKILL.md', s => s.replace(k8sTwice, k8sTwice.replace('more than twice', 'more than four times')), kubernetes],
   ['kubernetes: the weakest-status rule reworded', 'SKILL.md', s => s.replace(k8sWeakest, k8sWeakest.replace('the weakest status', 'the most common status')), kubernetes],
   ['kubernetes: a fail-list word dropped', 'references/checks.md', s => s.replace("`pwd`, `pw`, `passphrase`", "`pwd`, `passphrase`"), kubernetes],
+  ['kubernetes: an exact-name exclusion dropped', 'references/checks.md', s => s.replace('`PWD` (a working directory), `OLDPWD`, and `NOPASSWD`', '`PWD` (a working directory) and `OLDPWD`'), kubernetes],
+  ['kubernetes: the service-account user form dropped', 'references/checks.md', s => s.replace(', a `User` in the service-account form (`subject.<n>.user-form=service-account`),', ','), kubernetes],
   ['kubernetes: a read-only hostPath let through', 'references/checks.md', s => s.replace('or it has a `hostPath` volume, read-only or not.', 'or it has a `hostPath` volume mounted read-write.'), kubernetes],
   ['kubernetes: the cluster-admin binding softened', 'references/checks.md', s => s.replace('A binding to `cluster-admin` fails K6 when', 'A binding to `cluster-admin` warns on K6 when'), kubernetes],
   ['kubernetes: rule 10 without its pointer', 'SKILL.md', s => s.replace('The one exception is the table "Absent fields" in `references/checks.md`', 'The one exception is a key that is absent'), kubernetes],

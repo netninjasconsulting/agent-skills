@@ -219,6 +219,7 @@ role-ref-kind role-ref-kind other
 role-ref-name role-name
 subject.#.kind subject-kind other
 subject.#.name dns-subdomain
+subject.#.user-form user-form
 subject.#.namespace dns-label
 np-pod-selector selector-word
 np-pod-label.* label-value
@@ -305,6 +306,7 @@ conform() {
       RE["image-pin"] = "^(digest|tag|latest|none)$"; MX["image-pin"] = 6
       RE["mount-mode"] = "^(read-only|read-write)$"; MX["mount-mode"] = 10
       RE["state-word"] = "^(scalar|empty|block|encrypted)$"; MX["state-word"] = 9
+      RE["user-form"] = "^(service-account|plain|other)$"; MX["user-form"] = 15
       RE["selector-word"] = "^(all|labels)$"; MX["selector-word"] = 6
       RE["generator-word"] = "^(list|other)$"; MX["generator-word"] = 5
       RE["repo-word"] = "^(this|other|unknown)$"; MX["repo-word"] = 7
@@ -909,6 +911,39 @@ EOF
   cat > "$a/values-enc.yaml" <<'EOF'
 db:
   password: ENC[AES256_GCM,data:FIXTUREVALUE-values-nosops,type:str]
+EOF
+  cat > "$a/rbac-users.yaml" <<'EOF'
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: users
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: User
+    name: system:serviceaccount:web:default
+  - kind: User
+    name: "system:serviceaccount:web:api"
+  - kind: User
+    name: alice@example.com
+  - kind: User
+    name: "system:serviceaccount:"
+  - kind: User
+    name: SYSTEM:SERVICEACCOUNT:web:x
+  - kind: User
+    name: ""
+  - kind: User
+    name: |
+      system:serviceaccount:web:block
+  - kind: User
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: system:serviceaccounts
+  - kind: ServiceAccount
+    name: web
+    namespace: web
 EOF
   cat > "$a/multi.yaml" <<'EOF'
 apiVersion: v1
@@ -1624,6 +1659,17 @@ EOF
   att values-enc.yaml
   [ "$code" -eq 0 ] || fail "attack ENC values with no sops block: exit $code"
   expect_line "$out" "values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar" "attack ENC values with no sops block"
+
+  att rbac-users.yaml
+  [ "$code" -eq 0 ] || fail "attack User subjects: exit $code"
+  o="ClusterRoleBinding/-/users"
+  for want in "11:$o:-:subject.1.user-form=service-account" "13:$o:-:subject.2.user-form=service-account" \
+    "15:$o:-:subject.3.user-form=plain" "17:$o:-:subject.4.user-form=service-account" \
+    "19:$o:-:subject.5.user-form=plain" "21:$o:-:subject.6.user-form=other" "23:$o:-:subject.7.user-form=other" \
+    "27:$o:-:subject.9.kind=Group" "30:$o:-:subject.10.name=web"; do
+    expect_line "$out" "rbac-users.yaml:$want" "attack User subjects"
+  done
+  expect_no "$out" 'subject\.(8|9|10)\.user-form|alice|SERVICEACCOUNT|serviceaccount:|=system' "attack User subjects"
 
   att multi.yaml
   [ "$code" -eq 0 ] || fail "attack multi-document: exit $code"
@@ -2405,6 +2451,7 @@ pins() {
   pin "an encrypted value ends with a bracket" '# looks encrypted' '/# looks encrypted$/s/ \&\& substr(v, length(v), 1) == "]"//' attacks "missing line sops-mixed.yaml:13:Secret/-/mixed:-:sops-clear-count=3"
   pin "a clear value in a sops Secret" '# a clear value in a sops Secret' '/# a clear value in a sops Secret$/s/c++/c = c/' attacks "missing line sops-fake.yaml:7:Secret/-/fake:-:sops-clear-count=1"
   pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
+  pin "the form of a User name" '# the form of a User name' '/# the form of a User name$/s/== "system:serviceaccount:"/== "x"/' attacks "missing line rbac-users.yaml:11:ClusterRoleBinding/-/users:-:subject.1.user-form=service-account"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
