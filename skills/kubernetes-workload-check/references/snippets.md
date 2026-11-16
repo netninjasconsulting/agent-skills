@@ -1,8 +1,8 @@
 # Snippets
 
-Fixes to paste, one section for each check. The field paths come from [fields.md](fields.md). Each snippet is one YAML block and at most one line under it that starts with "Note:". A first-three item copies the block and its note as they stand, with names, files, and placeholders adapted to the repository, and takes nothing else from this file. In a report, each "verify" is written as "not confirmed against the documentation".
+Fixes to paste, one section for each check. The field paths come from [fields.md](fields.md). Each snippet is one YAML block and at most one line under it that starts with "Note:". A first-three item copies the block and its note as they stand, with names, files, and placeholders adapted to the repository, and takes nothing else from this file. No YAML block carries a comment about a fact: a fact that was not confirmed sits in the snippet's Note line, in the words "(not confirmed against the documentation)", which a report copies as they stand.
 
-Every value is a placeholder in angle brackets. A snippet shows where a setting goes and leaves the value to the team: the skill never says what a request, a limit, a size, a deadline, a replica count, or a utilisation target should be. Here, "verify" marks a name, a key, or a form that `fields.md` does not hold, or that it marks "verify": it was not read in the Kubernetes, Helm, Kustomize, or Argo documentation on 15 November 2026, so read the current page before pasting it. A secret never goes into a snippet, as a value or as an example.
+Every value is a placeholder in angle brackets. A snippet shows where a setting goes and leaves the value to the team: the skill never says what a request, a limit, a size, a deadline, a replica count, or a utilisation target should be. Here, "(not confirmed against the documentation)" marks a name, a key, or a form that `fields.md` does not hold, or that it marks "verify": it was not read in the Kubernetes, Helm, Kustomize, or Argo documentation on 15 or 16 November 2026, so read the current page before pasting it. A secret never goes into a snippet, as a value or as an example.
 
 Each snippet shows only the fields that fix its check, in the place they sit. `<P>` in a comment is the pod spec: `spec` in a Pod, `spec.template.spec` in a Deployment, StatefulSet, DaemonSet, Job, or `Rollout`, and `spec.jobTemplate.spec.template.spec` in a CronJob. Write every map in block style, as below. A flow map such as `matchLabels: {app: web}` makes the reader skip the whole file. In a chart, the fix goes in the template or in the values key the template reads. In an overlay, it goes in the base or in a patch of the overlay.
 
@@ -48,12 +48,14 @@ initContainers:
 Note: Every container needs both requests, init containers included.
 
 ```yaml
-# values-<environment>.yaml, for a chart whose template reads resources from its values (the key names are the chart's own, verify)
+# values-<environment>.yaml, for a chart whose template reads resources from its values
 resources:
   requests:
     cpu: <CPU request, from measured use>
     memory: <memory request, from measured use>
 ```
+
+Note: The key names are the chart's own, so adapt them to its template (not confirmed against the documentation).
 
 ## R2. Memory limit
 
@@ -66,7 +68,7 @@ containers:
         memory: <memory limit>
 ```
 
-Note: In a chart, the values form is the R1 values block with `limits` in place of `requests` (verify).
+Note: In a chart, the values form is the R1 values block with `limits` in place of `requests` (not confirmed against the documentation).
 
 ## R3. Limit close to the request
 
@@ -119,7 +121,7 @@ metadata:
   namespace: <namespace>
 spec:
   limits:
-    - type: Container          # verify: the API page shows no list of types
+    - type: Container
       defaultRequest:
         cpu: <default CPU request>
         memory: <default memory request>
@@ -231,12 +233,14 @@ containers:
       readOnlyRootFilesystem: true
     volumeMounts:
       - name: <volume>
-        mountPath: <path the program writes>   # verify
+        mountPath: <path the program writes>
 volumes:
   - name: <volume>
     emptyDir:
       sizeLimit: <size>
 ```
+
+Note: The volume gives the program a writable directory at `mountPath` (not confirmed against the documentation).
 
 ## K4. Nothing shared with the host
 
@@ -294,7 +298,7 @@ metadata:
   name: <binding>
   namespace: <namespace>
 roleRef:
-  apiGroup: rbac.authorization.k8s.io   # verify
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: <role>
 subjects:
@@ -317,7 +321,7 @@ rules:
       - get
 ```
 
-Note: `get`, `list`, and `watch` on `secrets` reveal their contents, so the rule names the Secrets it reads (verify: which verbs `resourceNames` narrows is not in `fields.md`).
+Note: `get`, `list`, and `watch` on `secrets` reveal their contents, so the rule names the Secrets it reads.
 
 ## K7. Secrets out of the repository
 
@@ -330,16 +334,18 @@ containers:
         valueFrom:
           secretKeyRef:
             name: <secret made outside the repository>
-            key: <key>   # verify
+            key: <key>
 ```
 
-Note: The value leaves the manifest, the values file, the ConfigMap, or the `Application`, and the env var reads a Secret made outside the repository by name.
+Note: The value leaves the manifest, the values file, the ConfigMap, or the `Application`, and the env var reads a Secret made outside the repository by its name and its `key` (not confirmed against the documentation).
 
 ```yaml
-# values-<environment>.yaml, for a chart that takes the name of an existing Secret in a values key (the key name is the chart's own, verify)
-database:   # the section of the chart that takes the Secret: adapt it (verify)
+# values-<environment>.yaml, for a chart that takes the name of an existing Secret in a values key
+database:
   existingSecret: <secret made outside the repository>
 ```
+
+Note: `existingSecret` and the section above it are the chart's own names, so adapt them to its template (not confirmed against the documentation).
 
 ## K8. NetworkPolicy
 
@@ -379,7 +385,7 @@ spec:
     - Ingress
 ```
 
-Note: This policy covers every workload of the namespace and lets no traffic in until a policy like the one above allows it (verify: how a policy with no ingress rule is read is not in `fields.md`).
+Note: This policy selects every pod of the namespace and allows no ingress, so only the pod's node and what a policy like the one above allows can reach a pod.
 
 ## K9. Images pinned by digest
 
@@ -391,16 +397,18 @@ containers:
 ```
 
 ```yaml
-# values-<environment>.yaml, for a chart whose template builds the image from image.digest (a chart convention, verify)
+# values-<environment>.yaml, for a chart whose template builds the image from image.digest
 image:
   repository: <registry host>/<repository>
   digest: sha256:<digest>
 ```
 
+Note: `image.digest` is a chart convention, so adapt it to the chart's template (not confirmed against the documentation).
+
 ## K10. Pod Security level
 
 ```yaml
-apiVersion: v1   # verify: the pages read show no apiVersion for Namespace
+apiVersion: v1
 kind: Namespace
 metadata:
   name: <namespace>
@@ -409,4 +417,4 @@ metadata:
     pod-security.kubernetes.io/enforce-version: <latest, or a minor version such as v1.NN>
 ```
 
-Note: Put the Namespace object in the same environment as its workloads, so that the check can see it.
+Note: Put the Namespace object in the same environment as its workloads, so that the check can see it, with `apiVersion: v1` (not confirmed against the documentation).
