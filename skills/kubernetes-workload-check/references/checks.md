@@ -56,7 +56,7 @@ Every other absent field is "not found". The main one is `run-as-user`: when it 
 
 ### Facts marked "verify"
 
-A fact marked "verify" here or in `fields.md` never makes a pass and never makes a fail. The one exception is the chart convention behind the values paths of "A printed fault decides" in SKILL.md (see "A chart that was not rendered" below), and the evidence still says "verify". The part it would decide is a warn at most, or "ask the team", as the rule says, and the evidence says "verify".
+A fact marked "verify" here or in `fields.md` never makes a pass and never makes a fail. The part it would decide is a warn at most, or "ask the team", as the rule says, and the evidence says "verify".
 
 ### Environments and workloads
 
@@ -69,7 +69,7 @@ A fact marked "verify" here or in `fields.md` never makes a pass and never makes
   - When an inline path ends in a key of the values table of `fields.md` (`resources.requests.cpu`, `resources.limits.memory`, a `securityContext` flag, `capabilities.drop`, `image.tag`, `image.digest`, `replicaCount`, `minReplicas`, `maxReplicas`), the rendered field it would set is "Not checked" too, and the check that it decides is "ask the team" at best for that environment. This covers every sizing field set there.
   - For K7, an inline `values-key` line is judged like a line of a values file. See K7.
   - `source.<n>.helm-values=other` means the block was not read. Every check is then "ask the team" at best for the fields a values key could set, and K7 is "ask the team" at best.
-- **A chart that was not rendered.** Every field of its templates is "not found". The checks that judge its workloads are "ask the team" at best, and the report says that the chart was not rendered. Its values files are still read with `--values`: K7 judges their credential-like keys, and the `values.<path>` lines (requests, limits, flags, the `image.tag` and `image.digest` pin words) are named in the evidence as what the values set, not as what the pod gets. The one exception is a printed fault: in an environment that is not fully seen, a printed value that itself breaks a check fails or warns it, read from its file and not from a render, under the rule "A printed fault decides" in SKILL.md ("The verdict"). That rule names the values paths, the order of the values sources, and the condition for K9. It rests on a chart convention marked "verify", and the evidence says so; this is the one place where such a convention makes a fail.
+- **A chart that was not rendered.** Every field of its templates is "not found". The checks that judge its workloads are "ask the team" at best, and the report says that the chart was not rendered. Its values files are still read with `--values`: K7 judges their credential-like keys, and the `values.<path>` lines (requests, limits, flags, the `image.tag` and `image.digest` pin words) are named in the evidence as what the values set, not as what the pod gets. Such a line changes no status. When it would fail or warn a check, it is listed in the block "Seen in the files, not confirmed by a render" (SKILL.md, "The verdict").
 - **A namespace.** The namespaces of an environment are the `<namespace>` of each of its workloads. An object with the namespace `-` takes `destination-namespace` from its `Application`, or the `--namespace` given to the chart render. A workload whose namespace is still `-` has an unknown namespace, and R5, K8, and K10 are "ask the team" at best for it.
 
 ### How the statuses combine
@@ -293,7 +293,7 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 - **Pass:** every container prints `image-pin=digest` and an `image-registry` other than `default`.
 - **Warn:** a container prints `image-pin=tag` (whether a registry lets a tag move to another image is not read, verify; this check's own call is that only a digest pins), or `image-registry=default`. With no registry written, the image comes from the Docker public registry (K26). How the reader tells a host from a path is "verify" (see `fields.md`), and the evidence says so.
 - **Fail:** a container prints `image-pin=latest` or `image-pin=none`. An image with no tag and no digest is treated as `latest` (K26).
-- **Ask the team:** `image-registry` or `image-repository` is `other` (the image did not fit the image shape), or the workload is not read or not rendered. For a chart that was not rendered, the `values.<path>` lines ending in `image.tag` or `image.digest` are named in the evidence as what the values set, except where "A printed fault decides" in SKILL.md lets `image.tag` decide: only when no values source of the environment sets an `image.digest` key.
+- **Ask the team:** `image-registry` or `image-repository` is `other` (the image did not fit the image shape), or the workload is not read or not rendered. For a chart that was not rendered, the `values.<path>` lines ending in `image.tag` or `image.digest` are named in the evidence as what the values set.
 - **Question:** "Do the images of <containers> come from a registry the team controls, pinned by digest?"
 
 ### K10. Every namespace enforces the restricted Pod Security level.
