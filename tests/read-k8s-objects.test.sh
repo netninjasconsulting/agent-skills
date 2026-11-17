@@ -2189,6 +2189,19 @@ EOF
     printf 'apiVersion: example.com/v1\nkind: Widget\nmetadata:\n  name: w\n' > "$rr/widgetov/widget.yaml"
     printf 'resources:\n  - widget.yaml\n' > "$rr/widgetov/kustomization.yaml"
     refuse "widgetov:overlay:render printed nothing" "render an overlay that prints only a kind the reader does not read" --render kustomize widgetov
+    # kustomize reads its own keys in any case, but a label, an annotation,
+    # or a selector is a map whose keys it takes as written, so a key there
+    # that is spelt like one of its own does not refuse the render.
+    mkdir -p "$rr/kl1" "$rr/kl2" "$rr/kl3"
+    printf 'resources:\n  - ../kustomize/base\ncommonLabels:\n  Env: prod\n' > "$rr/kl1/kustomization.yaml"
+    printf 'resources:\n  - ../kustomize/base\ncommonAnnotations:\n  Path: x\n' > "$rr/kl2/kustomization.yaml"
+    printf 'resources:\n  - ../kustomize/base\nlabels:\n  - pairs:\n      Resources: web\n' > "$rr/kl3/kustomization.yaml"
+    for ov in kl1 kl2 kl3; do
+      rd --render kustomize "$ov"
+      [ "$code" -eq 0 ] || fail "render an overlay with a label or annotation key spelt like a kustomization key ($ov): exit $code"
+      printf '%s\n' "$out" | grep -q "^$ov:[0-9]*:Deployment/[^/]*/api:api:container-kind=main$" ||
+        fail "render an overlay with a label or annotation key spelt like a kustomization key ($ov): no api container"
+    done
     # An overlay whose base is a directory link inside the repository renders.
     mkdir -p "$rr/linkov"
     ln -s ../kustomize/base "$rr/linkov/base"
