@@ -2893,7 +2893,9 @@ pins() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a JSON escape in a schema" '# a JSON escape can spell $ref' 's/ -e '"'"'\\u'"'"' {}/ {}/' refusals "render a chart with a schema reference spelt with a JSON escape: the render tool ran before the refusal"
+  pin "a JSON escape in a schema is decoded" '# a JSON escape, decoded' 's/S = S ((v >= 32 \&\& v < 127) ? sprintf("%c", v) : "?")  # a JSON escape, decoded/S = S "?"/' refusals "render a chart with a schema reference spelt with a JSON escape: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a schema reference that is not local" '# a reference that is not local' 's/if (substr(T, i, 1) != "\\"" || !str(i) || substr(S, 1, 1) != "#") { bad = 1; break }  # a reference that is not local//' refusals "render a chart with a remote schema reference: the render tool ran before the refusal"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a link the list can carry" '# a link the list can carry' 's/\\( -type l ! -path "$unsafe_path" \\) -print/-type l -print/' listx "list with unsafe names: printed"

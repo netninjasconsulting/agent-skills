@@ -1298,6 +1298,78 @@ END {
 }
 '
 
+# The schema test. It reads a values.schema.json file as JSON, decodes the
+# escapes of each string (\uXXXX in either case of hex, \/, and the rest),
+# and exits 1 when a decoded key is $ref (or $dynamicRef or $recursiveRef)
+# with a value that is not a string starting with #, when a decoded key is
+# $id, or when the file is not JSON the test can read. It prints nothing.
+# shellcheck disable=SC2016 # awk code, not shell
+SCHEMA='
+function hexv(h,    i, v, c) {
+  v = 0
+  for (i = 1; i <= 4; i++) {
+    c = index("0123456789abcdef", tolower(substr(h, i, 1)))
+    if (!c) return -1
+    v = v * 16 + c - 1
+  }
+  return v
+}
+# A string that starts at T[i] (the quote): its decoded text in S, and the
+# place after its closing quote in POS. A character that cannot be part of
+# a key the test looks for is decoded as "?".
+function str(i,    c, e, v) {
+  S = ""; i++
+  while (i <= N) {
+    c = substr(T, i, 1)
+    if (c == "\"") { POS = i + 1; return 1 }
+    if (c < " ") return 0
+    if (c == "\\") {
+      e = substr(T, i + 1, 1)
+      if (e == "u") {
+        v = hexv(substr(T, i + 2, 4))
+        if (v < 0) return 0
+        S = S ((v >= 32 && v < 127) ? sprintf("%c", v) : "?")  # a JSON escape, decoded
+        i += 6; continue
+      }
+      if (e == "\"" || e == "\\" || e == "/") S = S e
+      else if (index("bfnrt", e) && e != "") S = S "?"
+      else return 0
+      i += 2; continue
+    }
+    S = S c; i++
+  }
+  return 0
+}
+function ws(i) { while (i <= N && index(" \t\n\r", substr(T, i, 1))) i++; return i }
+{ T = T $0 "\n" }
+END {
+  N = length(T); i = 1; bad = 0
+  while (i <= N && !bad) {
+    c = substr(T, i, 1)
+    if (index(" \t\n\r{}[],:", c)) { i++; continue }
+    if (c == "\"") {
+      if (!str(i)) { bad = 1; break }
+      key = S; i = ws(POS)
+      if (substr(T, i, 1) != ":") continue
+      i = ws(i + 1)
+      if (key == "$id") { bad = 1; break }
+      if (key == "$ref" || key == "$dynamicRef" || key == "$recursiveRef") {
+        if (substr(T, i, 1) != "\"" || !str(i) || substr(S, 1, 1) != "#") { bad = 1; break }  # a reference that is not local
+      }
+      continue
+    }
+    if (index("-0123456789", c)) { while (i <= N && index("-+.eE0123456789", substr(T, i, 1))) i++; continue }
+    if (c ~ /[a-z]/) {
+      w = ""
+      while (i <= N && substr(T, i, 1) ~ /[a-z]/) { w = w substr(T, i, 1); i++ }
+      if (w != "true" && w != "false" && w != "null") bad = 1
+      continue
+    }
+    bad = 1
+  }
+  exit bad
+}'
+
 # ---- Shell helpers ----
 
 extract() {
@@ -1807,10 +1879,10 @@ $1" ;;
   [ "$nv" -le 2 ] || die2 "--render helm takes one or two values files"
   cp_=$(phys "$chart")
   tree_dirs "$cp_"  # the resolved chart path
-  # shellcheck disable=SC2016 # the text $ref and $id, not expansions
-  # A JSON escape (\u) can spell either, so a schema that holds one is
-  # refused too.
-  if [ -n "$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" -type f -name values.schema.json -exec grep -lF -e '$ref' -e '$id' -e '\u' {} +; done | sed -n 1p)" ]; then  # a JSON escape can spell $ref
+  # A schema with a reference that is not local, or with an $id, is
+  # refused, with its JSON escapes decoded first, since an escape can spell
+  # $ref. So is a schema the test cannot read as JSON.
+  if [ -n "$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" -type f -name values.schema.json -print; done | while IFS= read -r sf; do awk "$SCHEMA" < "$sf" || { echo bad; break; }; done)" ]; then
     refuse "remote schema ref"
   fi
   deps=$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" \( -name Chart.yaml -o -name requirements.yaml \) -type f -print; done | while IFS= read -r cf; do
