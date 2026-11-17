@@ -2,7 +2,7 @@
 name: kubernetes-workload-check
 description: Use when a team runs workloads on Kubernetes and wants to know whether each workload is sized on purpose and confined to what it needs, or when a cluster bill has grown and nobody can say which request caused it. Reads plain manifests, Helm charts, and Kustomize overlays in the repository, scores sizing and security for each environment, and maps what each workload can reach. Read-only. Renders and reads the cluster only after a yes.
 license: Apache-2.0
-compatibility: Needs a local repository and a POSIX shell with git, grep, sed, awk, find, and sort (POSIX base tools). The first pass works offline, writes nothing, and installs, builds, and deploys nothing. helm, kustomize, and kubectl are optional and run only after a yes. Rendering evaluates the project's chart templates and Kustomize files on this machine and needs no network. The cluster pass makes read requests through kubectl with the user's own settings. Nothing else makes a network request.
+compatibility: Needs a local repository and a POSIX shell with git, grep, sed, awk, find, sort, and readlink (POSIX base tools). The first pass works offline, writes nothing, and installs, builds, and deploys nothing. helm, kustomize, and kubectl are optional and run only after a yes. Rendering evaluates the project's chart templates and Kustomize files on this machine and needs no network. The cluster pass makes read requests through kubectl with the user's own settings. Nothing else makes a network request.
 metadata:
   author: Net Ninjas Consulting
   version: "0.2.0"
