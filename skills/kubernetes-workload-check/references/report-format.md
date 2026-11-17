@@ -116,6 +116,7 @@ In an environment that is not fully seen, a cell that is not "broad" from a deci
 - <Each inline values path of an Application, by file, line, and path, as a value the render left out: every `values-key` line the reader printed for it, a parent printed as `block` included. Each `source.<n>.kustomize=present` line.>
 - <Each Argo CD object that names no environment: another repository, or a generator the files cannot resolve.>
 - <One entry for each render whose namespace is unknown: "<render>: namespace unknown (no namespace was given to the render)".>
+- <Each `link` line of the list, by its path, with the words of its line: "<path>: points outside the repository, not read" or "<path>: broken, not read", and the environment it leaves not fully seen.>
 - <The count of paths the list left out, when its exit code was 4.>
 - <What each check names as "Not checked, always", for every environment it applies to, even when nothing else is listed for that environment, such as whether a metrics source runs in the cluster, and whether the network plugin enforces NetworkPolicy.>
 - <"R8: no cluster offer, because <reason>.", when R8 is "ask the team" and the offer was not made.>

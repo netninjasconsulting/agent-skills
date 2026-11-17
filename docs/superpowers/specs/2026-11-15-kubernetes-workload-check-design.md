@@ -133,7 +133,7 @@ sh read-k8s-objects.sh --render kustomize DIR     print the field table of the b
 - **Nothing prints by default.** A field prints only when it is in `references/fields.md` and its value matches the shape that file gives for it. An env var prints its name and where its value comes from (`literal`, `secretKeyRef`, `configMapKeyRef`, `fieldRef`), never the value. A `Secret` prints its name, its type, and its key names. A ConfigMap prints its name and its key names.
 - The cluster pass and the fields table treat a `Rollout` as they treat a Deployment.
 - `--render` runs `helm template` or `kustomize build` (or `kubectl kustomize`) itself and pipes the output straight into the extractor, so the rendered text never reaches the agent. It refuses a chart with dependencies that are not vendored, and an overlay that names a remote base. It never passes a flag that fetches.
-- A symbolic link is refused in every mode. A file the reader cannot place is reported as "not read", with exit code 4.
+- A symbolic link that stays inside the repository is followed. One that points outside it, or is broken, is not read: the list names it in a `link` line, `--fields` and `--values` exit with code 4, and a render is refused (changed on 16 Nov 2026; it was refused in every mode). A file the reader cannot place is reported as "not read", with exit code 4.
 - The reader works by line and does not parse. A layout it cannot follow, such as a flow-style map or a Helm template that is not rendered, gives "not found" for its fields.
 
 ### The cluster script
