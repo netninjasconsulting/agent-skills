@@ -403,7 +403,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/links-outside" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -1991,23 +1991,56 @@ EOF
   ln -s missing.yaml "$work/links/dangling.yaml"
   ln -s loop2.yaml "$work/links/loop1.yaml"
   ln -s loop1.yaml "$work/links/loop2.yaml"
+  # A file linked into an Application's path is listed under that path, and
+  # so is a directory linked there, whatever other path reaches them.
+  mkdir -p "$work/links/apps/prod" "$work/links/aaa" "$work/links/a-real/prod2"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$work/links/apps/prod/ok.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: bad\nspec:\n  hostNetwork: true\n' > "$work/links/aaa/bad.yaml"
+  ln -s ../../aaa/bad.yaml "$work/links/apps/prod/bad.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok2\n' > "$work/links/a-real/prod2/ok2.yaml"
+  ln -s ../a-real/prod2 "$work/links/apps/prod2"
+  # A directory link inside a directory a link reaches is followed too, and
+  # two directories that link to each other stop where the path loops.
+  mkdir -p "$work/links/nest" "$work/links/p" "$work/links/r"
+  ln -s ../real "$work/links/nest/inner"
+  ln -s nest "$work/links/x"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: pf\n' > "$work/links/p/pf.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: rf\n' > "$work/links/r/rf.yaml"
+  ln -s ../r "$work/links/p/q"
+  ln -s ../p "$work/links/r/s"
   cwd=$work/links
   rd .
   [ "$code" -eq 0 ] || fail "links: the list exit $code"
-  expected='.venv/lib/pkg/cm.yaml:manifest:no-git
+  expected=$(LC_ALL=C sort <<'LIST'
+.venv/lib/pkg/cm.yaml:manifest:no-git
+.venv/lib64/pkg/cm.yaml:manifest:no-git
+a-real/prod2/ok2.yaml:manifest:no-git
+aaa/bad.yaml:manifest:no-git
+apps/prod/bad.yaml:manifest:no-git
+apps/prod/ok.yaml:manifest:no-git
+apps/prod2/ok2.yaml:manifest:no-git
 dangling.yaml:link:broken, not read
 dir/sa.yaml:manifest:no-git
 loop1.yaml:link:broken, not read
 loop2.yaml:link:broken, not read
 loopd/zz.yaml:manifest:no-git
+nest/inner/sa.yaml:manifest:no-git
 outdir:link:points outside the repository, not read
 outside.yaml:link:points outside the repository, not read
-secret.yaml:manifest:no-git'
+p/pf.yaml:manifest:no-git
+p/q/rf.yaml:manifest:no-git
+r/rf.yaml:manifest:no-git
+r/s/pf.yaml:manifest:no-git
+real/sa.yaml:manifest:no-git
+secret.yaml:manifest:no-git
+x/inner/sa.yaml:manifest:no-git
+LIST
+)
   printf '%s\n' "$expected" > "$work/links-expected"
   while IFS= read -r want; do expect_line "$out" "$want" "links: the list"; done < "$work/links-expected"
   [ "$out" = "$expected" ] || fail "links: the list printed
 $out"
-  expect_no "$out" '^a/|loopd/aa|lib64|real/sa\.yaml|notes\.txt' "links: a path reached twice, or an outside link with a name the list does not list"
+  expect_no "$out" '^a/|loopd/aa|p/q/s|r/s/q|notes\.txt' "links: a path that loops, or an outside link with a name the list does not list"
   rd --fields secret.yaml
   [ "$code" -eq 0 ] || fail "links: --fields on a link inside the repository, exit $code"
   expect_line "$out" "secret.yaml:6:Secret/-/linked:-:secret-key.string-data=token" "links: --fields on a link inside the repository"
@@ -2031,6 +2064,30 @@ $out"
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields on a dangling link, exit $code"
   rd --fields loop1.yaml
   [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields on a link that loops, exit $code"
+  # --fields and --values take the same root as the list: the directory the
+  # reader runs in, not the top of its Git repository.
+  mkdir -p "$work/links-git/sub"
+  git -C "$work/links-git" init -q
+  printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: above\nstringData:\n  token: FIXTUREVALUE-above\n' > "$work/links-git/above.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$work/links-git/sub/ok.yaml"
+  ln -s ../above.yaml "$work/links-git/sub/l.yaml"
+  cwd=$work/links-git/sub
+  rd .
+  expect_line "$out" "l.yaml:link:points outside the repository, not read" "links: a root below the top of Git"
+  rd --fields l.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields on a link that leaves the directory the reader runs in, exit $code"
+  rd --values l.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --values on a link that leaves the directory the reader runs in, exit $code"
+  # A link to a name with a control character is a path the reader cannot
+  # carry, and says so.
+  mkdir -p "$work/links-ctl"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ctl\n' > "$work/links-ctl/ctl	name.yaml"
+  ln -s "ctl	name.yaml" "$work/links-ctl/ctl-in.yaml"
+  cwd=$work/links-ctl
+  rd --fields ctl-in.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields on a link to a name with a control character, exit $code"
+  grep -q 'control character' "$work/err" || fail "links: --fields on a link to a name with a control character: standard error does not name the control character"
+  cwd=$work/links
 
   # A top-level key in quotes is a key --fields reads, so the list must
   # list the file: a quoted kind never hides a workload.
@@ -2265,6 +2322,27 @@ EOF
   printf '{"\\u0024r\\u0065f": "https:\\/\\/schemas.invalid\\u002FFIXTUREVALUE-esc2.json"}\n' > "$rr/esc2chart/values.schema.json"
   refuse "esc2chart:chart:remote schema ref" "render a chart with a remote schema reference whose key and value are escaped" \
     --render helm esc2chart esc2chart/values.yaml
+  # A schema file, a Chart.yaml, or a requirements.yaml that is a link
+  # inside the repository gets the same tests as a file.
+  mkdir -p "$rr/schemas"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  printf '{"$ref": "https://schemas.invalid/FIXTUREVALUE-linked.json"}\n' > "$rr/schemas/remote.json"
+  cp -R "$rr/chart" "$rr/cC"
+  ln -s ../schemas/remote.json "$rr/cC/values.schema.json"
+  refuse "cC:chart:remote schema ref" "render a chart whose schema is a link to a remote reference" \
+    --render helm cC cC/values.yaml
+  cp -R "$rr/chart" "$rr/cD"
+  { cat "$rr/chart/Chart.yaml"; printf 'Dependencies:\n  - name: redis\n    version: 19.0.0\n'; } > "$rr/schemas/Chart-deps.yaml"
+  rm "$rr/cD/Chart.yaml"
+  ln -s ../schemas/Chart-deps.yaml "$rr/cD/Chart.yaml"
+  refuse "cD:chart:dependencies not vendored" "render a chart whose Chart.yaml is a link to one with dependencies" \
+    --render helm cD cD/values.yaml
+  # A $schema that is not local is refused like a $ref.
+  cp -R "$rr/chart" "$rr/metachart"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  printf '{"$schema": "https://schemas.invalid/FIXTUREVALUE-meta.json", "type": "object"}\n' > "$rr/metachart/values.schema.json"
+  refuse "metachart:chart:remote schema ref" "render a chart whose schema names a remote \$schema" \
+    --render helm metachart metachart/values.yaml
   cp -R "$rr/chart" "$rr/yamlschema"
   # shellcheck disable=SC2016 # literal text, not an expansion
   printf '$ref: https://schemas.invalid/FIXTUREVALUE-yaml.json\n' > "$rr/yamlschema/values.schema.json"
@@ -2392,6 +2470,29 @@ EOF
   ln -s "$work/outside-base" "$rr/extlink"
   printf 'resources:\n  - ../extlink/cm.yaml\n' > "$rr/extov/kustomization.yaml"
   refuse "extov:overlay:points outside the repository, not read" "render an overlay with an entry through a link outside the repository" --render kustomize extov
+  # kustomize cleans a path before it follows links, so ".." after a link
+  # climbs from the link's own directory: lnk/../../../c1out is c1out beside
+  # the repository to kustomize, and c1out inside it to cd -P. Either way
+  # out refuses the render.
+  mkdir -p "$rr/deep/a/b" "$rr/c1out" "$work/c1out" "$rr/oJ" "$rr/oK" "$rr/oL" "$rr/oM" "$rr/oN"
+  printf 'resources:\n  - cm.yaml\n' > "$rr/c1out/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: inside\n' > "$rr/c1out/cm.yaml"
+  printf 'resources:\n  - secret.yaml\n' > "$work/c1out/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: outside\nstringData:\n  api-token: FIXTUREVALUE-c1\n' > "$work/c1out/secret.yaml"
+  for o in oJ oK oL; do ln -s ../deep/a/b "$rr/$o/lnk"; done
+  printf 'resources:\n  - lnk/../../../c1out\n' > "$rr/oJ/kustomization.yaml"
+  refuse "oJ:overlay:points outside the repository, not read" "render an overlay whose resource has .. after a link" --render kustomize oJ
+  printf 'bases:\n  - lnk/../../../c1out\n' > "$rr/oK/kustomization.yaml"
+  refuse "oK:overlay:points outside the repository, not read" "render an overlay whose base has .. after a link" --render kustomize oK
+  printf 'resources:\n  - ../c1out\ncomponents:\n  - lnk/../../../c1out\n' > "$rr/oL/kustomization.yaml"
+  refuse "oL:overlay:points outside the repository, not read" "render an overlay whose component has .. after a link" --render kustomize oL
+  # An entry through a link that does not resolve.
+  ln -s missing "$rr/oM/dang"
+  printf 'resources:\n  - dang\n' > "$rr/oM/kustomization.yaml"
+  refuse "oM:overlay:broken, not read" "render an overlay whose resource is a dangling link" --render kustomize oM
+  ln -s ../missing-dir "$rr/dangdir"
+  printf 'resources:\n  - ../dangdir/cm.yaml\n' > "$rr/oN/kustomization.yaml"
+  refuse "oN:overlay:broken, not read" "render an overlay whose resource goes through a dangling link" --render kustomize oN
   # kustomize reads the keys of a kustomization in any case, so a key in
   # another case is judged as its lower-case form, and the kustomization
   # that writes one is refused before the tool runs.
@@ -2654,7 +2755,9 @@ $out"
   rd f
   [ "$code" -eq 0 ] || fail "list with a linked manifest and a linked directory: expected exit 0, got $code"
   [ "$out" = "linkdir/dep.yaml:manifest:no-git
-ok.yaml:manifest:no-git" ] || fail "list with a linked manifest and a linked directory: printed
+linked.yaml:manifest:no-git
+ok.yaml:manifest:no-git
+real/dep.yaml:manifest:no-git" ] || fail "list with a linked manifest and a linked directory: printed
 $out"
   # A link that stays inside the tree but leaves the list root points
   # outside the repository: the list root is the repository.
@@ -2675,6 +2778,45 @@ $out"
   la=$out
   rd alink/base
   [ "$code" -eq 0 ] && [ "$out" = "$la" ] || fail "list through a symbolic link: exit $code"
+  fi
+
+  if want noreadlink; then
+  # Without readlink the reader cannot tell where a link goes, so a tree
+  # that holds one is not listed: exit 4, with the reason.
+  mkdir -p "$work/nrl/bin" "$work/nrl/tree/real"
+  for t in sh unshare awk find sed sort grep git env cat; do
+    tp=$(command -v "$t") && ln -s "$tp" "$work/nrl/bin/$t"
+  done
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$work/nrl/tree/real/ok.yaml"
+  ln -s real "$work/nrl/tree/linked"
+  cwd=$work/nrl/tree
+  RPATH_SAVED=$RPATH
+  RPATH=$work/nrl/bin
+  rd .
+  RPATH=$RPATH_SAVED
+  [ "$code" -eq 4 ] || fail "list with no readlink and a link in the tree: expected exit 4, got $code"
+  grep -q 'readlink' "$work/err" || fail "list with no readlink and a link in the tree: standard error does not name readlink"
+  cwd=$repo
+  fi
+
+  if want biglist; then
+  # A file list over 128 KiB, the most Linux takes in one environment
+  # string, still reaches the join of directory-link paths.
+  mkdir -p "$work/big/node_modules" "$work/big/real-apps"
+  i=0
+  while [ "$i" -lt 2500 ]; do
+    mkdir -p "$work/big/node_modules/package-number-$i"
+    : > "$work/big/node_modules/package-number-$i/configuration-file-of-the-package.yml"
+    i=$((i + 1))
+  done
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: pod\n' > "$work/big/real-apps/pod.yaml"
+  ln -s real-apps "$work/big/0-apps"
+  cwd=$work/big
+  rd .
+  [ "$code" -eq 0 ] || fail "list with a file list over 128 KiB: exit $code"
+  expect_line "$out" "0-apps/pod.yaml:manifest:no-git" "list with a file list over 128 KiB"
+  expect_line "$out" "real-apps/pod.yaml:manifest:no-git" "list with a file list over 128 KiB"
+  cwd=$repo
   fi
 
   if want gen; then
