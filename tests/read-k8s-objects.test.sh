@@ -323,7 +323,8 @@ conform() {
     /^$/ { next }
     {
       line = $0
-      if (line ~ /^[^:]+:(manifest|chart|chart-values|overlay|kustomize-base|argo-application):(tracked|untracked|ignored|no-git|tool not installed|not a local file|symbolic link inside|remote schema ref|dependencies not vendored|remote base|plugin or inflator needed|render failed|render printed nothing|not read)$/) next
+      if (line ~ /^[^:]+:(manifest|chart|chart-values|overlay|kustomize-base|argo-application):(tracked|untracked|ignored|no-git|tool not installed|not a local file|points outside the repository, not read|broken, not read|remote schema ref|dependencies not vendored|remote base|plugin or inflator needed|render failed|render printed nothing|not read)$/) next
+      if (line ~ /^[^:]+:link:(points outside the repository, not read|broken, not read)$/) next
       if (line !~ /^[^:]+:[0-9]+:[^:\/]+\/[^:\/]+\/[^:\/]+:[^:]+:[^=:]+=/) { bad("not a list line or a field line"); next }
       i = index(line, ":"); rest = substr(line, i + 1)
       i = index(rest, ":"); rest = substr(rest, i + 1)
@@ -402,7 +403,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/links-outside" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -1969,28 +1970,63 @@ EOF
   fi
 
   if want links; then
-  # A symbolic link is refused in every mode, and is not listed.
-  mkdir "$work/links"
+  # A symbolic link that stays inside the repository is followed like what
+  # it points to. One that points outside it, or does not resolve, is not
+  # read: the list prints a link line for it, and --fields exits 4.
+  mkdir -p "$work/links/real" "$work/links/.venv/lib/pkg" "$work/links-outside"
   printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: linked\nstringData:\n  token: FIXTUREVALUE-link\n' > "$work/links/target.txt"
   ln -s target.txt "$work/links/secret.yaml"
-  cwd=$work/links
-  rd --fields secret.yaml
-  [ "$code" -eq 4 ] || fail "symbolic link: --fields exit $code"
-  [ -z "$out" ] || fail "symbolic link: --fields printed output"
-  rd --values secret.yaml
-  [ "$code" -eq 4 ] || fail "symbolic link: --values exit $code"
-  rd .
-  [ -z "$out" ] || fail "symbolic link: listed $out"
-  [ "$code" -eq 4 ] || fail "symbolic link: the list of a tree with a linked manifest, expected exit 4, got $code"
-  grep -q 'not listed: 1 path' "$work/err" || fail "symbolic link: the list does not say that a linked manifest was not listed"
-  mkdir "$work/links/real"
   printf 'apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: through-a-link\nautomountServiceAccountToken: false\n' > "$work/links/real/sa.yaml"
   ln -s real "$work/links/dir"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: venv\n' > "$work/links/.venv/lib/pkg/cm.yaml"
+  ln -s lib "$work/links/.venv/lib64"
+  ln -s . "$work/links/a"
+  printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: outside\nstringData:\n  token: FIXTUREVALUE-link-outside\n' > "$work/links-outside/secret.yaml"
+  ln -s "$work/links-outside/secret.yaml" "$work/links/outside.yaml"
+  ln -s ../links-outside "$work/links/outdir"
+  ln -s "$work/links-outside/secret.yaml" "$work/links/notes.txt"
+  ln -s missing.yaml "$work/links/dangling.yaml"
+  ln -s loop2.yaml "$work/links/loop1.yaml"
+  ln -s loop1.yaml "$work/links/loop2.yaml"
+  cwd=$work/links
+  rd .
+  [ "$code" -eq 0 ] || fail "links: the list exit $code"
+  expected='.venv/lib/pkg/cm.yaml:manifest:no-git
+dangling.yaml:link:broken, not read
+dir/sa.yaml:manifest:no-git
+loop1.yaml:link:broken, not read
+loop2.yaml:link:broken, not read
+outdir:link:points outside the repository, not read
+outside.yaml:link:points outside the repository, not read
+secret.yaml:manifest:no-git'
+  printf '%s\n' "$expected" > "$work/links-expected"
+  while IFS= read -r want; do expect_line "$out" "$want" "links: the list"; done < "$work/links-expected"
+  [ "$out" = "$expected" ] || fail "links: the list printed
+$out"
+  expect_no "$out" '^a/|lib64|real/sa\.yaml|notes\.txt' "links: a path reached twice, or an outside link with a name the list does not list"
+  rd --fields secret.yaml
+  [ "$code" -eq 0 ] || fail "links: --fields on a link inside the repository, exit $code"
+  expect_line "$out" "secret.yaml:6:Secret/-/linked:-:secret-key.string-data=token" "links: --fields on a link inside the repository"
+  rd --values secret.yaml
+  [ "$code" -eq 0 ] || fail "links: --values on a link inside the repository, exit $code"
   rd --fields dir/sa.yaml
-  [ "$code" -eq 4 ] || fail "symbolic link: a file reached through a linked directory, exit $code"
-  [ -z "$out" ] || fail "symbolic link: a file reached through a linked directory printed output"
+  [ "$code" -eq 0 ] || fail "links: --fields through a directory link inside the repository, exit $code"
+  expect_line "$out" "dir/sa.yaml:5:ServiceAccount/-/through-a-link:-:automount-sa-token=false" "links: --fields through a directory link inside the repository"
+  rd --fields .venv/lib64/pkg/cm.yaml
+  [ "$code" -eq 0 ] || fail "links: --fields through lib64, exit $code"
   rd --fields real/../real/sa.yaml
   [ "$code" -eq 0 ] || fail "a path with .. and no link: exit $code"
+  rd --fields outside.yaml
+  [ "$code" -eq 4 ] || fail "links: --fields on a link outside the repository, exit $code"
+  [ -z "$out" ] || fail "links: --fields on a link outside the repository printed output"
+  rd --values outside.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --values on a link outside the repository, exit $code"
+  rd --fields outdir/secret.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields through a directory link outside the repository, exit $code"
+  rd --fields dangling.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields on a dangling link, exit $code"
+  rd --fields loop1.yaml
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "links: --fields on a link that loops, exit $code"
 
   # A top-level key in quotes is a key --fields reads, so the list must
   # list the file: a quoted kind never hides a workload.
@@ -2111,6 +2147,19 @@ EOF
     rd --render helm tgzchart tgzchart/values.yaml
     [ "$code" -eq 0 ] || fail "render a chart whose vendored dependency names a remote schema: exit $code"
     expect_line "$out" "tgzchart:4:ConfigMap/-/sub:-:object=present" "render a chart whose vendored dependency names a remote schema"
+    # A link that stays inside the repository is followed: a chart that
+    # holds one renders, and so does a chart that is one.
+    cp -R "$rr/chart" "$rr/linkchart"
+    ln -s ../../manifests/secret.yaml "$rr/linkchart/templates/secret.yaml"
+    rd --render helm linkchart linkchart/values.yaml
+    [ "$code" -eq 0 ] || fail "render a chart with a link inside the repository: exit $code"
+    printf '%s\n' "$out" | grep -q '^linkchart:[0-9]*:Secret/fleetboard-tools/tracker-credentials:-:object=present$' ||
+      fail "render a chart with a link inside the repository: no Secret from the linked template"
+    ln -s chart "$rr/chartlink"
+    rd --render helm chartlink chart/values.yaml
+    [ "$code" -eq 0 ] || fail "render a chart that is a link inside the repository: exit $code"
+    printf '%s\n' "$out" | grep -q ':Deployment/[^/]*/dispatch:dispatch:container-kind=main$' ||
+      fail "render a chart that is a link inside the repository: no dispatch container"
   fi
   if [ "$have_kustomize" -eq 1 ]; then
     mkdir -p "$rr/kfail"
@@ -2136,6 +2185,14 @@ EOF
     printf 'apiVersion: example.com/v1\nkind: Widget\nmetadata:\n  name: w\n' > "$rr/widgetov/widget.yaml"
     printf 'resources:\n  - widget.yaml\n' > "$rr/widgetov/kustomization.yaml"
     refuse "widgetov:overlay:render printed nothing" "render an overlay that prints only a kind the reader does not read" --render kustomize widgetov
+    # An overlay whose base is a directory link inside the repository renders.
+    mkdir -p "$rr/linkov"
+    ln -s ../kustomize/base "$rr/linkov/base"
+    printf 'resources:\n  - base\n' > "$rr/linkov/kustomization.yaml"
+    rd --render kustomize linkov
+    [ "$code" -eq 0 ] || fail "render an overlay with a link inside the repository: exit $code"
+    printf '%s\n' "$out" | grep -q '^linkov:[0-9]*:Deployment/[^/]*/api:api:container-kind=main$' ||
+      fail "render an overlay with a link inside the repository: no api container"
   fi
   fi
 
@@ -2171,18 +2228,30 @@ EOF
   printf '{"\\u0024ref": "https://schemas.invalid/FIXTUREVALUE-esc.json"}\n' > "$rr/escchart/values.schema.json"
   refuse "escchart:chart:remote schema ref" "render a chart with a schema reference spelt with a JSON escape" \
     --render helm escchart escchart/values.yaml
-  cp -R "$rr/chart" "$rr/linkchart"
-  ln -s ../../manifests/secret.yaml "$rr/linkchart/templates/secret.yaml"
-  refuse "linkchart:chart:symbolic link inside" "render a chart with a symbolic link inside" \
-    --render helm linkchart linkchart/values.yaml
+  # A link in a chart or overlay tree that points outside the repository,
+  # or does not resolve, is never handed to the render tool.
   printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: outside\nstringData:\n  token: FIXTUREVALUE-outside\n' > "$work/outside-secret.yaml"
   cp -R "$rr/chart" "$rr/-L"
   ln -s "$work/outside-secret.yaml" "$rr/-L/templates/sa.yaml"
-  refuse "-L:chart:symbolic link inside" "render a chart named -L" \
+  refuse "-L:chart:points outside the repository, not read" "render a chart named -L" \
     --render helm -L ./-L/values.yaml
-  ln -s chart "$rr/chartlink"
-  refuse "chartlink:chart:not a local file" "render a chart that is a symbolic link" \
-    --render helm chartlink chart/values.yaml
+  cp -R "$rr/chart" "$rr/outchart"
+  ln -s "$work/outside-secret.yaml" "$rr/outchart/templates/secret.yaml"
+  refuse "outchart:chart:points outside the repository, not read" "render a chart with a link outside the repository" \
+    --render helm outchart outchart/values.yaml
+  mkdir -p "$rr/shared"
+  ln -s "$work/outside-secret.yaml" "$rr/shared/secret.yaml"
+  cp -R "$rr/chart" "$rr/viachart"
+  ln -s ../../shared "$rr/viachart/templates/shared"
+  refuse "viachart:chart:points outside the repository, not read" "render a chart whose linked directory holds a link outside the repository" \
+    --render helm viachart viachart/values.yaml
+  cp -R "$rr/chart" "$rr/brokenchart"
+  ln -s missing.yaml "$rr/brokenchart/templates/missing.yaml"
+  refuse "brokenchart:chart:broken, not read" "render a chart with a dangling link" \
+    --render helm brokenchart brokenchart/values.yaml
+  ln -s "$work/outside-secret.yaml" "$rr/linkvalues.yaml"
+  refuse "chart:chart:points outside the repository, not read" "render with a values file that is a link outside the repository" \
+    --render helm chart linkvalues.yaml
   printf 'replicaCount: 1\n' > "$work/outside-values.yaml"
   refuse "chart:chart:not a local file" "render with a values file outside the repository" \
     --render helm chart "$work/outside-values.yaml"
@@ -2214,11 +2283,12 @@ EOF
   printf 'helmCharts:\n  - name: redis\n    repo: https://charts.example.com\n' > "$rr/helmov/kustomization.yaml"
   refuse "helmov:overlay:plugin or inflator needed" "render an overlay that inflates a chart" \
     --render kustomize helmov
-  mkdir -p "$rr/linkov"
-  printf 'resources:\n  - secret.yaml\n' > "$rr/linkov/kustomization.yaml"
-  ln -s ../manifests/secret.yaml "$rr/linkov/secret.yaml"
-  refuse "linkov:overlay:symbolic link inside" "render an overlay with a symbolic link inside" \
-    --render kustomize linkov
+  mkdir -p "$rr/outov"
+  printf 'resources:\n  - cm.yaml\n' > "$rr/outov/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: outov\n' > "$rr/outov/cm.yaml"
+  ln -s "$work/outside-secret.yaml" "$rr/outov/secret.yaml"
+  refuse "outov:overlay:points outside the repository, not read" "render an overlay with a link outside the repository" \
+    --render kustomize outov
   # An entry that is not a plain scalar, or that kustomize can take for a
   # repository although a local path of that name exists.
   mkdir -p "$rr/k1" "$rr/k2" "$rr/k3/github.com/example-fleetboard/FIXTUREVALUE" "$rr/k4" "$rr/k5" "$rr/k6"
@@ -2274,6 +2344,12 @@ EOF
   printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: FIXTUREVALUE-outside-base\n' > "$work/outside-base/cm.yaml"
   printf 'resources:\n  - ../../outside-base\n' > "$rr/kout/kustomization.yaml"
   refuse "kout:overlay:remote base" "render an overlay with a base outside the repository" --render kustomize kout
+  # An entry that reaches outside the repository through a link elsewhere
+  # in the repository.
+  mkdir -p "$rr/extov"
+  ln -s "$work/outside-base" "$rr/extlink"
+  printf 'resources:\n  - ../extlink/cm.yaml\n' > "$rr/extov/kustomization.yaml"
+  refuse "extov:overlay:points outside the repository, not read" "render an overlay with an entry through a link outside the repository" --render kustomize extov
   # kustomize reads the keys of a kustomization in any case, so a key in
   # another case is judged as its lower-case form, and the kustomization
   # that writes one is refused before the tool runs.
@@ -2518,25 +2594,38 @@ $out"
   [ "$out" = "ok.yaml:manifest:no-git
 zz.yaml:manifest:no-git" ] || fail "list with a line break that repeats a name: printed
 $out"
-  # A symbolic link inside the tree, to a manifest or to a directory, is
-  # counted with the paths the list cannot carry: exit 4, never left out
-  # in silence.
+  # A symbolic link inside the tree, to a manifest or to a directory, that
+  # stays inside the list root is followed, and the file it reaches is
+  # listed once, by its first path in sorted order.
   mkdir -p "$lx/f/real"
   printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: dep\nspec:\n  template:\n    spec:\n      hostNetwork: true\n' > "$lx/f/real/dep.yaml"
   printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$lx/f/ok.yaml"
   ln -s real/dep.yaml "$lx/f/linked.yaml"
   ln -s real "$lx/f/linkdir"
   rd f
-  [ "$code" -eq 4 ] || fail "list with a linked manifest and a linked directory: expected exit 4, got $code"
-  [ "$out" = "ok.yaml:manifest:no-git
-real/dep.yaml:manifest:no-git" ] || fail "list with a linked manifest and a linked directory: printed
+  [ "$code" -eq 0 ] || fail "list with a linked manifest and a linked directory: expected exit 0, got $code"
+  [ "$out" = "linkdir/dep.yaml:manifest:no-git
+ok.yaml:manifest:no-git" ] || fail "list with a linked manifest and a linked directory: printed
 $out"
-  grep -q 'not listed: 2 paths' "$work/err" || fail "list with a linked manifest and a linked directory: standard error does not count the links"
+  # A link that stays inside the tree but leaves the list root points
+  # outside the repository: the list root is the repository.
+  mkdir -p "$lx/g"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$lx/g/ok.yaml"
+  ln -s ../f/real/dep.yaml "$lx/g/up.yaml"
+  rd g
+  [ "$code" -eq 0 ] && [ "$out" = "ok.yaml:manifest:no-git
+up.yaml:link:points outside the repository, not read" ] || fail "list with a link that leaves the list root: exit $code, printed
+$out"
+  # The list root is resolved with its own links.
   ln -s a "$lx/alink"
+  rd a
+  la=$out
   rd alink/
-  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list through a symbolic link with a trailing slash: exit $code"
+  [ "$code" -eq 0 ] && [ "$out" = "$la" ] || fail "list through a symbolic link with a trailing slash: exit $code"
+  rd a/base
+  la=$out
   rd alink/base
-  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "list through a symbolic link: exit $code"
+  [ "$code" -eq 0 ] && [ "$out" = "$la" ] || fail "list through a symbolic link: exit $code"
   fi
 
   if want gen; then
