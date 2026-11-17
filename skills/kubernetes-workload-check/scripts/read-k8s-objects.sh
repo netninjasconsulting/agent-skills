@@ -34,12 +34,13 @@
 # unrendered template line) means the whole file is not read: it prints
 # nothing and exits 4.
 #
-# A symbolic link that stays inside the repository (for the list, --fields,
-# and --values, the directory the reader runs in; for a render, the top of
-# its Git repository; each resolved with its own links) is followed like
-# what it points to, and the list prints every path that reaches a file. A link that points outside
-# it, or that does not resolve, is not read: the list prints a link line
-# for it, --fields and --values exit 4, and a render is refused.
+# A symbolic link that stays inside the repository (in every mode, the
+# directory the reader runs in, resolved with its own links) is followed
+# like what it points to, and the list prints every path that reaches a
+# file. A link that points outside it, or that does not resolve, is not
+# read: the list prints a link line for it, --fields and --values exit 4,
+# and a render is refused. A render also refuses an overlay entry with a
+# ".." part after a part that is a link.
 #
 # The reader reads files and Git objects and writes nothing. --render runs
 # helm template or kustomize build (or kubectl kustomize) itself, after the
@@ -1868,16 +1869,10 @@ refuse() {
   exit 3
 }
 
-# The top of the repository the reader runs in, or the working directory
-# where there is none. The "x" keeps a line break at its end, as in phys.
-repo_top() {
-  top=$(git rev-parse --show-toplevel 2>/dev/null && echo x) || top=$(pwd && echo x)
-  top=${top%"${NL}x"}  # a line break at the end of the repository root
-  ROOTP=$(phys "$top")
-}
-
+# The root of a render: the directory the reader runs in, with its links
+# resolved, the same root as the list's, --fields', and --values'.
 set_root() {
-  repo_top || refuse "not a local file"
+  ROOTP=$(phys .) || refuse "not a local file"
 }
 
 local_ok() {
@@ -2035,15 +2030,27 @@ $d"
       if repo_like "$target" "$d"; then refuse "remote base"  # an entry kustomize can take for a repository
       fi
       t="$d/$target"
-      rest=$target; acc=$d; via=0; dang=0
+      rest=$target; acc=$d; via=0; dang=0; back=0
       while [ -n "$rest" ]; do
         part=${rest%%/*}
         case "$rest" in */*) rest=${rest#*/} ;; *) rest= ;; esac
         [ -n "$part" ] || continue
+        if [ "$part" = .. ] && [ "$via" -eq 1 ]; then back=1; fi
         acc="$acc/$part"
         if [ -L "$acc" ]; then via=1; [ -e "$acc" ] || dang=1; fi
       done
       [ "$dang" -eq 0 ] || refuse "broken, not read"  # an entry through a link that does not resolve
+      # A ".." part after a part that is a link climbs from the link's target
+      # for cd -P and from the link's own directory for kustomize, so the
+      # entry is refused whatever both ways give.
+      if [ "$back" -eq 1 ]; then  # a .. after a link
+        bo=0
+        if resolve "$t" && ! inside_root "$RP"; then bo=1; fi
+        lexical "$t"
+        if resolve "$LX" && ! inside_root "$RP"; then bo=1; fi
+        [ "$bo" -eq 0 ] || refuse "points outside the repository, not read"
+        refuse "symbolic link inside"
+      fi
       [ -e "$t" ] || refuse "remote base"
       # The entry is tested twice: with its links followed first (cd -P),
       # and cleaned first, the way kustomize reads it. Either one outside
@@ -2060,8 +2067,11 @@ $d"
           refuse "remote base"  # a base outside the repository
         fi
       done
-      if [ "$what" = res ] && [ -d "$t" ]; then
-        queue=$(printf '%s\n%s\n%s\n' "$queue" "$pp" "$lp" | sed '/^$/d')
+      # Both ways are walked as bases, each one that is a directory.
+      if [ "$what" = res ]; then
+        for ep in "$pp" "$lp"; do  # each way that is a directory
+          if [ -d "$ep" ]; then queue=$(printf '%s\n%s\n' "$queue" "$ep" | sed '/^$/d'); fi
+        done
       fi
     done <<EOF
 $entries

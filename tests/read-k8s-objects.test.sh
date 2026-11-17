@@ -323,7 +323,7 @@ conform() {
     /^$/ { next }
     {
       line = $0
-      if (line ~ /^[^:]+:(manifest|chart|chart-values|overlay|kustomize-base|argo-application):(tracked|untracked|ignored|no-git|tool not installed|not a local file|points outside the repository, not read|broken, not read|remote schema ref|dependencies not vendored|remote base|plugin or inflator needed|render failed|render printed nothing|not read)$/) next
+      if (line ~ /^[^:]+:(manifest|chart|chart-values|overlay|kustomize-base|argo-application):(tracked|untracked|ignored|no-git|tool not installed|not a local file|symbolic link inside|points outside the repository, not read|broken, not read|remote schema ref|dependencies not vendored|remote base|plugin or inflator needed|render failed|render printed nothing|not read)$/) next
       if (line ~ /^[^:]+:link:(points outside the repository, not read|broken, not read)$/) next
       if (line !~ /^[^:]+:[0-9]+:[^:\/]+\/[^:\/]+\/[^:\/]+:[^:]+:[^=:]+=/) { bad("not a list line or a field line"); next }
       i = index(line, ":"); rest = substr(line, i + 1)
@@ -3061,8 +3061,6 @@ pins() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a line break at the end of a resolved path" '# a line break at the end of a resolved path' 's/r=${r%"${NL}x"}  # a line break at the end of a resolved path/r=$(printf %s "${r%x}")/' refusals "render an overlay from a directory whose name ends in a line break: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a line break at the end of the repository root" '# a line break at the end of the repository root' 's/top=${top%"${NL}x"}  # a line break at the end of the repository root/top=$(printf %s "${top%x}")/' refusals "render an overlay beside a repository whose path ends in a line break: the render tool ran before the refusal"
-  # shellcheck disable=SC2016 # literal text, not an expansion
   pin_behind "the directory of a file, with a line break at its end" '# the directory of the file, with a line break at its end' "$front_off;$phys_off;$resolve_off" 's/dir_part "$f"; REMOTES=$(remotes_of "$DIR")  # the directory of the file, with a line break at its end/REMOTES=$(remotes_of "$(dirname -- "$f")")/' refusals "read a file under a directory whose name ends in a line break: the remotes of another directory were read"
   pin "an equals sign that starts a flow item" '# an equals sign does not start an item' 's|(t ~ "^\[A-Za-z0-9./\]|(t ~ "^[A-Za-z0-9./=]|' attacks 'flow form table: [=x] expected exit 4, got 0'
   pin "a dash alone as a flow item" '# a dash alone is not an item' 's|@+=-\]+\$") return 1  # a dash alone is not an item|@+=-]*$") return 1|' attacks 'flow form table: [-] expected exit 4, got 0'
@@ -3100,9 +3098,15 @@ pins() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a file link is listed at its own path" '# a file link at its own path' 's/if (LK\[j\] == "F") return emit("f" t p)  # a file link at its own path/if (LK[j] == "F") return 1/' links "links: the list: missing line apps/prod/bad.yaml:manifest:no-git"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "--fields and --values take the root of the list" '# the root of the list' 's/ROOTP=$(phys .) || {.*}  # the root of the list/repo_top || exit 4/' links "links: --fields on a link that leaves the directory the reader runs in, exit 0"
+  pin "--fields and --values take the root of the list" '# the root of the list' 's/ROOTP=$(phys .) || {.*}  # the root of the list/ROOTP=$(phys "$(git rev-parse --show-toplevel)") || exit 4/' links "links: --fields on a link that leaves the directory the reader runs in, exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "an overlay entry tested the way kustomize cleans it" '# the path as kustomize cleans it' 's/lexical "$t"  # the path as kustomize cleans it/LX=$t/' refusals "render an overlay whose resource has .. after a link: the render tool ran before the refusal"
+  back_off='s/if \[ "$back" -eq 1 \]; then  # a \.\. after a link/if false; then/'
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin_behind "an overlay entry tested the way kustomize cleans it" '# the path as kustomize cleans it' "$back_off" 's/lexical "$t"  # the path as kustomize cleans it/LX=$t/' refusals "render an overlay whose resource has .. after a link: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin_behind "an overlay entry walked both ways" '# each way that is a directory' "$back_off" 's/for ep in "$pp" "$lp"; do  # each way that is a directory/for ep in "$pp"; do/' refusals "render an overlay whose resource is a file one way and a directory the other: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "an overlay entry with .. after a link" '# a .. after a link' 's/if \[ "$back" -eq 1 \]; then  # a \.\. after a link/if false; then/' refusals "render an overlay whose patch path has .. after a link: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "an overlay entry through a link that does not resolve" '# an entry through a link that does not resolve' 's/\[ "$dang" -eq 0 \] || refuse "broken, not read"  # an entry through a link that does not resolve//' refusals "render an overlay whose resource goes through a dangling link: expected oN:overlay:broken, not read"
   pin "a schema that is a link is tested" '-name values.schema.json -print' 's/\\( -type f -o -type l \\) -name values.schema.json/-type f -name values.schema.json/' refusals "render a chart whose schema is a link to a remote reference: the render tool ran before the refusal"
