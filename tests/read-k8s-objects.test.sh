@@ -2104,6 +2104,22 @@ $out"
   rd --fields dq.yaml
   expect_line "$out" "dq.yaml:6:Pod/-/dq:-:host-network=true" "quoted top-level keys"
 
+  # A root mapping indented as a whole is one --fields reads, so the list
+  # lists it too. A key indented below the root (a nested kind) is not a
+  # top-level key, so a file with only nested keys is not a manifest.
+  mkdir "$work/indented"
+  printf '  apiVersion: v1\n  kind: Pod\n  metadata:\n    name: ind\n  spec:\n    hostNetwork: true\n' > "$work/indented/ind.yaml"
+  printf -- '---\nname: other\n---\n    "apiVersion": argoproj.io/v1alpha1\n    kind: Application\n    metadata:\n      name: app\n' > "$work/indented/app.yaml"
+  printf 'name: ci\njobs:\n  kind: Pod\n  apiVersion: v1\n' > "$work/indented/nested.yaml"
+  cwd=$work/indented
+  rd .
+  [ "$code" -eq 0 ] || fail "indented root mappings: the list exit $code"
+  expect_line "$out" "ind.yaml:manifest:no-git" "indented root mappings"
+  expect_line "$out" "app.yaml:argo-application:no-git" "indented root mappings"
+  expect_no "$out" 'nested\.yaml' "indented root mappings"
+  rd --fields ind.yaml
+  expect_line "$out" "ind.yaml:6:Pod/-/ind:-:host-network=true" "indented root mappings"
+
   # Usage.
   cwd=$repo
   rd --fields
@@ -3078,7 +3094,8 @@ pins() {
   pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
   pin "the form of a User name" '# the form of a User name' '/# the form of a User name$/s/== "system:serviceaccount:"/== "x"/' attacks "missing line rbac-users.yaml:11:ClusterRoleBinding/-/users:-:subject.1.user-form=service-account"
   pin "a quoted User name with a backslash" '# the form of a User name' '/# the form of a User name$/s/ || (LQ\[0, k\] \&\& index(LVAL\[0, k\], "\\\\"))//' attacks "missing line rbac-escaped.yaml:11:ClusterRoleBinding/-/escaped:-:subject.1.user-form=other"
-  pin "a quoted top-level key in the list" '# a quoted top-level key' '/# a quoted top-level key$/s/(kind|"kind"|/(kind|/' links "missing line dq.yaml:manifest:no-git"
+  pin "a quoted top-level key in the list" '# a quoted top-level key' '/# a quoted top-level key$/s/|\\"" name "\\"|/|/' links "missing line dq.yaml:manifest:no-git"
+  pin "an indented root mapping in the list" '# the indent of the root mapping' '/# the indent of the root mapping$/s/root = RLENGTH/root = 0/' links "missing line ind.yaml:manifest:no-git"
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
