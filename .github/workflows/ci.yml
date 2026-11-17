@@ -36,6 +36,29 @@ jobs:
         run: sh tests/list-agent-config.test.sh
       - name: Test the serverless configuration reader
         run: sh tests/read-serverless-config.test.sh
+      # The render cases of the Kubernetes reader and the flag classification
+      # of the cluster script need helm and kubectl. Each download is checked
+      # against a SHA-256 written here, and the step fails on a mismatch.
+      - name: Install helm and kubectl, pinned by checksum
+        env:
+          KUBECTL_URL: https://dl.k8s.io/release/v1.37.2/bin/linux/amd64/kubectl
+          KUBECTL_SHA256: c04487523e7aa7d1493f7808174c899db93d7a9cf57531420cd76b9bd415f8f4
+          HELM_URL: https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz
+          HELM_SHA256: d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983
+        run: |
+          set -eu
+          bin="$RUNNER_TEMP/pinned-bin"
+          mkdir -p "$bin"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$RUNNER_TEMP/kubectl" "$KUBECTL_URL"
+          echo "$KUBECTL_SHA256  $RUNNER_TEMP/kubectl" | sha256sum --check --strict
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --output "$RUNNER_TEMP/helm.tar.gz" "$HELM_URL"
+          echo "$HELM_SHA256  $RUNNER_TEMP/helm.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/helm.tar.gz" -C "$RUNNER_TEMP" linux-amd64/helm
+          install -m 0755 "$RUNNER_TEMP/kubectl" "$bin/kubectl"
+          install -m 0755 "$RUNNER_TEMP/linux-amd64/helm" "$bin/helm"
+          echo "$bin" >> "$GITHUB_PATH"
+          "$bin/kubectl" version --client
+          "$bin/helm" version
       - name: Test the Kubernetes object reader
         run: sh tests/read-k8s-objects.test.sh
       - name: Test the cluster usage reader

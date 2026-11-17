@@ -48,7 +48,7 @@ sh tests/read-cluster-usage.test.sh   # the cluster usage script against a stand
 sh tests/names-filter.test.sh   # the names-only filter that two skills use on env files
 ```
 
-All eight commands run in CI on every pull request. The validator mutation suite includes the starter's default permissions, redacted quotation, and package approval rules. Scenarios 10 to 12 cover the corresponding agent behaviour and security check requirements; these scenarios have not been run yet.
+All eight commands run in CI on every pull request. Before the Kubernetes tests, CI installs `kubectl` v1.37.2 and `helm` v4.3.2, each checked against a SHA-256 written in `.github/workflows/ci.yml`, so the reader's render cases and the cluster script's flag classification run there and are not skipped. The validator mutation suite includes the starter's default permissions, redacted quotation, and package approval rules. Scenarios 10 to 12 cover the corresponding agent behaviour and security check requirements; these scenarios have not been run yet.
 
 ## Before a release
 
