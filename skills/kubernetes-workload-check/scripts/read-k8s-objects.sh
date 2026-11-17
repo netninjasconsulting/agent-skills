@@ -1452,19 +1452,32 @@ kfile_in() {
 
 # The paths a kustomization names, one "<field> <path>" line each, read
 # with the extractor and never printed. Exit 4 when the file is not read.
-# kustomize reads a key in any case, so each key of the list below is
-# judged by its lower-case form, and a kustomization that writes one in
-# another case is refused as well.
+# kustomize decodes its own keys as Go structure fields, which match a key
+# in any case: the top-level keys of a kustomization, and the keys of an
+# item of a list whose items are structures (patches, replacements, and
+# generators). So each such key of the lists below is judged by its
+# lower-case form, and a kustomization that writes one in another case is
+# refused as well. A key under a label, an annotation, or a selector is a
+# map key, which kustomize takes as written, and is never judged so.
 kust_entries() {
   leaves=$(REMOTES='' extract leaves "" < "$1") || return 4
   printf '%s\n' "$leaves" | awk -F '\t' '
     BEGIN {
-      n = split("helmCharts helmGlobals helmChartInflationGenerator generators transformers validators resources bases components crds configurations patchesStrategicMerge patches patchesJson6902 replacements path openapi configMapGenerator secretGenerator files envs env", w, " ")
-      for (i = 1; i <= n; i++) CANON[tolower(w[i])] = w[i]
+      n = split("helmCharts helmGlobals helmChartInflationGenerator generators transformers validators resources bases components crds configurations patchesStrategicMerge patches patchesJson6902 replacements openapi configMapGenerator secretGenerator", w, " ")
+      for (i = 1; i <= n; i++) TOP[tolower(w[i])] = w[i]
+      n = split("patches patchesStrategicMerge patchesJson6902 replacements helmCharts configMapGenerator secretGenerator", w, " ")
+      for (i = 1; i <= n; i++) ITEMS[w[i]] = 1
+      n = split("path files envs env", w, " ")
+      for (i = 1; i <= n; i++) ITEMKEY[tolower(w[i])] = w[i]
     }
     {
       n = split($2, s, ">"); p = ""
-      for (i = 1; i <= n; i++) { k = tolower(s[i]); if (k in CANON) s[i] = CANON[k]; p = (i == 1) ? s[i] : p ">" s[i] }
+      for (i = 1; i <= n; i++) {
+        k = tolower(s[i])
+        if (i == 1 && (k in TOP)) s[i] = TOP[k]  # a top-level key
+        else if (i == 3 && (s[1] in ITEMS) && s[2] ~ /^#[0-9]+$/ && (k in ITEMKEY)) s[i] = ITEMKEY[k]  # a key of an item that is a structure
+        p = (i == 1) ? s[i] : p ">" s[i]
+      }
       if (p != $2) { print "bad -"; $2 = p }  # a known key in another case
     }
     $2 ~ /^(helmCharts|helmGlobals|helmChartInflationGenerator|generators|transformers|validators)(>|$)/ { print "plugin -"; next }

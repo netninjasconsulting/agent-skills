@@ -2385,6 +2385,12 @@ EOF
   refuse "kc6:overlay:plugin or inflator needed" "render an overlay that inflates a chart under HelmCharts" --render kustomize kc6
   printf 'resources:\n  - ../kustomize/base\nconfigmapgenerator:\n  - name: kc7\n    Files:\n      - https://attacker.invalid/FIXTUREVALUE-kc7\n' > "$rr/kc7/kustomization.yaml"
   refuse "kc7:overlay:remote base" "render an overlay with a remote generator file under configmapgenerator and Files" --render kustomize kc7
+  # The key of an item of patches or of a generator is kustomize's own too.
+  mkdir -p "$rr/kc8" "$rr/kc9"
+  printf 'resources:\n  - ../kustomize/base\npatches:\n  - Path: https://attacker.invalid/FIXTUREVALUE-kc8.yaml\n' > "$rr/kc8/kustomization.yaml"
+  refuse "kc8:overlay:remote base" "render an overlay with a remote patch under patches and Path" --render kustomize kc8
+  printf 'resources:\n  - ../kustomize/base\nconfigMapGenerator:\n  - name: kc9\n    Files:\n      - https://attacker.invalid/FIXTUREVALUE-kc9\n' > "$rr/kc9/kustomization.yaml"
+  refuse "kc9:overlay:remote base" "render an overlay with a remote generator file under configMapGenerator and Files" --render kustomize kc9
   # Helm reads the keys of Chart.yaml in any case too.
   cp -R "$rr/chart" "$rr/depcase"
   cat >> "$rr/depcase/Chart.yaml" <<'EOF'
@@ -2811,7 +2817,8 @@ pins() {
   pin "a kustomization entry that looks like a repository" '# an entry kustomize can take for a repository' 's/refuse "remote base"  # an entry kustomize can take for a repository/:/' refusals "render an overlay with a local directory named like a host: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a known key in another case is refused" '# a known key in another case' 's/{ print "bad -"; \$2 = p }  # a known key in another case/{ $2 = p }/' refusals "render an overlay with a local base under RESOURCES: the render tool ran before the refusal"
-  pin "a kustomization key judged by its lower-case form" 'if (k in CANON) s[i] = CANON[k]' 's/if (k in CANON) s\[i\] = CANON\[k\]; //' refusals "render an overlay that inflates a chart under HelmCharts: expected kc6:overlay:plugin or inflator needed"
+  pin "a kustomization key judged by its lower-case form" '# a top-level key' 's/if (i == 1 \&\& (k in TOP)) s\[i\] = TOP\[k\]  # a top-level key/if (0) s[i] = s[i]/' refusals "render an overlay that inflates a chart under HelmCharts: expected kc6:overlay:plugin or inflator needed"
+  pin "the key of a patch or generator item judged by its lower-case form" '# a key of an item that is a structure' 's/else if (i == 3 .*  # a key of an item that is a structure//' refusals "render an overlay with a remote patch under patches and Path: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "Chart.yaml dependencies in another case" '# dependencies in another case' '/# dependencies in another case$/s/tolower(\$2)/0 \&\& tolower($2)/' refusals "render a chart with a dependency under Dependencies: expected depcase:chart:dependencies not vendored"
   # shellcheck disable=SC2016 # literal text, not an expansion
@@ -2896,6 +2903,9 @@ pins() {
     pin "a line separator in a rendered output" '# a line break YAML takes from Unicode' 's/{ ERR\[I\] = 1; return }  # a line break YAML takes from Unicode/{ }/' render "render a chart with a line separator: expected exit 4, got 0"
   else
     echo "skipped: the helm pins (helm is not installed)"
+  fi
+  if [ "$have_kustomize" -eq 1 ]; then
+    pin "the case of a key judged only where kustomization reads its own keys" '# a top-level key' 's/if (i == 1 \&\& (k in TOP))/if ((k in TOP))/' render "render an overlay with a label or annotation key spelt like a kustomization key (kl3): exit 3"
   fi
   if command -v kustomize >/dev/null 2>&1; then
     pin "kustomize standard error is dropped" '# kustomize: drop standard error' 's/ 2>\/dev\/null) || status=$?  # kustomize: drop standard error/) || status=$?/' render "render an overlay that fails inside the tool: standard error holds chart text"
