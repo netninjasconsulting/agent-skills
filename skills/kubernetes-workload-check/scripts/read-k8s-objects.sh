@@ -1300,8 +1300,8 @@ END {
 
 # The schema test. It reads a values.schema.json file as JSON, decodes the
 # escapes of each string (\uXXXX in either case of hex, \/, and the rest),
-# and exits 1 when a decoded key is $ref (or $dynamicRef or $recursiveRef)
-# with a value that is not a string starting with #, when a decoded key is
+# and exits 1 when a decoded key is $ref (or $dynamicRef, $recursiveRef,
+# or $schema) with a value that is not a string starting with #, when a decoded key is
 # $id, or when the file is not JSON the test can read. It prints nothing.
 # shellcheck disable=SC2016 # awk code, not shell
 SCHEMA='
@@ -1353,7 +1353,7 @@ END {
       if (substr(T, i, 1) != ":") continue
       i = ws(i + 1)
       if (key == "$id") { bad = 1; break }
-      if (key == "$ref" || key == "$dynamicRef" || key == "$recursiveRef") {
+      if (key == "$ref" || key == "$dynamicRef" || key == "$recursiveRef" || key == "$schema") {
         if (substr(T, i, 1) != "\"" || !str(i) || substr(S, 1, 1) != "#") { bad = 1; break }  # a reference that is not local
       }
       continue
@@ -1461,13 +1461,15 @@ phys() {
 
 # The physical path of $1 with every symbolic link followed, the last part
 # included, in RP. Returns 1 when a link does not resolve (its target does
-# not exist, or the links loop) and 2 when the path holds a control
-# character. readlink prints the target of one link.
+# not exist, or the links loop), 2 when the path holds a control
+# character, and 3 when readlink, which prints the target of one link, is
+# not installed.
 resolve() {
   rp_p=$1; rp_n=0
   while [ -L "$rp_p" ]; do
     rp_n=$((rp_n + 1))
     [ "$rp_n" -le 40 ] || return 1  # links that loop
+    command -v readlink >/dev/null 2>&1 || return 3
     rp_t=$(readlink -- "$rp_p" && echo x) || return 1
     rp_t=${rp_t%"${NL}x"}
     [ -n "$rp_t" ] || return 1
@@ -1479,6 +1481,23 @@ resolve() {
   [ -e "$rp_p" ] || return 1  # a link whose target does not exist
   if has_ctl "$rp_p"; then return 2; fi
   RP=$(phys "$rp_p") || return 2
+}
+
+# The absolute path $1 cleaned the way kustomize cleans a path before it
+# follows any link, in LX: each "." part dropped, and each ".." part
+# cancelling the part before it.
+lexical() {
+  lx_rest=$1; LX=
+  while [ -n "$lx_rest" ]; do
+    lx_part=${lx_rest%%/*}
+    case "$lx_rest" in */*) lx_rest=${lx_rest#*/} ;; *) lx_rest= ;; esac
+    case "$lx_part" in
+      '' | .) ;;
+      ..) LX=${LX%/*} ;;
+      *) LX="$LX/$lx_part" ;;
+    esac
+  done
+  [ -n "$LX" ] || LX=/
 }
 
 # A file or directory in the tree $1 has a line break in its name, which
@@ -1622,12 +1641,17 @@ list_mode() {
   ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
   unsafe=$((unsafe + ulinks))
   # Every other symbolic link is followed when it stays inside the list
-  # root. A file link adds its own path, and a directory link adds its
-  # path in front of each file under the directory it reaches, each with
-  # the path of the file it reaches. A link that points outside the root,
-  # or does not resolve, is not read and gets a link line.
+  # root, and every path that reaches a file inside it is listed at its own
+  # path: a file link by its own path, and a directory link with its path
+  # in front of each file under the directory it reaches, the links there
+  # included. Only a directory loop stops the descent. A link that points
+  # outside the root, or does not resolve, is not read and gets a link line.
   links=$(find . -name .git -prune -o \( -type l ! -path "$unsafe_path" \) -print | sed 's#^\./##' | sort)  # a link the list can carry
-  pairs=; dlinks=; llines=
+  if [ -n "$links" ] && ! command -v readlink >/dev/null 2>&1; then  # no readlink
+    echo "$me: not listed: the tree holds a symbolic link, and readlink, which the reader needs to follow one, is not installed" >&2
+    exit 4
+  fi
+  recs=
   for l in $links; do
     named=0
     case "${l##*/}" in *.yaml | *.yml | Kustomization) named=1 ;; esac
@@ -1638,33 +1662,68 @@ list_mode() {
       continue
     fi
     if [ "$rs" -ne 0 ]; then
-      [ "$named" -eq 0 ] || llines="$llines$(shown "$l"):link:broken, not read$NL"
+      [ "$named" -eq 0 ] || recs="${recs}B$TAB$l$NL"
       continue
     fi
     if ! inside_root "$RP"; then  # a link that points outside the list root
-      if [ "$named" -eq 1 ] || [ -d "$RP" ]; then llines="$llines$(shown "$l"):link:points outside the repository, not read$NL"; fi
+      if [ "$named" -eq 1 ] || [ -d "$RP" ]; then recs="${recs}O$TAB$l$NL"; fi
       continue
     fi
     rel=${RP#"$ROOTP"}; rel=${rel#/}; [ -n "$rel" ] || rel=.
     if [ -d "$RP" ]; then
-      # A link to the directory that holds it, or to one above, is not
-      # followed: what it reaches is listed already.
-      dir_part "$l"; lp=$(phys "$DIR") || continue
-      case "$lp/" in "${RP%/}"/*) continue ;; esac  # a link to a directory above it
-      dlinks="$dlinks$l$TAB$rel$NL"
+      recs="${recs}D$TAB$l$TAB$rel$NL"
     elif [ "$named" -eq 1 ]; then
-      pairs="$pairs$l$TAB$rel$NL"
+      recs="${recs}F$TAB$l$NL"
     fi
   done
-  # A file reached by two paths is listed once, by its first path in
-  # sorted order.
-  files=$({
-    printf '%s\n' "$files" | awk -v t="$TAB" 'NF { print $0 t $0 }'
-    printf '%s' "$pairs"
-    printf '%s' "$dlinks" | K8S_FILES=$files awk -F "$TAB" -v t="$TAB" '
-      BEGIN { n = split(ENVIRON["K8S_FILES"], F, "\n") }
-      { for (i = 1; i <= n; i++) if (substr(F[i], 1, length($2) + 1) == $2 "/") print $1 substr(F[i], length($2) + 1) t F[i] }'
-  } | sort | awk -F "$TAB" '!($2 in seen) { seen[$2] = 1; print $1 }')  # a file reached twice is listed once
+  # The paths, from the file list and the link records on standard input,
+  # with a line ":" between them, which no listed path can be.
+  lpaths=$({ printf '%s\n' "$files"; echo ':'; printf '%s' "$recs"; } | awk -F "$TAB" -v t="$TAB" '
+    function anc(a, d) { return a == "." || d == a || substr(d, 1, length(a) + 1) == a "/" }
+    function first(A, n, key,    lo, hi, m) {
+      lo = 1; hi = n + 1
+      while (lo < hi) { m = int((lo + hi) / 2); if ((A[m] "") < key) lo = m + 1; else hi = m }
+      return lo
+    }
+    function dirof(p,    i) { i = match(p, /\/[^\/]*$/); return i ? substr(p, 1, i - 1) : "." }
+    function shown(p) { return (substr(p, 1, 1) == "-") ? "./" p : p }
+    function emit(line) { if (++NOUT > 200000) { MANY = 1; return 0 } print line; return 1 }
+    function link(j, p) {
+      if (LK[j] == "F") return emit("f" t p)  # a file link at its own path
+      if (LK[j] == "O") return emit("l" t shown(p) ":link:points outside the repository, not read")
+      if (LK[j] == "B") return emit("l" t shown(p) ":link:broken, not read")
+      return expand(p, LT[j], DIRS[j], 1)
+    }
+    # The files and links under the directory a, with the path p in front.
+    function expand(p, a, chain, depth,    n, c, i, key, r) {
+      n = split(chain, c, SUBSEP)
+      for (i = 1; i <= n; i++) if (anc(a, c[i])) return 1  # a directory loop
+      if (depth > 40) return 1
+      key = (a == ".") ? "" : a "/"
+      for (i = first(F, NF_, key); i <= NF_ && substr(F[i], 1, length(key)) == key; i++)
+        if (!emit("f" t p "/" substr(F[i], length(key) + 1))) return 0
+      for (i = first(LP, NLK, key); i <= NLK && substr(LP[i], 1, length(key)) == key; i++) {
+        r = substr(LP[i], length(key) + 1)
+        if (LK[i] == "D") { if (!expand(p "/" r, LT[i], chain SUBSEP DIRS[i], depth + 1)) return 0 }
+        else if (!link(i, p "/" r)) return 0
+      }
+      return 1
+    }
+    BEGIN { part = 1 }
+    part == 1 && $0 == ":" { part = 2; next }
+    part == 1 { if ($0 != "") F[++NF_] = $0; next }
+    $0 != "" {
+      NLK++; LK[NLK] = $1; LP[NLK] = $2; LT[NLK] = $3
+      DIRS[NLK] = dirof($2)
+    }
+    END {
+      for (i = 1; i <= NF_; i++) if (!emit("f" t F[i])) break
+      for (j = 1; j <= NLK && !MANY; j++) link(j, LP[j])
+      if (MANY) exit 3
+    }') || { echo "$me: not listed: the links of the tree reach more than 200000 paths" >&2; exit 4; }
+  files=$(printf '%s\n' "$lpaths" | awk -F "$TAB" '$1 == "f" { print $2 }' | sort -u)
+  llines=$(printf '%s\n' "$lpaths" | awk -F "$TAB" '$1 == "l" { print $2 }' | sort -u)
+  [ -z "$llines" ] || llines="$llines$NL"
   charts=
   for f in $files; do
     case "$f" in Chart.yaml) charts="$charts ." ;; */Chart.yaml) charts="$charts ${f%/Chart.yaml}" ;; esac
@@ -1758,8 +1817,18 @@ read_file_mode() {
     exit 4
   fi
   [ -f "$f" ] || die2 "not a file: $f"
-  repo_top || { echo "$me: not read, a control character in the resolved path" >&2; exit 4; }
-  if ! resolve "$f" || ! inside_root "$RP"; then  # a path that leaves the repository
+  ROOTP=$(phys .) || { echo "$me: not read, a control character in the resolved path" >&2; exit 4; }  # the root of the list
+  rs=0
+  resolve "$f" || rs=$?
+  if [ "$rs" -eq 2 ]; then
+    echo "$me: not read, a path with a control character once its links are followed: $f" >&2
+    exit 4
+  fi
+  if [ "$rs" -eq 3 ]; then
+    echo "$me: not read, a symbolic link, and readlink is not installed: $f" >&2
+    exit 4
+  fi
+  if [ "$rs" -ne 0 ] || ! inside_root "$RP"; then  # a path that leaves the repository
     echo "$me: not read, a path that leads outside the repository: $f" >&2
     exit 4
   fi
@@ -1882,10 +1951,10 @@ $1" ;;
   # A schema with a reference that is not local, or with an $id, is
   # refused, with its JSON escapes decoded first, since an escape can spell
   # $ref. So is a schema the test cannot read as JSON.
-  if [ -n "$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" -type f -name values.schema.json -print; done | while IFS= read -r sf; do awk "$SCHEMA" < "$sf" || { echo bad; break; }; done)" ]; then
+  if [ -n "$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" \( -type f -o -type l \) -name values.schema.json -print; done | while IFS= read -r sf; do awk "$SCHEMA" < "$sf" || { echo bad; break; }; done)" ]; then
     refuse "remote schema ref"
   fi
-  deps=$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" \( -name Chart.yaml -o -name requirements.yaml \) -type f -print; done | while IFS= read -r cf; do
+  deps=$(printf '%s' "$TREE_DIRS" | while IFS= read -r td; do find "$td" \( -name Chart.yaml -o -name requirements.yaml \) \( -type f -o -type l \) -print; done | while IFS= read -r cf; do
     cdir=$(dirname -- "$cf")
     leaves=$(REMOTES='' extract leaves "" < "$cf") || { echo bad; break; }
     items=$(printf '%s\n' "$leaves" | awk -F '\t' '$2 ~ /^dependencies>#[0-9]+$/ { n++ } tolower($2) ~ /^dependencies(>|$)/ && $2 !~ /^dependencies(>|$)/ { n = -1; exit } END { print n + 0 }')  # dependencies in another case
@@ -1954,23 +2023,33 @@ $d"
       if repo_like "$target" "$d"; then refuse "remote base"  # an entry kustomize can take for a repository
       fi
       t="$d/$target"
-      [ -e "$t" ] || refuse "remote base"
-      rest=$target; acc=$d; via=0
+      rest=$target; acc=$d; via=0; dang=0
       while [ -n "$rest" ]; do
         part=${rest%%/*}
         case "$rest" in */*) rest=${rest#*/} ;; *) rest= ;; esac
         [ -n "$part" ] || continue
         acc="$acc/$part"
-        [ ! -L "$acc" ] || via=1
+        if [ -L "$acc" ]; then via=1; [ -e "$acc" ] || dang=1; fi
       done
+      [ "$dang" -eq 0 ] || refuse "broken, not read"  # an entry through a link that does not resolve
+      [ -e "$t" ] || refuse "remote base"
+      # The entry is tested twice: with its links followed first (cd -P),
+      # and cleaned first, the way kustomize reads it. Either one outside
+      # the repository refuses the render.
       resolve "$t" || refuse "remote base"
       pp=$RP
-      if ! inside_root "$pp"; then
-        [ "$via" -eq 0 ] || refuse "points outside the repository, not read"  # an entry through a link that leaves the repository
-        refuse "remote base"  # a base outside the repository
-      fi
+      lexical "$t"  # the path as kustomize cleans it
+      [ -e "$LX" ] || refuse "remote base"
+      resolve "$LX" || refuse "remote base"
+      lp=$RP
+      for ep in "$pp" "$lp"; do
+        if ! inside_root "$ep"; then
+          [ "$via" -eq 0 ] || refuse "points outside the repository, not read"  # an entry through a link that leaves the repository
+          refuse "remote base"  # a base outside the repository
+        fi
+      done
       if [ "$what" = res ] && [ -d "$t" ]; then
-        queue=$(printf '%s\n%s\n' "$queue" "$pp" | sed '/^$/d')
+        queue=$(printf '%s\n%s\n%s\n' "$queue" "$pp" "$lp" | sed '/^$/d')
       fi
     done <<EOF
 $entries

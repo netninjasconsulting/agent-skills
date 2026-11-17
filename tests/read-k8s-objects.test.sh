@@ -3045,11 +3045,23 @@ pins() {
   pin "a link that points outside the list root" '# a link that points outside the list root' 's/if ! inside_root "$RP"; then  # a link that points outside the list root/if false; then/' links "links: the list: missing line outside.yaml:link:points outside the repository, not read"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a link whose target does not exist" '# a link whose target does not exist' 's/\[ -e "$rp_p" \] || return 1  # a link whose target does not exist/:/' links "links: the list: missing line dangling.yaml:link:broken, not read"
-  pin "a link to a directory above it is not followed" '# a link to a directory above it' 's/continue ;; esac  # a link to a directory above it/;; esac/' links "links: the list: missing line loopd/zz.yaml:manifest:no-git"
+  pin "only a directory loop stops the descent" '# a directory loop' 's/for (i = 1; i <= n; i++) if (anc(a, c\[i\])) return 1  # a directory loop//' links "links: the list printed"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a file reached twice is listed once" '# a file reached twice is listed once' 's/!(\$2 in seen) { seen\[\$2\] = 1; print \$1 }/{ print $1 }/' links "links: a path reached twice, or an outside link with a name the list does not list: a line matches"
+  pin "a file link is listed at its own path" '# a file link at its own path' 's/if (LK\[j\] == "F") return emit("f" t p)  # a file link at its own path/if (LK[j] == "F") return 1/' links "links: the list: missing line apps/prod/bad.yaml:manifest:no-git"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "--fields on a path that leaves the repository" '# a path that leaves the repository' 's/if ! resolve "$f" || ! inside_root "$RP"; then  # a path that leaves the repository/if ! resolve "$f"; then/' links "links: --fields on a link outside the repository, exit 0"
+  pin "--fields and --values take the root of the list" '# the root of the list' 's/ROOTP=$(phys .) || {.*}  # the root of the list/repo_top || exit 4/' links "links: --fields on a link that leaves the directory the reader runs in, exit 0"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "an overlay entry tested the way kustomize cleans it" '# the path as kustomize cleans it' 's/lexical "$t"  # the path as kustomize cleans it/LX=$t/' refusals "render an overlay whose resource has .. after a link: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "an overlay entry through a link that does not resolve" '# an entry through a link that does not resolve' 's/\[ "$dang" -eq 0 \] || refuse "broken, not read"  # an entry through a link that does not resolve//' refusals "render an overlay whose resource goes through a dangling link: expected oN:overlay:broken, not read"
+  pin "a schema that is a link is tested" '-name values.schema.json -print' 's/\\( -type f -o -type l \\) -name values.schema.json/-type f -name values.schema.json/' refusals "render a chart whose schema is a link to a remote reference: the render tool ran before the refusal"
+  pin "a Chart.yaml that is a link is tested" '-name requirements.yaml \) \( -type f -o -type l \)' 's/-name requirements.yaml \\) \\( -type f -o -type l \\)/-name requirements.yaml \\) -type f/' refusals "render a chart whose Chart.yaml is a link to one with dependencies: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a \$schema that is not local" '|| key == "$schema")' 's/ || key == "$schema")/)/' refusals "render a chart whose schema names a remote \$schema: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a list with no readlink" '# no readlink' 's/^\( *\)if .*  # no readlink$/\1if false; then/' noreadlink "list with no readlink and a link in the tree: expected exit 4, got 0"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "--fields on a path that leaves the repository" '# a path that leaves the repository' 's/if \[ "$rs" -ne 0 \] || ! inside_root "$RP"; then  # a path that leaves the repository/if [ "$rs" -ne 0 ]; then/' links "links: --fields on a link outside the repository, exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a link in a chart or overlay tree that leaves the repository" '# a link in the tree that leaves the repository' 's/inside_root "$RP" || refuse "points outside the repository, not read"  # a link in the tree that leaves the repository/:/' refusals "render a chart with a link outside the repository: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
