@@ -1614,6 +1614,43 @@ repo_like() {
 }
 
 # The directory of a path: "." for a path with no "/".
+# top_kind FILE: "argo-application" or "manifest" when the file has
+# top-level apiVersion and kind keys, each bare or in quotes, at the indent
+# of its document's root mapping; nothing otherwise.
+top_kind() {
+  awk '
+    function key(line, name) {
+      return line ~ ("^(" name "|\"" name "\"|\047" name "\047):")  # a quoted top-level key
+    }
+    function val(line) {
+      sub(/^[^:]*:[ \t]*/, "", line)
+      gsub(/^["\047]|["\047][ \t]*$/, "", line)
+      sub(/[ \t]+$/, "", line)
+      return line
+    }
+    /^(---|\.\.\.)([ \t]|$)/ { root = -1; next }
+    /^[ \t]*(#|$)/ { next }
+    {
+      match($0, /^ */)
+      if (root < 0) root = RLENGTH  # the indent of the root mapping
+      if (RLENGTH != root) next
+      line = substr($0, RLENGTH + 1)
+      if (key(line, "kind")) {
+        k = 1
+        if (val(line) == "Application" || val(line) == "ApplicationSet") ak = 1
+      }
+      if (key(line, "apiVersion")) {
+        a = 1
+        if (index(val(line), "argoproj.io/") == 1) aa = 1
+      }
+    }
+    BEGIN { root = -1 }
+    END {
+      if (k && a) print (ak && aa) ? "argo-application" : "manifest"
+    }
+  ' "$1"
+}
+
 dir_of() {
   case "$1" in */*) printf '%s\n' "${1%/*}" ;; *) echo . ;; esac
 }
@@ -1800,16 +1837,10 @@ list_mode() {
         case "$base" in values*.yaml | values*.yml) kind='chart-values' ;; esac
       fi
       # A top-level key may be written bare, in double quotes, or in single
-      # quotes: the same forms --fields reads (keyline).
-      if [ -z "$kind" ] && grep -Eq -- '^(kind|"kind"|'"'"'kind'"'"'):' "$f" &&  # a quoted top-level key
-        grep -Eq -- '^(apiVersion|"apiVersion"|'"'"'apiVersion'"'"'):' "$f"; then
-        if grep -Eq -- '^(kind|"kind"|'"'"'kind'"'"'):[[:space:]]*["'"'"']?(Application|ApplicationSet)["'"'"']?[[:space:]]*$' "$f" &&
-          grep -Eq -- '^(apiVersion|"apiVersion"|'"'"'apiVersion'"'"'):[[:space:]]*["'"'"']?argoproj\.io/' "$f"; then
-          kind=argo-application
-        else
-          kind=manifest
-        fi
-      elif [ -z "$kind" ]; then
+      # quotes, at the indent of its document's root mapping: the same forms
+      # --fields reads (keyline).
+      [ -n "$kind" ] || kind=$(top_kind "$f")
+      if [ -z "$kind" ]; then
         case "$base" in values*.yaml | values*.yml) kind='chart-values' ;; esac
       fi
       [ -n "$kind" ] && printf '%s:%s:%s\n' "$(shown "$f")" "$kind" "$(git_state "$f")"
