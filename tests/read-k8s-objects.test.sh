@@ -403,7 +403,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -2507,6 +2507,36 @@ EOF
   refuse "oK:overlay:points outside the repository, not read" "render an overlay whose base has .. after a link" --render kustomize oK
   printf 'resources:\n  - ../c1out\ncomponents:\n  - lnk/../../../c1out\n' > "$rr/oL/kustomization.yaml"
   refuse "oL:overlay:points outside the repository, not read" "render an overlay whose component has .. after a link" --render kustomize oL
+  # Any entry with a ".." part after a part that is a link is refused,
+  # whatever both ways give: v5 is a file when followed and a directory,
+  # whose kustomization reaches outside, when cleaned.
+  mkdir -p "$rr/p/q" "$rr/v5/evil" "$rr/pV" "$rr/pW/xdir" "$rr/deep/a/xdir"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: p-evil\n' > "$rr/p/evil"
+  printf 'resources:\n  - ../../../c1out\n' > "$rr/v5/evil/kustomization.yaml"
+  ln -s ../p/q "$rr/v5/lnk"
+  printf 'resources:\n  - lnk/../evil\n' > "$rr/v5/kustomization.yaml"
+  refuse "v5:overlay:symbolic link inside" "render an overlay whose resource is a file one way and a directory the other" --render kustomize v5
+  ln -s ../deep/a/b "$rr/pV/lnk"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: patch\n' > "$rr/pV/patch.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: patch\n' > "$rr/deep/a/patch.yaml"
+  printf 'resources:\n  - ../c1out\npatches:\n  - path: lnk/../patch.yaml\n' > "$rr/pV/kustomization.yaml"
+  refuse "pV:overlay:symbolic link inside" "render an overlay whose patch path has .. after a link" --render kustomize pV
+  ln -s ../deep/a/b "$rr/pW/lnk"
+  printf 'resources:\n  - cm.yaml\n' > "$rr/pW/xdir/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: x\n' > "$rr/pW/xdir/cm.yaml"
+  cp "$rr/pW/xdir/kustomization.yaml" "$rr/pW/xdir/cm.yaml" "$rr/deep/a/xdir/"
+  printf 'resources:\n  - ./lnk/./../xdir\n' > "$rr/pW/kustomization.yaml"
+  refuse "pW:overlay:symbolic link inside" "render an overlay whose resource is ./lnk/./../xdir" --render kustomize pW
+  # A render takes the same root as the list: the directory the reader runs
+  # in, not the top of its Git repository.
+  mkdir -p "$work/rgit/sub/ov"
+  git -C "$work/rgit" init -q
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: above\n' > "$work/rgit/above.yaml"
+  printf 'resources:\n  - cm.yaml\n' > "$work/rgit/sub/ov/kustomization.yaml"
+  ln -s ../../above.yaml "$work/rgit/sub/ov/cm.yaml"
+  cwd=$work/rgit/sub
+  refuse "ov:overlay:points outside the repository, not read" "render from a directory below the top of Git, with a link above it" --render kustomize ov
+  cwd=$rr
   # An entry through a link that does not resolve.
   ln -s missing "$rr/oM/dang"
   printf 'resources:\n  - dang\n' > "$rr/oM/kustomization.yaml"
