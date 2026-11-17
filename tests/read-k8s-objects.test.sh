@@ -2151,6 +2151,17 @@ $out"
     rd --render helm tgzchart tgzchart/values.yaml
     [ "$code" -eq 0 ] || fail "render a chart whose vendored dependency names a remote schema: exit $code"
     expect_line "$out" "tgzchart:4:ConfigMap/-/sub:-:object=present" "render a chart whose vendored dependency names a remote schema"
+    # A schema is read with its JSON escapes decoded, so an escape in a
+    # description and a local reference do not refuse the render.
+    cp -R "$rr/chart" "$rr/cafechart"
+    # shellcheck disable=SC2016 # literal text, not an expansion
+    printf '{"description": "caf\\u00e9 and caf\\u00E9", "type": "object", "properties": {"note": {"$ref": "#/definitions/note"}}, "definitions": {"note": {"type": "string"}}}\n' > "$rr/cafechart/values.schema.json"
+    rd --render helm cafechart cafechart/values.yaml
+    [ "$code" -eq 0 ] || fail "render a chart whose schema holds an escape and a local reference: exit $code"
+    cp -R "$rr/chart" "$rr/localref"
+    printf '{"\\u0024ref": "\\u0023/definitions/x", "definitions": {"x": {"type": "object"}}}\n' > "$rr/localref/values.schema.json"
+    rd --render helm localref localref/values.yaml
+    [ "$code" -eq 0 ] || fail "render a chart whose schema holds an escaped local reference: exit $code"
     # A link that stays inside the repository is followed: a chart that
     # holds one renders, and so does a chart that is one.
     cp -R "$rr/chart" "$rr/linkchart"
@@ -2245,6 +2256,20 @@ EOF
   printf '{"\\u0024ref": "https://schemas.invalid/FIXTUREVALUE-esc.json"}\n' > "$rr/escchart/values.schema.json"
   refuse "escchart:chart:remote schema ref" "render a chart with a schema reference spelt with a JSON escape" \
     --render helm escchart escchart/values.yaml
+  cp -R "$rr/chart" "$rr/httpschart"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  printf '{"type": "object", "$ref": "https://schemas.invalid/FIXTUREVALUE-https.json"}\n' > "$rr/httpschart/values.schema.json"
+  refuse "httpschart:chart:remote schema ref" "render a chart with a remote schema reference" \
+    --render helm httpschart httpschart/values.yaml
+  cp -R "$rr/chart" "$rr/esc2chart"
+  printf '{"\\u0024r\\u0065f": "https:\\/\\/schemas.invalid\\u002FFIXTUREVALUE-esc2.json"}\n' > "$rr/esc2chart/values.schema.json"
+  refuse "esc2chart:chart:remote schema ref" "render a chart with a remote schema reference whose key and value are escaped" \
+    --render helm esc2chart esc2chart/values.yaml
+  cp -R "$rr/chart" "$rr/yamlschema"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  printf '$ref: https://schemas.invalid/FIXTUREVALUE-yaml.json\n' > "$rr/yamlschema/values.schema.json"
+  refuse "yamlschema:chart:remote schema ref" "render a chart whose schema is not JSON" \
+    --render helm yamlschema yamlschema/values.yaml
   # A link in a chart or overlay tree that points outside the repository,
   # or does not resolve, is never handed to the render tool.
   printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: outside\nstringData:\n  token: FIXTUREVALUE-outside\n' > "$work/outside-secret.yaml"
