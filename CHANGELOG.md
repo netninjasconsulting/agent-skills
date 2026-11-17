@@ -50,7 +50,7 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - A kustomization key in another case is refused only where kustomize reads its own keys: the top level, and the `path`, `files`, `envs`, and `env` keys of a patch, replacement, or generator item. A label, annotation, or selector key spelt like one of them no longer refuses the render.
 - A values schema is read as JSON with its escapes decoded, and is refused only for a `$ref` that is not local, an `$id`, or a file that is not JSON. An escape in a description and a local `#` reference no longer refuse the render.
 - `role-ref-name` is marked checked from the Kubernetes RBAC page, and the `User` subject fact cites the page's general sentence.
-- CI installs `kubectl` v1.37.2 and `helm` v4.3.2, each checked against a SHA-256 in the workflow, so the render cases and the flag classification run there.
+- CI installs `kubectl` v1.37.2, `helm` v4.3.2, and `kustomize` v5.8.1, each checked against a SHA-256 in the workflow and put first on the path, and prints their versions, so the render cases and the flag classification run there with the pinned tools.
 - `scenarios.md` gains scenario 5, symbolic links. It has not been run yet.
 
 ### Serverless branch review corrections (15 November 2026)
