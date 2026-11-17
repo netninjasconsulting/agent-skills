@@ -2343,6 +2343,27 @@ EOF
   printf '{"$schema": "https://schemas.invalid/FIXTUREVALUE-meta.json", "type": "object"}\n' > "$rr/metachart/values.schema.json"
   refuse "metachart:chart:remote schema ref" "render a chart whose schema names a remote \$schema" \
     --render helm metachart metachart/values.yaml
+  # The standard metaschemas, which helm has built in, reach the tool; a
+  # name that only looks like one does not.
+  for m in "draft07:http://json-schema.org/draft-07/schema#" "draft2020:https://json-schema.org/draft/2020-12/schema"; do
+    cp -R "$rr/chart" "$rr/${m%%:*}"
+    # shellcheck disable=SC2016 # literal text, not an expansion
+    printf '{"$schema": "%s", "type": "object"}\n' "${m#*:}" > "$rr/${m%%:*}/values.schema.json"
+    rm -f "$work/fake-calls"
+    rd --render helm "${m%%:*}" "${m%%:*}/values.yaml"
+    [ "$out" = "${m%%:*}:chart:render failed" ] && [ -e "$work/fake-calls" ] ||
+      fail "render a chart whose schema names the standard metaschema ${m#*:}: the render tool was not called, got $out"
+    rm -f "$work/fake-calls"
+  done
+  cp -R "$rr/chart" "$rr/evilmeta"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  printf '{"$schema": "https://json-schema.org/draft-07/schema.evil"}\n' > "$rr/evilmeta/values.schema.json"
+  refuse "evilmeta:chart:remote schema ref" "render a chart whose \$schema only looks like a standard one" \
+    --render helm evilmeta evilmeta/values.yaml
+  cp -R "$rr/chart" "$rr/othermeta"
+  printf '{"\\u0024schema": "https:\\/\\/example.com\\/draft-07\\/schema"}\n' > "$rr/othermeta/values.schema.json"
+  refuse "othermeta:chart:remote schema ref" "render a chart whose \$schema is a draft path on another host" \
+    --render helm othermeta othermeta/values.yaml
   cp -R "$rr/chart" "$rr/yamlschema"
   # shellcheck disable=SC2016 # literal text, not an expansion
   printf '$ref: https://schemas.invalid/FIXTUREVALUE-yaml.json\n' > "$rr/yamlschema/values.schema.json"
