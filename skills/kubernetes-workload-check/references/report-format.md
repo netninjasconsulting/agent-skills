@@ -64,7 +64,7 @@ Files read, one row for each path the list printed, and no other row:
 
 | Path | Kind | In Git? | Read with | Result |
 | --- | --- | --- | --- | --- |
-| <path> | <manifest, argo-application, chart, chart-values, overlay, or kustomize-base> | <tracked, untracked, ignored, or not in Git> | <--fields, --values, --render, or "no command"> | <read, not read, a kind the reader does not read, rendered, or not rendered: <state>> |
+| <path> | <manifest, argo-application, chart, chart-values, overlay, kustomize-base, or link> | <tracked, untracked, ignored, or not in Git; "not read" for a link> | <--fields, --values, --render, or "no command"> | <read, not read, a kind the reader does not read, rendered, or not rendered: <state>> |
 
 ## The eight sizing checks
 
@@ -139,7 +139,7 @@ In an environment that is not fully seen, a cell that is not "broad" from a deci
 - <Each `link` line of the list, by its path, with the words of its line: "<path>: points outside the repository, not read" or "<path>: broken, not read", and the environment it leaves not fully seen.>
 - <The count of paths the list left out, when its exit code was 4.>
 - <What each check names as "Not checked, always", for every environment it applies to, even when nothing else is listed for that environment, such as whether a metrics source runs in the cluster, and whether the network plugin enforces NetworkPolicy.>
-- <"R8: no cluster offer, because <reason>.", when R8 is "ask the team" and the offer was not made.>
+- <"R8: no cluster offer, because <reason>.", for each environment where R8 is "ask the team" and the offer does not name its namespace, whether or not an offer is made for others. With several such environments, one line each, beginning with the environment.>
 - The reader works by line and does not parse: a layout it cannot follow gives "not found", a chart or an overlay that is not rendered shows little, a setting with no field is not seen, and a kind it does not read leaves no line, even in a file with other objects.
 
 ---
