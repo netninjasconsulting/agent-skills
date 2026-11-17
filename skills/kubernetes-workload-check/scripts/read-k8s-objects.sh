@@ -1302,7 +1302,8 @@ END {
 # The schema test. It reads a values.schema.json file as JSON, decodes the
 # escapes of each string (\uXXXX in either case of hex, \/, and the rest),
 # and exits 1 when a decoded key is $ref (or $dynamicRef, $recursiveRef,
-# or $schema) with a value that is not a string starting with #, when a decoded key is
+# or $schema) with a value that is not a string starting with #, other
+# than a $schema that names one of the standard metaschemas exactly, when a decoded key is
 # $id, or when the file is not JSON the test can read. It prints nothing.
 # shellcheck disable=SC2016 # awk code, not shell
 SCHEMA='
@@ -1342,6 +1343,14 @@ function str(i,    c, e, v) {
   return 0
 }
 function ws(i) { while (i <= N && index(" \t\n\r", substr(T, i, 1))) i++; return i }
+# The metaschemas json-schema.org publishes, which helm has built in.
+BEGIN {
+  n = split("/draft-04/schema /draft-06/schema /draft-07/schema /draft/2019-09/schema /draft/2020-12/schema", m, " ")
+  for (i = 1; i <= n; i++) {
+    META["http://json-schema.org" m[i]] = 1; META["http://json-schema.org" m[i] "#"] = 1
+    META["https://json-schema.org" m[i]] = 1; META["https://json-schema.org" m[i] "#"] = 1
+  }
+}
 { T = T $0 "\n" }
 END {
   N = length(T); i = 1; bad = 0
@@ -1355,7 +1364,9 @@ END {
       i = ws(i + 1)
       if (key == "$id") { bad = 1; break }
       if (key == "$ref" || key == "$dynamicRef" || key == "$recursiveRef" || key == "$schema") {
-        if (substr(T, i, 1) != "\"" || !str(i) || substr(S, 1, 1) != "#") { bad = 1; break }  # a reference that is not local
+        if (substr(T, i, 1) != "\"" || !str(i)) { bad = 1; break }
+        if (key == "$schema" && (S in META)) continue  # a standard metaschema
+        if (substr(S, 1, 1) != "#") { bad = 1; break }  # a reference that is not local
       }
       continue
     }

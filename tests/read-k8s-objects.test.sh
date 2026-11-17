@@ -3078,6 +3078,8 @@ pins() {
   pin "a schema that is a link is tested" '-name values.schema.json -print' 's/\\( -type f -o -type l \\) -name values.schema.json/-type f -name values.schema.json/' refusals "render a chart whose schema is a link to a remote reference: the render tool ran before the refusal"
   pin "a Chart.yaml that is a link is tested" '-name requirements.yaml \) \( -type f -o -type l \)' 's/-name requirements.yaml \\) \\( -type f -o -type l \\)/-name requirements.yaml \\) -type f/' refusals "render a chart whose Chart.yaml is a link to one with dependencies: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "only the standard metaschemas are allowed in \$schema" '# a standard metaschema' 's/if (key == "$schema" \&\& (S in META)) continue  # a standard metaschema/if (key == "$schema") continue/' refusals "render a chart whose \$schema only looks like a standard one: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a \$schema that is not local" '|| key == "$schema")' 's/ || key == "$schema")/)/' refusals "render a chart whose schema names a remote \$schema: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a list with no readlink" '# no readlink' 's/^\( *\)if .*  # no readlink$/\1if false; then/' noreadlink "list with no readlink and a link in the tree: expected exit 4, got 0"
