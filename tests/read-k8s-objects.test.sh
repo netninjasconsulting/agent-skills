@@ -1981,6 +1981,9 @@ EOF
   printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: venv\n' > "$work/links/.venv/lib/pkg/cm.yaml"
   ln -s lib "$work/links/.venv/lib64"
   ln -s . "$work/links/a"
+  mkdir "$work/links/loopd"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: loopd\n' > "$work/links/loopd/zz.yaml"
+  ln -s . "$work/links/loopd/aa"
   printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: outside\nstringData:\n  token: FIXTUREVALUE-link-outside\n' > "$work/links-outside/secret.yaml"
   ln -s "$work/links-outside/secret.yaml" "$work/links/outside.yaml"
   ln -s ../links-outside "$work/links/outdir"
@@ -1996,6 +1999,7 @@ dangling.yaml:link:broken, not read
 dir/sa.yaml:manifest:no-git
 loop1.yaml:link:broken, not read
 loop2.yaml:link:broken, not read
+loopd/zz.yaml:manifest:no-git
 outdir:link:points outside the repository, not read
 outside.yaml:link:points outside the repository, not read
 secret.yaml:manifest:no-git'
@@ -2003,7 +2007,7 @@ secret.yaml:manifest:no-git'
   while IFS= read -r want; do expect_line "$out" "$want" "links: the list"; done < "$work/links-expected"
   [ "$out" = "$expected" ] || fail "links: the list printed
 $out"
-  expect_no "$out" '^a/|lib64|real/sa\.yaml|notes\.txt' "links: a path reached twice, or an outside link with a name the list does not list"
+  expect_no "$out" '^a/|loopd/aa|lib64|real/sa\.yaml|notes\.txt' "links: a path reached twice, or an outside link with a name the list does not list"
   rd --fields secret.yaml
   [ "$code" -eq 0 ] || fail "links: --fields on a link inside the repository, exit $code"
   expect_line "$out" "secret.yaml:6:Secret/-/linked:-:secret-key.string-data=token" "links: --fields on a link inside the repository"
@@ -2578,6 +2582,7 @@ sub"
   printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: s\n' > "$lx/d/nl
 sub/ok.yaml"
   printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: ok\n' > "$lx/d/ok.yaml"
+  ln -s ../ok.yaml "$lx/d/sub/l nk.yaml"
   rd d
   [ "$code" -eq 4 ] || fail "list with unsafe names: expected exit 4, got $code"
   [ "$out" = "ok.yaml:manifest:no-git" ] || fail "list with unsafe names: printed
@@ -2797,7 +2802,7 @@ pins() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "Chart.yaml dependencies in another case" '# dependencies in another case' '/# dependencies in another case$/s/tolower(\$2)/0 \&\& tolower($2)/' refusals "render a chart with a dependency under Dependencies: expected depcase:chart:dependencies not vendored"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "the resolved chart path in find" 'find "$cp_" -type l' 's/find "$cp_" -type l/find "$chart" -type l/' refusals "render a chart named -L: the render tool ran before the refusal"
+  pin "the resolved chart path in find" 'tree_dirs "$cp_"  # the resolved chart path' 's/tree_dirs "$cp_"  # the resolved chart path/tree_dirs "$chart"/' refusals "render a chart named -L: expected -L:chart:points outside the repository, not read"
   pin "the allow shape of a flow item" '# the allow shape of a flow item' 's/^\( *\)ok = .*  # the allow shape of a flow item$/\1ok = 1/' attacks 'flow form table: [?"hostPort":22] expected exit 4, got 0'
   pin "a control character in a path argument" '# a control character in a path argument' 's/^\(no_ctl() {\)  # a control character in a path argument$/\1 return 0/' refusals "render an overlay whose path holds a line break: expected exit 2"
   # The resolved path is the only safeguard of the list, so its pin stands
@@ -2810,15 +2815,17 @@ pins() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   phys_off='s/if has_ctl "$r"; then return 1; fi  # a control character in a resolved path/:/'
   # shellcheck disable=SC2016 # literal text, not an expansion
+  resolve_off='s/if has_ctl "$rp_p"; then return 2; fi/:/'
+  # shellcheck disable=SC2016 # literal text, not an expansion
   queue_off='s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/'
-  pin_behind "a control character in a resolved path, in a render" '# a control character in a resolved path' "$front_off;$queue_off" "$phys_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
-  pin_behind "a queue entry that does not exist" '# a queue entry that does not exist' "$front_off;$phys_off" "$queue_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  pin_behind "a control character in a resolved path, in a render" '# a control character in a resolved path' "$front_off;$queue_off;$resolve_off" "$phys_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  pin_behind "a queue entry that does not exist" '# a queue entry that does not exist' "$front_off;$phys_off;$resolve_off" "$queue_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a line break at the end of a resolved path" '# a line break at the end of a resolved path' 's/r=${r%"${NL}x"}  # a line break at the end of a resolved path/r=$(printf %s "${r%x}")/' refusals "render an overlay from a directory whose name ends in a line break: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a line break at the end of the repository root" '# a line break at the end of the repository root' 's/top=${top%"${NL}x"}  # a line break at the end of the repository root/top=$(printf %s "${top%x}")/' refusals "render an overlay beside a repository whose path ends in a line break: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin_behind "the directory of a file, with a line break at its end" '# the directory of the file, with a line break at its end' "$front_off" 's/dir_part "$f"; REMOTES=$(remotes_of "$DIR")  # the directory of the file, with a line break at its end/REMOTES=$(remotes_of "$(dirname -- "$f")")/' refusals "read a file under a directory whose name ends in a line break: the remotes of another directory were read"
+  pin_behind "the directory of a file, with a line break at its end" '# the directory of the file, with a line break at its end' "$front_off;$phys_off;$resolve_off" 's/dir_part "$f"; REMOTES=$(remotes_of "$DIR")  # the directory of the file, with a line break at its end/REMOTES=$(remotes_of "$(dirname -- "$f")")/' refusals "read a file under a directory whose name ends in a line break: the remotes of another directory were read"
   pin "an equals sign that starts a flow item" '# an equals sign does not start an item' 's|(t ~ "^\[A-Za-z0-9./\]|(t ~ "^[A-Za-z0-9./=]|' attacks 'flow form table: [=x] expected exit 4, got 0'
   pin "a dash alone as a flow item" '# a dash alone is not an item' 's|@+=-\]+\$") return 1  # a dash alone is not an item|@+=-]*$") return 1|' attacks 'flow form table: [-] expected exit 4, got 0'
   if command -v kubectl >/dev/null 2>&1; then
@@ -2839,15 +2846,34 @@ pins() {
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a base outside the repository" '# a base outside the repository' 's/inside_root "$pp" || refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
+  pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a JSON escape in a schema" '# a JSON escape can spell $ref' 's/ -e '"'"'\\u'"'"' {}/ {}/' refusals "render a chart with a schema reference spelt with a JSON escape: the render tool ran before the refusal"
   pin "a line break in a chart or overlay tree" '# a line break in a name' 's/^\(nl_inside() {\)  # a line break in a name$/\1 return 1/' refusals "render a chart with a line break in a name: the render tool ran before the refusal"
-  pin "a symbolic link in the tree is counted" '# a symbolic link is not listed' '/# a symbolic link is not listed$/s/-type l /-type l -name x-no-link /' listx "list with a linked manifest and a linked directory: expected exit 4, got 0"
-  pin "a List kind is not read" '# a List holds objects the reader does not follow' '/# a List holds objects the reader does not follow$/s/ERR\[0\] = 1; //' attacks "attack List kind: expected exit 4, got 0"
-  pin "the list root has no link" '# the list root: no link in any part' 's/^\( *\)if .*  # the list root: no link in any part$/\1if false; then/' listx "list through a symbolic link: exit 0"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a path the list cannot carry" '! -path "$unsafe_path" -print' 's/ ! -path "$unsafe_path" -print/ -print/' listx "list with a line break that repeats a name: printed"
+  pin "a link the list can carry" '# a link the list can carry' 's/\\( -type l ! -path "$unsafe_path" \\) -print/-type l -print/' listx "list with unsafe names: printed"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a link that points outside the list root" '# a link that points outside the list root' 's/if ! inside_root "$RP"; then  # a link that points outside the list root/if false; then/' links "links: the list: missing line outside.yaml:link:points outside the repository, not read"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a link whose target does not exist" '# a link whose target does not exist' 's/\[ -e "$rp_p" \] || return 1  # a link whose target does not exist/:/' links "links: the list: missing line dangling.yaml:link:broken, not read"
+  pin "a link to a directory above it is not followed" '# a link to a directory above it' 's/continue ;; esac  # a link to a directory above it/;; esac/' links "links: the list: missing line loopd/zz.yaml:manifest:no-git"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a file reached twice is listed once" '# a file reached twice is listed once' 's/!(\$2 in seen) { seen\[\$2\] = 1; print \$1 }/{ print $1 }/' links "links: a path reached twice, or an outside link with a name the list does not list: a line matches"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "--fields on a path that leaves the repository" '# a path that leaves the repository' 's/if ! resolve "$f" || ! inside_root "$RP"; then  # a path that leaves the repository/if ! resolve "$f"; then/' links "links: --fields on a link outside the repository, exit 0"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a link in a chart or overlay tree that leaves the repository" '# a link in the tree that leaves the repository' 's/inside_root "$RP" || refuse "points outside the repository, not read"  # a link in the tree that leaves the repository/:/' refusals "render a chart with a link outside the repository: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a directory a link in the tree reaches is checked" '# a directory a link reaches' 's/if \[ -d "$RP" \]; then td_queue="$td_queue$NL$RP"; fi  # a directory a link reaches/:/' refusals "render a chart whose linked directory holds a link outside the repository: the render tool ran before the refusal"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a link in a chart or overlay tree that does not resolve" '# a link that does not resolve' 's/\[ "$td_s" -ne 1 \] || refuse "broken, not read"  # a link that does not resolve/:/' refusals "render a chart with a dangling link: expected brokenchart:chart:broken, not read"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "an overlay entry through a link that leaves the repository" '# an entry through a link that leaves the repository' 's/\[ "$via" -eq 0 \] || refuse "points outside the repository, not read"  # an entry through a link that leaves the repository/:/' refusals "render an overlay with an entry through a link outside the repository: expected extov:overlay:points outside the repository, not read"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a values file a link takes outside the repository" '# a path a link takes outside the repository' 's/\[ "$nl_s" -ne 3 \] || refuse "points outside the repository, not read"  # a path a link takes outside the repository/:/' refusals "render with a values file that is a link outside the repository: expected chart:chart:points outside the repository, not read"
+  pin "a List kind is not read" '# a List holds objects the reader does not follow' '/# a List holds objects the reader does not follow$/s/ERR\[0\] = 1; //' attacks "attack List kind: expected exit 4, got 0"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a path the list cannot carry" '! -path "$unsafe_path" -print' 's/ ! -path "$unsafe_path" -print/ -print/' listx "list with unsafe names: printed"
   if [ "$have_helm" -eq 1 ]; then
     # shellcheck disable=SC2016 # literal text, not an expansion
     pin "the pipe from the renderer" '# the pipe' 's/ | extract render "$label"  # the pipe//' render "a planted value leaked"
