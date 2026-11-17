@@ -18,7 +18,9 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The Kubernetes reader test, with its render cases and pins, takes about
+    # four and a half minutes on a workstation, and the whole job about six.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

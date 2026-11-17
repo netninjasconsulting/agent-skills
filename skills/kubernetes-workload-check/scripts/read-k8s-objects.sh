@@ -34,9 +34,10 @@
 # unrendered template line) means the whole file is not read: it prints
 # nothing and exits 4.
 #
-# A symbolic link that stays inside the repository (the list root, or the
-# top of the Git repository in the other modes, each resolved with its own
-# links) is followed like what it points to. A link that points outside
+# A symbolic link that stays inside the repository (for the list, --fields,
+# and --values, the directory the reader runs in; for a render, the top of
+# its Git repository; each resolved with its own links) is followed like
+# what it points to, and the list prints every path that reaches a file. A link that points outside
 # it, or that does not resolve, is not read: the list prints a link line
 # for it, --fields and --values exit 4, and a render is refused.
 #
