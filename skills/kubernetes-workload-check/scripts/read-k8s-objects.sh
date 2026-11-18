@@ -1613,12 +1613,18 @@ repo_like() {
   return 1
 }
 
-# The directory of a path: "." for a path with no "/".
 # top_kind FILE: "argo-application" or "manifest" when the file has
 # top-level apiVersion and kind keys, each bare or in quotes, at the indent
-# of its document's root mapping; nothing otherwise.
+# of its document's root mapping. Otherwise "maybe" when the file looks
+# like a manifest: its bytes hold both words, or a backslash escape \u, \U,
+# or \x, which can spell either word. Nothing otherwise.
 top_kind() {
   awk '
+    {
+      if (index($0, "apiVersion")) LA = 1
+      if (index($0, "kind")) LK = 1
+      if (index($0, "\\u") || index($0, "\\U") || index($0, "\\x")) LE = 1  # an escape can spell a key
+    }
     function key(line, name) {
       return line ~ ("^(" name "|\"" name "\"|\047" name "\047):")  # a quoted top-level key
     }
@@ -1647,10 +1653,25 @@ top_kind() {
     BEGIN { root = -1 }
     END {
       if (k && a) print (ak && aa) ? "argo-application" : "manifest"
+      else if ((LA && LK) || LE) print "maybe"  # looks like a manifest
     }
   ' "$1"
 }
 
+# read_kind FILE: the kind of a file that looks like a manifest and whose
+# top-level keys top_kind cannot see. The extractor decides. A file it
+# cannot read is a manifest, so that --fields reports it not read; a file
+# it reads is a manifest only when its root holds apiVersion and kind.
+read_kind() {
+  if not_text "$1"; then echo manifest; return; fi
+  rk=$(REMOTES='' extract leaves "" < "$1") || { echo manifest; return; }  # a file the extractor cannot read
+  printf '%s\n' "$rk" | awk -F '\t' '
+    $2 == "kind" { k = 1; if ($3 == "Application" || $3 == "ApplicationSet") ak = 1 }
+    $2 == "apiVersion" { a = 1; if (index($3, "argoproj.io/") == 1) aa = 1 }
+    END { if (k && a) print (ak && aa) ? "argo-application" : "manifest" }'  # a root that holds both keys
+}
+
+# The directory of a path: "." for a path with no "/".
 dir_of() {
   case "$1" in */*) printf '%s\n' "${1%/*}" ;; *) echo . ;; esac
 }
@@ -1684,11 +1705,13 @@ list_mode() {
   # is counted and reported, and the run ends with exit code 4.
   set -f
   unsafe_path='*[!A-Za-z0-9._/@+-]*'
-  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)
-  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization \) -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
-  # A symbolic link with such a path, named like a manifest or to a
+  # The candidates: *.yaml, *.yml, *.json (not a chart's values.schema.json),
+  # and Kustomization.
+  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -name values.schema.json ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)  # the candidates
+  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -name values.schema.json -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
+  # A symbolic link with such a path, named like a candidate or to a
   # directory, is counted with them.
-  ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
+  ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o \( -name '*.json' ! -name values.schema.json \) -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
   unsafe=$((unsafe + ulinks))
   # Every other symbolic link is followed when it stays inside the list
   # root, and every path that reaches a file inside it is listed at its own
@@ -1704,7 +1727,7 @@ list_mode() {
   recs=
   for l in $links; do
     named=0
-    case "${l##*/}" in *.yaml | *.yml | Kustomization) named=1 ;; esac
+    case "${l##*/}" in values.schema.json) ;; *.yaml | *.yml | *.json | Kustomization) named=1 ;; esac
     rs=0
     resolve "$l" || rs=$?
     if [ "$rs" -eq 2 ]; then
@@ -1840,6 +1863,7 @@ list_mode() {
       # quotes, at the indent of its document's root mapping: the same forms
       # --fields reads (keyline).
       [ -n "$kind" ] || kind=$(top_kind "$f")
+      if [ "$kind" = maybe ]; then kind=$(read_kind "$f"); fi  # the extractor decides
       if [ -z "$kind" ]; then
         case "$base" in values*.yaml | values*.yml) kind='chart-values' ;; esac
       fi

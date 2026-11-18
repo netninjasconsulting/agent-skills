@@ -3146,8 +3146,17 @@ pins() {
   pin "encrypted only in a sops document" '# encrypted only in a sops document' '/# encrypted only in a sops document$/s/sopsdoc(I) \&\& //' attacks "missing line values-enc.yaml:2:Values/-/-:-:values-key.db.password=scalar"
   pin "the form of a User name" '# the form of a User name' '/# the form of a User name$/s/== "system:serviceaccount:"/== "x"/' attacks "missing line rbac-users.yaml:11:ClusterRoleBinding/-/users:-:subject.1.user-form=service-account"
   pin "a quoted User name with a backslash" '# the form of a User name' '/# the form of a User name$/s/ || (LQ\[0, k\] \&\& index(LVAL\[0, k\], "\\\\"))//' attacks "missing line rbac-escaped.yaml:11:ClusterRoleBinding/-/escaped:-:subject.1.user-form=other"
-  pin "a quoted top-level key in the list" '# a quoted top-level key' '/# a quoted top-level key$/s/|\\"" name "\\"|/|/' links "missing line dq.yaml:manifest:no-git"
-  pin "an indented root mapping in the list" '# the indent of the root mapping' '/# the indent of the root mapping$/s/root = RLENGTH/root = 0/' links "missing line ind.yaml:manifest:no-git"
+  # The extractor reads a file whose keys top_kind cannot see, so these two
+  # are shown with the extractor's turn switched off.
+  pin_behind "a quoted top-level key in the list" '# a quoted top-level key' '/# the extractor decides$/d' '/# a quoted top-level key$/s/|\\"" name "\\"|/|/' links "missing line dq.yaml:manifest:no-git"
+  pin_behind "an indented root mapping in the list" '# the indent of the root mapping' '/# the extractor decides$/d' '/# the indent of the root mapping$/s/root = RLENGTH/root = 0/' links "missing line ind.yaml:manifest:no-git"
+  pin "a file that looks like a manifest goes to the extractor" '# the extractor decides' '/# the extractor decides$/d' links "missing line json-in-yaml.yaml:manifest:no-git"
+  pin "a file the extractor cannot read is listed" '# a file the extractor cannot read' '/# a file the extractor cannot read$/s/{ echo manifest; return; }/return/' links "missing line spacecolon.yaml:manifest:no-git"
+  pin "an escape can spell a key" '# an escape can spell a key' '/# an escape can spell a key$/s/LE = 1/LE = 0/' links "missing line esckey.yaml:manifest:no-git"
+  pin "a file the extractor reads is a manifest only with both root keys" '# a root that holds both keys' '/# a root that holds both keys$/s/if (k \&\& a) print/print/' links "a line matches ^(package"
+  pin "a JSON file is a candidate" '# the candidates' '/# the candidates$/s/ -o -name .\*\.json. -o -name Kustomization/ -o -name Kustomization/' links "missing line pod.json:manifest:no-git"
+  pin "a chart's values.schema.json is not a candidate" '# the candidates' '/# the candidates$/s/ ! -name values\.schema\.json ! -path/ ! -path/' links "a line matches ^(package"
+  pin "a JSON link is named like a candidate" '*.yml | *.json | Kustomization) named=1' 's/ \*\.yml | \*\.json | Kustomization) named=1/ *.yml | Kustomization) named=1/' links "missing line out.json:link:points outside the repository, not read"
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion

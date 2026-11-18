@@ -53,6 +53,10 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 - CI installs `kubectl` v1.37.2, `helm` v4.3.2, and `kustomize` v5.8.1, each checked against a SHA-256 in the workflow and put first on the path, and prints their versions, so the render cases and the flag classification run there with the pinned tools.
 - `scenarios.md` gains scenario 5, symbolic links. It has not been run yet.
 
+### Kubernetes workload check: changes decided on review (17 November 2026)
+
+- The list also looks at `*.json` files (not a chart's `values.schema.json`). A file whose top-level keys the list cannot see, and whose bytes hold both `apiVersion` and `kind` or an escape `\u`, `\U`, or `\x`, goes to the extractor: a file it cannot read (JSON, a byte order mark, `kind : Pod`, a complex key, an escaped key) is listed as `manifest`, so `--fields` exits 4 on it and it is "not read"; a file it reads is listed only when its root holds `apiVersion` and `kind`. Before, the list left such a file out with exit code 0, though kubectl reads it.
+
 ### Serverless branch review corrections (15 November 2026)
 
 - List every supported platform in a Terraform or OpenTofu file, so a mixed infrastructure file does not silently omit platforms from coverage.

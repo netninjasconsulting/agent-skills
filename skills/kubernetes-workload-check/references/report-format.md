@@ -241,7 +241,7 @@ This is a quick check. It is not a penetration test and it is not legal advice.
 
 No Kubernetes workload was found in this repository, so there is nothing to score.
 
-Searched for: files with top-level `apiVersion` and `kind` lines, Helm charts (`Chart.yaml`) and their values files, Kustomize overlays and bases, and Argo CD `Application` and `ApplicationSet` objects; and in them the workload kinds Deployment, StatefulSet, DaemonSet, Job, CronJob, Pod, and the Argo Rollouts `Rollout`.
+Searched for: `.yaml`, `.yml`, and `.json` files with top-level `apiVersion` and `kind` lines, or that look like a manifest in a layout the reader cannot read, Helm charts (`Chart.yaml`) and their values files, Kustomize overlays and bases, and Argo CD `Application` and `ApplicationSet` objects; and in them the workload kinds Deployment, StatefulSet, DaemonSet, Job, CronJob, Pod, and the Argo Rollouts `Rollout`.
 
 <Each item the reader listed, by path and kind, with what it held, such as "a ConfigMap only" or "a kind the reader does not read".>
 
