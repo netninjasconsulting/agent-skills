@@ -1166,12 +1166,13 @@ BEGIN {
   n = split("app app.kubernetes.io/name app.kubernetes.io/instance app.kubernetes.io/component " \
     "app.kubernetes.io/part-of component tier role environment", L, " ")
   for (i = 1; i <= n; i++) LABELKEYS[L[i]] = 1
-  n = split("Pod Deployment StatefulSet DaemonSet Job CronJob Rollout HorizontalPodAutoscaler " \
+  n = split("Pod Deployment ReplicaSet ReplicationController StatefulSet DaemonSet Job CronJob Rollout HorizontalPodAutoscaler " \
     "VerticalPodAutoscaler LimitRange ResourceQuota Namespace ServiceAccount Role ClusterRole " \
     "RoleBinding ClusterRoleBinding NetworkPolicy Secret ConfigMap Application ApplicationSet", L, " ")
   for (i = 1; i <= n; i++) KINDS[L[i]] = 1
   n = split("Pod Deployment StatefulSet DaemonSet Job CronJob Rollout", L, " ")
   for (i = 1; i <= n; i++) PODKINDS[L[i]] = 1
+  PODKINDS["ReplicaSet"] = 1; PODKINDS["ReplicationController"] = 1  # read like a Deployment
   ARGO["Application"] = 1; ARGO["ApplicationSet"] = 1
 
   # The simple fields: context, path ("#" for an item), field, and shape.
@@ -1207,6 +1208,7 @@ BEGIN {
     "c|envFrom>#>secretRef>name|env-from-secret|dns-subdomain;" \
     "c|envFrom>#>configMapRef>name|env-from-configmap|dns-subdomain;" \
     "Deployment|spec>replicas|replicas|int;StatefulSet|spec>replicas|replicas|int;" \
+    "ReplicaSet|spec>replicas|replicas|int;ReplicationController|spec>replicas|replicas|int;" \
     "Rollout|spec>replicas|replicas|int;Rollout|spec>workloadRef>kind|workload-ref-kind|kind-name;" \
     "Rollout|spec>workloadRef>name|workload-ref-name|dns-subdomain;" \
     "Rollout|spec>workloadRef>scaleDown|workload-ref-scale-down|scale-down;" \

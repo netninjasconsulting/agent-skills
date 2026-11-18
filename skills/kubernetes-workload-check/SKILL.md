@@ -222,7 +222,7 @@ sh <skill-dir>/scripts/read-k8s-objects.sh --render kustomize <overlay>
 
 Before judging anything, list what exists. The map is printed in the report as the coverage record.
 
-- For each environment, list each workload with the line of its `object=present`: Deployment, StatefulSet, DaemonSet, Job, CronJob, bare Pod, and the Argo Rollouts `Rollout`, with its containers (`container-kind=main` or `init`).
+- For each environment, list each workload with the line of its `object=present`: Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, Job, CronJob, bare Pod, and the Argo Rollouts `Rollout`, with its containers (`container-kind=main` or `init`).
 - A `Rollout` that prints `workload-ref-kind` and `workload-ref-name` has no pod template of its own. The pair is one workload, judged once on the fields of the Deployment it names, and its row names both. The Deployment gets no row of its own.
 - A chart that was not rendered gets one row, "not rendered", with the reason, and no workload row.
 - An overlay that was not rendered gets one row, "not rendered", with the reason, and then one row for each workload printed by `--fields` in its own directory or in a `kustomize-base` directory, each labelled "read from `<file>`, not from the overlay".

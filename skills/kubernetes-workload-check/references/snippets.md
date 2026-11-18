@@ -4,7 +4,7 @@ Fixes to paste, one section for each check. The field paths come from [fields.md
 
 Every value is a placeholder in angle brackets. A snippet shows where a setting goes and leaves the value to the team: the skill never says what a request, a limit, a size, a deadline, a replica count, or a utilisation target should be. Here, "(not confirmed against the documentation)" marks a name, a key, or a form that `fields.md` does not hold, or that it marks "verify": it was not read in the Kubernetes, Helm, Kustomize, or Argo documentation on 15 or 16 November 2026, so read the current page before pasting it. A secret never goes into a snippet, as a value or as an example.
 
-Each snippet shows only the fields that fix its check, in the place they sit. `<P>` in a comment is the pod spec: `spec` in a Pod, `spec.template.spec` in a Deployment, StatefulSet, DaemonSet, Job, or `Rollout`, and `spec.jobTemplate.spec.template.spec` in a CronJob. Write every map in block style, as below. A flow map such as `matchLabels: {app: web}` makes the reader skip the whole file. In a chart, the fix goes in the template or in the values key the template reads. In an overlay, it goes in the base or in a patch of the overlay.
+Each snippet shows only the fields that fix its check, in the place they sit. `<P>` in a comment is the pod spec: `spec` in a Pod, `spec.template.spec` in a Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, Job, or `Rollout`, and `spec.jobTemplate.spec.template.spec` in a CronJob. Write every map in block style, as below. A flow map such as `matchLabels: {app: web}` makes the reader skip the whole file. In a chart, the fix goes in the template or in the values key the template reads. In an overlay, it goes in the base or in a patch of the overlay.
 
 ## Contents
 
@@ -96,7 +96,7 @@ metadata:
 spec:
   scaleTargetRef:
     apiVersion: <apps/v1, or argoproj.io/v1alpha1 for a Rollout>
-    kind: <Deployment, StatefulSet, or Rollout>
+    kind: <Deployment, ReplicaSet, StatefulSet, or Rollout>
     name: <workload in this environment>
   minReplicas: <minimum>
   maxReplicas: <maximum, above the minimum>

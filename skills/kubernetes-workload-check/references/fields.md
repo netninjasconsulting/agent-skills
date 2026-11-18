@@ -215,6 +215,8 @@ The reader reads these kinds and no others. A kind with no row is listed under "
 | --- | --- | --- | --- | --- | --- |
 | Pod | `v1` | `spec` | K27 | 15 Nov 2026 | checked |
 | Deployment | `apps/v1` | `spec.template.spec` | K4 | 15 Nov 2026 | checked |
+| ReplicaSet | `apps/v1` | `spec.template.spec` | K36 | 17 Nov 2026 | checked |
+| ReplicationController | `v1` | `spec.template.spec` | K37 | 17 Nov 2026 | checked |
 | StatefulSet | `apps/v1` | `spec.template.spec` | K5 | 15 Nov 2026 | checked |
 | DaemonSet | `apps/v1` | `spec.template.spec` | K6 | 15 Nov 2026 | checked |
 | Job | `batch/v1` | `spec.template.spec` | K7 | 15 Nov 2026 | checked |
@@ -252,7 +254,7 @@ In the tables below, `P` stands for the pod spec path in the third column above.
 
 ## Fields of a pod template
 
-These fields come from every kind in the "Pod template at" column: Pod, Deployment, StatefulSet, DaemonSet, Job, CronJob, and Rollout. A Rollout with `workloadRef` has no pod template, so it prints none of them. The pod template of the Deployment it points to is read from that Deployment.
+These fields come from every kind in the "Pod template at" column: Pod, Deployment, ReplicaSet, ReplicationController, StatefulSet, DaemonSet, Job, CronJob, and Rollout. A Rollout with `workloadRef` has no pod template, so it prints none of them. The pod template of the Deployment it points to is read from that Deployment.
 
 An entry of `initContainers` is a container like any other. The reader prints `container-kind=init` for it, and every container field below applies. Container-level settings override pod-level settings of the same name (K1, K3), so the reader prints both levels under the same field name, one with `<container>` set to the container and one with `-`.
 
@@ -333,6 +335,7 @@ Notes on the container rows:
 | Field | Kinds | Path | Shape | Source | Read | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `replicas` | Deployment, StatefulSet, Rollout | `spec.replicas` (defaults to 1) | `int` | K4, K5, A1 | 15 Nov 2026 | checked |
+| `replicas` | ReplicaSet, ReplicationController | `spec.replicas` (defaults to 1) | `int` | K36, K37 | 17 Nov 2026 | checked |
 | `workload-ref-kind` | Rollout | `spec.workloadRef.kind` | `kind-name` | A1, A2 | 15 Nov 2026 | checked |
 | `workload-ref-name` | Rollout | `spec.workloadRef.name` | `dns-subdomain` | A1, A2 | 15 Nov 2026 | checked |
 | `workload-ref-scale-down` | Rollout | `spec.workloadRef.scaleDown` | `scale-down` (on a miss: other) | A1, A2 | 15 Nov 2026 | checked |
@@ -349,6 +352,7 @@ Notes on the container rows:
 
 Notes:
 
+- A ReplicaSet and a ReplicationController are read like a Deployment: the pod template at `spec.template.spec` and `replicas`, which defaults to 1 (K36, K37). The template's `restartPolicy` can only be `Always` (K36, K37). A ReplicaSet's `spec.selector` is a label selector with `matchLabels` (K36). A ReplicationController's `spec.selector` is a plain label map, which defaults to the template's labels (K37). The reader prints no workload selector for any kind: K8 and the reach map match a NetworkPolicy to a workload's `pod-label.<key>` lines, which both kinds print from the template's labels. A ReplicaSet can be the target of a HorizontalPodAutoscaler (K36), and an external autoscaler can change a ReplicationController's `replicas` (K37). Both pages recommend a Deployment in their place (K36, K37). The skill reads them as they are written.
 - A Rollout uses either `template` or `workloadRef`, never both (A1). With `workloadRef`, the page says a change is made to the pod template of the Deployment (A2), so the Deployment is the workload that holds the pod template, and the pair counts once. The Rollout's `scaleDown` values are `never`, `onsuccess`, and `progressively` (A1, A2).
 - A Job's `restartPolicy` can only be `Never` or `OnFailure` (K7). The reader has no field for it.
 - `schedule`, `timeZone`, `suspend`, `parallelism`, `completions`, and a Job's `podFailurePolicy` have no field.
@@ -944,6 +948,8 @@ Kubernetes, `kubernetes.io`:
 - K33 Source of `kubectl config current-context`: https://raw.githubusercontent.com/kubernetes/kubernetes/master/staging/src/k8s.io/kubectl/pkg/cmd/config/current_context.go
 - K34 `kubectl kustomize`: https://kubernetes.io/docs/reference/kubectl/generated/kubectl_kustomize/
 - K35 Using ABAC authorisation, the service account username: https://kubernetes.io/docs/reference/access-authn-authz/abac/ (read 16 Nov 2026)
+- K36 ReplicaSet: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/ (read 17 Nov 2026)
+- K37 ReplicationController: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/ (read 17 Nov 2026)
 - V1 Vertical Pod Autoscaler API types: https://raw.githubusercontent.com/kubernetes/autoscaler/master/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1/types.go
 
 Helm, `helm.sh`:

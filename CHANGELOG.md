@@ -34,7 +34,7 @@ Four new skills. The four skills from 0.1.0 keep their checks.
 - The names in `skills/ai-feature-architecture-check/references/signals.md`, each read on 15 November 2026 from the vendor's package on npm or PyPI, from its source code, or from its documentation. The file names the source and the version in every row. The reads changed the list: Sentry's JavaScript SDK now uses `dataCollection` where it used `sendDefaultPii`, Together's default host is `api.together.ai`, two Google packages and one Langfuse package are deprecated, and pgvector has a fourth operator.
 - The rule that a local settings file tracked by Git waits for trust, read from code.claude.com on 15 November 2026.
 - Provider facts in `skills/serverless-deploy-check/references/platforms.md`, read from each provider's documentation on 15 November 2026. Rows marked "verify" were not confirmed on that date.
-- Kubernetes, Helm, Kustomize, and Argo facts in `skills/kubernetes-workload-check/references/fields.md`: 247 of 268 rows were read on 15 and 16 November 2026 in the projects' own documentation, in their source, or in the output of a local tool (`helm` v4.3.2 and `kubectl` v1.37.2). The 21 rows marked "verify" were not confirmed on those dates.
+- Kubernetes, Helm, Kustomize, and Argo facts in `skills/kubernetes-workload-check/references/fields.md`: 250 of 271 rows were read on 15, 16, and 17 November 2026 in the projects' own documentation, in their source, or in the output of a local tool (`helm` v4.3.2 and `kubectl` v1.37.2). The 21 rows marked "verify" were not confirmed on those dates.
 - Run on 16 November 2026 for the Kubernetes workload check, with the repository documents in place: `node scripts/validate.mjs` (8 skills, 71 files of copy, no problems), `node tests/validate.test.mjs` (all mutation cases passed), every `sh tests/*.test.sh` (all passed), and ShellCheck 0.11.0 on the two scripts and the two test scripts of the skill (no findings). The fixture runs are recorded in `tests/RESULTS.md`. The final fixture run, after the last fixes, is not part of this line.
 
 ### Tested
@@ -56,6 +56,7 @@ See `tests/RESULTS.md`. In short: `agent-permissions-check` passed two runs agai
 ### Kubernetes workload check: changes decided on review (17 November 2026)
 
 - The list also looks at `*.json` files (not a chart's `values.schema.json`). A file whose top-level keys the list cannot see, and whose bytes hold both `apiVersion` and `kind` or an escape `\u`, `\U`, or `\x`, goes to the extractor: a file it cannot read (JSON, a byte order mark, `kind : Pod`, a complex key, an escaped key) is listed as `manifest`, so `--fields` exits 4 on it and it is "not read"; a file it reads is listed only when its root holds `apiVersion` and `kind`. Before, the list left such a file out with exit code 0, though kubectl reads it.
+- The reader reads a ReplicaSet and a ReplicationController like a Deployment: the pod template at `spec.template.spec`, and `replicas`. Before, it printed no line for either, so a privileged workload of either kind went unseen.
 
 ### Serverless branch review corrections (15 November 2026)
 

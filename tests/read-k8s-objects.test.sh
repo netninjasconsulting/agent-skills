@@ -3202,6 +3202,7 @@ pins() {
   pin "a chart's values.schema.json is not a candidate" '# the candidates' '/# the candidates$/s/ ! -name values\.schema\.json ! -path/ ! -path/' links "a line matches ^(package"
   pin "a JSON link is named like a candidate" '*.yml | *.json | Kustomization) named=1' 's/ \*\.yml | \*\.json | Kustomization) named=1/ *.yml | Kustomization) named=1/' links "missing line out.json:link:points outside the repository, not read"
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
+  pin "a ReplicaSet and a ReplicationController have a pod template" '# read like a Deployment' '/# read like a Deployment$/d' fields "missing line rs.yaml:13:ReplicaSet/shop/web:-:host-network=true"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
