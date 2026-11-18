@@ -3389,7 +3389,7 @@ pins() {
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
   pin "a ReplicaSet and a ReplicationController have a pod template" '# read like a Deployment' '/# read like a Deployment$/d' fields "missing line rs.yaml:13:ReplicaSet/shop/web:-:host-network=true"
   # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "a render tool inside the repository is refused" '# a tool inside the repository' '/# a tool inside the repository$/s/if inside_root "$RP"; then refuse "tool inside the repository"; fi/:/' refusals "render with a helm the repository supplies, PATH with .: the render tool ran before the refusal"
+  pin "a render tool inside the repository is refused" '# a tool inside the repository' '/# a tool inside the repository$/s/if inside_root "$RP"; then refuse "tool inside the repository"; fi/:/' refusals "render with a helm linked from outside to one the repository supplies: the render tool ran before the refusal"
   pin "hostProcess at the pod level" '"pod|securityContext>windowsOptions>hostProcess|' '/"pod|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:9:Pod/-/win:-:host-process=true"
   pin "hostProcess at the container level" '"c|securityContext>windowsOptions>hostProcess|' '/"c|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:15:Pod/-/win:init:host-process=false"
   if command -v bash >/dev/null 2>&1; then
