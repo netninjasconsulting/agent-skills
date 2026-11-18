@@ -596,6 +596,7 @@ pins() {
   pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| :/' "no context: the message does not name the failed command"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "an empty context answer exits 5" '# an empty context answer: exit 5' 's/^case "\$raw" in .*  # an empty context answer: exit 5$/:/' "a context answer of spaces: expected exit 5"
+  pin "a kubectl inside the current directory exits 5" '# a kubectl inside the current directory: exit 5' 's/) die 5 "the kubectl on PATH resolves inside[^"]*" ;; esac/) : ;; esac/' "a kubectl inside the current directory, PATH with ., --context: expected exit 5"
   pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a row with a control character" '# a row with a control character' 's/ -e "\/\[\[:cntrl:\]\]\/s\/^$1 \/$1X \/"  # a row with a control character//' "a row with a carriage return: printed: crlf-1"

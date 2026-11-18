@@ -28,7 +28,7 @@ The offer is made only when R8 is "ask the team" in at least one environment who
    | --- | --- | --- |
    | Exit code 0 and a name | The current context | Make the offer with that name. |
    | Exit code 0 and `other` | A context exists, and its name does not fit the shape the script passes on, so the namespace mode would stop | No offer. Under "Not checked": "R8: no cluster offer, because the current context name does not fit the shape the cluster script passes on." |
-   | Exit code 5 | `kubectl` is not installed, or it has no current context. The script says which on standard error: `kubectl is not installed`, `kubectl config current-context failed`, or `kubectl config current-context printed no context name` | No offer. Under "Not checked": "R8: no cluster offer, because" and the reason in plain words. |
+   | Exit code 5 | `kubectl` is not installed, the `kubectl` on the path resolves inside the current directory (the repository could supply it, so the script did not run it), or it has no current context. The script says which on standard error: `kubectl is not installed`, `the kubectl on PATH resolves inside the current directory`, `kubectl config current-context failed`, or `kubectl config current-context printed no context name` | No offer. Under "Not checked": "R8: no cluster offer, because" and the reason in plain words. |
    | Exit code 2 | A wrong argument | Fix the command. |
 
 Run nothing else with `kubectl` before a yes, and nothing with `kubectl` outside the script at any time.
@@ -61,7 +61,7 @@ For one namespace, write "for the namespace `<namespace>`" in the offer. `<list>
    | --- | --- | --- |
    | 0 | Every namespace was read | The block "Measured in the cluster". |
    | 2 | An argument is not a namespace name, and no command ran | Fix the command: pass only the namespaces of the offer. |
-   | 5 | `kubectl` is missing, or the context could not be read or does not fit its shape. Nothing ran after step 1 of the script | "The cluster pass did not run:" and the reason in plain words. No block. |
+   | 5 | `kubectl` is missing or resolves inside the current directory, or the context could not be read or does not fit its shape. Nothing ran after step 1 of the script, and nothing at all for a `kubectl` inside the current directory | "The cluster pass did not run:" and the reason in plain words. No block. |
    | 6 | `kubectl top pod` failed for one namespace, so no metrics were read there: a missing metrics source, no access, or no answer, and the script cannot tell which. That namespace and every one after it were not read | The block, with the tables of the namespaces before it, and the line "Not read: `<namespaces>`, because `kubectl top pod` failed for `<namespace>` (a missing metrics source, no access, or no answer)." |
    | any other | The script stopped with its own message | "The cluster pass stopped:" and the message in plain words. Print nothing from that run as findings. |
 

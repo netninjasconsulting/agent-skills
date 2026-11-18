@@ -14,8 +14,8 @@
 #
 # Exit codes: 0 success, 1 the table of a namespace could not be printed
 # (awk failed; the namespaces before it stay printed), 2 wrong usage or an
-# argument that is not a namespace name, 5 kubectl missing or no current
-# context, 6 no metrics.
+# argument that is not a namespace name, 5 kubectl missing, a kubectl
+# inside the current directory, or no current context, 6 no metrics.
 #
 # It runs only the commands of the fixed list below (references/fields.md,
 # "Command section 3: the cluster commands"), in the caller's environment
@@ -100,6 +100,7 @@ kube() {
   # shellcheck disable=SC2086 # the words of a fixed command
   set -- $c
   set +f
+  shift; set -- "$KUBECTL" "$@"  # the kubectl that was checked
   KOUT=$( { "$@" </dev/null 2>/dev/null; printf '\n%s\n' "$?"; } |  # kubectl: the caller environment, no input, standard error dropped
     tr '\000' '\001')  # a NUL in kubectl output becomes a control character
   krc=${KOUT##*"$NL"}
@@ -330,6 +331,27 @@ esac
 # ---- The commands ----
 
 command -v kubectl >/dev/null 2>&1 || die 5 "kubectl is not installed"  # kubectl missing: exit 5
+
+# The kubectl that would run, with every link followed. One inside the
+# directory the script runs in (the repository being checked) is refused
+# before it runs: a PATH with "." or a relative directory can find a
+# kubectl that the repository supplies. KUBECTL is the path that runs: its
+# directory resolved, its last part kept, so that a kubectl that reads its
+# own name still sees it.
+kc=$(command -v kubectl)
+case $kc in */*) ;; *) die 5 "the kubectl on PATH is not a file path, so where it comes from cannot be checked; it was not run" ;; esac
+kp=$kc; kn=0
+while [ -L "$kp" ]; do
+  kn=$((kn + 1))
+  [ "$kn" -le 40 ] || die 5 "the kubectl on PATH is a symbolic link that loops; it was not run"
+  command -v readlink >/dev/null 2>&1 || die 5 "the kubectl on PATH is a symbolic link, and readlink, which the script needs to follow it, is not installed; it was not run"
+  kt=$(readlink -- "$kp") || die 5 "the kubectl on PATH is a symbolic link that does not resolve; it was not run"
+  case $kt in /*) kp=$kt ;; *) kp=${kp%/*}/$kt ;; esac
+done
+kd=$(cd -P -- "${kp%/*}" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
+here=$(pwd -P) || die 5 "the current directory does not resolve"
+case $kd/${kp##*/} in "$here" | "$here"/*) die 5 "the kubectl on PATH resolves inside the current directory, so the repository may supply it; it was not run" ;; esac  # a kubectl inside the current directory: exit 5
+KUBECTL=$(cd -P -- "${kc%/*}" && pwd -P)/${kc##*/}
 
 kube "$CMD_CONTEXT" "" || die 5 "kubectl config current-context failed"  # no context: exit 5
 raw=$(printf '%s' "$KOUT")

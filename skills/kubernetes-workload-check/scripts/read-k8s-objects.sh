@@ -46,7 +46,8 @@
 # helm template or kustomize build (or kubectl kustomize) itself, after the
 # refusal tests of fields.md, with a cleared environment and the fixed
 # arguments of fields.md, drops what the tool writes to standard error, and
-# pipes its standard output into the same extractor.
+# pipes its standard output into the same extractor. It refuses a tool that
+# resolves inside the repository, and runs the tool by the path it tested.
 
 set -u
 LC_ALL=C
@@ -1980,6 +1981,24 @@ TREE
   done
 }
 
+# The render tool $1, as the shell would find it on PATH, with every link
+# followed. A tool whose physical path is inside the repository, or that
+# does not resolve to an absolute path, is refused before it runs: a PATH
+# with "." or a relative directory can find a tool that the scanned
+# repository supplies. TOOLRUN is the path that runs: its directory
+# resolved, its last part kept, so that a tool that reads its own name
+# still sees it.
+tool_path() {
+  tp_c=$(command -v "$1" 2>/dev/null) || refuse "tool not installed"
+  tp_s=0
+  resolve "$tp_c" || tp_s=$?
+  [ "$tp_s" -eq 0 ] || refuse "tool inside the repository"  # a tool that does not resolve
+  if inside_root "$RP"; then refuse "tool inside the repository"; fi  # a tool inside the repository
+  dir_part "$tp_c"
+  tp_d=$(phys "$DIR") || refuse "tool inside the repository"
+  TOOLRUN="${tp_d%/}/$BASE"
+}
+
 render_helm() {
   chart=${1%/}; shift
   label=$chart; rkind=chart
@@ -1999,8 +2018,8 @@ $1" ;;
   done
   [ -n "$vals" ] || die2 "--render helm needs a chart and a values file"
   printf '%s\n' "$ns" | grep -Eqx '([a-z]|[a-z][-a-z0-9]*[a-z0-9])' && [ ${#ns} -le 63 ] || die2 "the namespace is not a DNS label"
-  command -v helm >/dev/null 2>&1 || refuse "tool not installed"
   set_root
+  tool_path helm
   need_local "$chart" d
   need_local "$chart/Chart.yaml" f
   vlist=$(printf '%s\n' "$vals" | sed '/^$/d')
@@ -2042,7 +2061,7 @@ $1" ;;
   set -- "$@" --namespace "$ns"
   REMOTES=$(remotes_of "$ROOTP")
   status=0
-  rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C helm "$@" 2>/dev/null) || status=$?  # helm: drop standard error
+  rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" "$@" 2>/dev/null) || status=$?  # helm: drop standard error
   if [ "$status" -ne 0 ]; then
     echo "$me: helm template exited with status $status" >&2
     refuse "render failed"
@@ -2061,6 +2080,7 @@ render_kustomize() {
     refuse "tool not installed"
   fi
   set_root
+  tool_path "$tool"
   need_local "$dir" d
   [ -n "$(kfile_in "$dir")" ] || refuse "not a local file"
   queue=$(phys "$dir") || refuse "not a local file"
@@ -2138,9 +2158,9 @@ EOF
   dp=$(phys "$dir")
   status=0
   if [ "$tool" = kustomize ]; then
-    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C kustomize build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
+    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
   else
-    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C kubectl kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
+    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
   fi
   if [ "$status" -ne 0 ]; then
     echo "$me: $tool exited with status $status" >&2
