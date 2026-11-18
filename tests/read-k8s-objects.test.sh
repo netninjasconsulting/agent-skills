@@ -35,6 +35,7 @@ real_reader="$root/skills/kubernetes-workload-check/scripts/read-k8s-objects.sh"
 fields_md="$root/skills/kubernetes-workload-check/references/fields.md"
 fixture="$root/tests/fixtures/kubernetes-workload-check"
 work=$(mktemp -d)
+work=$(cd "$work" && pwd -P) || exit 1
 trap 'rm -rf "$work"' EXIT
 
 [ -f "$real_reader" ] || { echo "FAIL: the reader does not exist: $real_reader"; exit 1; }
@@ -3415,8 +3416,10 @@ pins() {
   resolve_off='s/if has_ctl "$rp_p"; then return 2; fi/:/'
   # shellcheck disable=SC2016 # literal text, not an expansion
   queue_off='s/\[ -d "$d" \] || refuse "not a local file"  # a queue entry that does not exist/:/'
-  pin_behind "a control character in a resolved path, in a render" '# a control character in a resolved path' "$front_off;$queue_off;$resolve_off" "$phys_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
-  pin_behind "a queue entry that does not exist" '# a queue entry that does not exist' "$front_off;$phys_off;$resolve_off" "$queue_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  # A failed link walk also stops a render when a split queue path is missing.
+  walk_off='/td_links=/s/ || refuse "not a local file"$//'
+  pin_behind "a control character in a resolved path, in a render" '# a control character in a resolved path' "$front_off;$queue_off;$resolve_off;$walk_off" "$phys_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
+  pin_behind "a queue entry that does not exist" '# a queue entry that does not exist' "$front_off;$phys_off;$resolve_off;$walk_off" "$queue_off" refusals "render an overlay whose path holds a line break: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a line break at the end of a resolved path" '# a line break at the end of a resolved path' 's/r=${r%"${NL}x"}  # a line break at the end of a resolved path/r=$(printf %s "${r%x}")/' refusals "render an overlay from a directory whose name ends in a line break: the render tool ran before the refusal"
   # shellcheck disable=SC2016 # literal text, not an expansion
