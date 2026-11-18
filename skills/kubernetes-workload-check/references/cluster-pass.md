@@ -50,10 +50,10 @@ For one namespace, write "for the namespace `<namespace>`" in the offer. `<list>
 1. **Run the one command,** with the namespaces of the offer, in the same order, and nothing else:
 
    ```sh
-   sh <skill-dir>/scripts/read-cluster-usage.sh <namespace> [<namespace> ...]
+   sh <skill-dir>/scripts/read-cluster-usage.sh --expect-context <context-from-offer> <namespace> [<namespace> ...]
    ```
 
-   Run it once. Do not run it again for a namespace that failed, and run no other `kubectl` command.
+   Pass the exact context named in the approved offer. The script compares it with the local current context before the first network request. Run it once. Do not run it again for a namespace that failed, and run no other `kubectl` command.
 2. **Read the first line.** It is `# context <name>`. When that name is not the name in the offer, stop. Print nothing from that run as findings, and say: "The cluster script read the context `<name from the script>`, not `<name from the offer>`, so nothing from that run is reported."
 3. **Read the exit code.**
 
@@ -61,7 +61,7 @@ For one namespace, write "for the namespace `<namespace>`" in the offer. `<list>
    | --- | --- | --- |
    | 0 | Every namespace was read | The block "Measured in the cluster". |
    | 2 | An argument is not a namespace name, and no command ran | Fix the command: pass only the namespaces of the offer. |
-   | 5 | `kubectl` is missing or resolves inside the current directory, or the context could not be read or does not fit its shape. Nothing ran after step 1 of the script, and nothing at all for a `kubectl` inside the current directory | "The cluster pass did not run:" and the reason in plain words. No block. |
+   | 5 | `kubectl` is missing or resolves inside the current directory, or the context could not be read or does not fit its shape, or differs from the approved context. Nothing ran after step 1 of the script, and nothing at all for a `kubectl` inside the current directory | "The cluster pass did not run:" and the reason in plain words. No block. |
    | 6 | `kubectl top pod` failed for one namespace, so no metrics were read there: a missing metrics source, no access, or no answer, and the script cannot tell which. That namespace and every one after it were not read | The block, with the tables of the namespaces before it, and the line "Not read: `<namespaces>`, because `kubectl top pod` failed for `<namespace>` (a missing metrics source, no access, or no answer)." |
    | any other | The script stopped with its own message | "The cluster pass stopped:" and the message in plain words. Print nothing from that run as findings. |
 

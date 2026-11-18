@@ -339,7 +339,7 @@ Exactly these three namespaces, in the report's order of environments: those whe
 Everything in way 2 holds, word for word, up to the offers. After "Yes to the cluster pass.", the agent runs one command, with the three namespaces of the offer in the offer's order, for example:
 
 ```sh
-sh <skill-dir>/scripts/read-cluster-usage.sh dispatch-staging fleetboard-production fleetboard-staging
+sh <skill-dir>/scripts/read-cluster-usage.sh --expect-context fleetboard-stand-in dispatch-staging fleetboard-production fleetboard-staging
 ```
 
 It exits 0, and its first line is `# context fleetboard-stand-in`. `/tmp/fleetboard-kubectl.log` then holds 14 lines: two `config current-context` lines, then for each namespace, in the offer's order, one `top pod` line (17 arguments) and three `get` lines (30 arguments each: `pods`, `verticalpodautoscalers.autoscaling.k8s.io`, `horizontalpodautoscalers.autoscaling`). No line names `dispatch-production`, `fleetboard-tools`, or any other namespace.

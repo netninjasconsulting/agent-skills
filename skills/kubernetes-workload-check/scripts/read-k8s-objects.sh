@@ -1740,6 +1740,11 @@ in_chart() {
 
 # ---- Modes ----
 
+list_failed() {
+  echo "$me: not listed: could not traverse the whole directory tree" >&2
+  exit 4
+}
+
 list_mode() {
   LROOT=$1
   [ -d "$LROOT" ] || die2 "not a directory: $LROOT"
@@ -1753,19 +1758,21 @@ list_mode() {
   unsafe_path='*[!A-Za-z0-9._/@+-]*'
   # The candidates: *.yaml, *.yml, *.json, and Kustomization. A
   # values.schema.json inside a chart directory is left out below.
-  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)  # the candidates
-  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
+  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -path "$unsafe_path" -print 2>/dev/null) || list_failed  # the candidates
+  files=$(printf '%s\n' "$files" | sed 's#^\./##' | sort)
+  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) -path "$unsafe_path" -exec printf . \; 2>/dev/null) || list_failed
   # A symbolic link with such a path, named like a candidate or to a
   # directory, is counted with them.
-  ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
-  unsafe=$((unsafe + ulinks))
+  ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; 2>/dev/null) || list_failed
+  unsafe=$((${#unsafe} + ${#ulinks}))
   # Every other symbolic link is followed when it stays inside the list
   # root, and every path that reaches a file inside it is listed at its own
   # path: a file link by its own path, and a directory link with its path
   # in front of each file under the directory it reaches, the links there
   # included. Only a directory loop stops the descent. A link that points
   # outside the root, or does not resolve, is not read and gets a link line.
-  links=$(find . -name .git -prune -o \( -type l ! -path "$unsafe_path" \) -print | sed 's#^\./##' | sort)  # a link the list can carry
+  links=$(find . -name .git -prune -o \( -type l ! -path "$unsafe_path" \) -print 2>/dev/null) || list_failed  # a link the list can carry
+  links=$(printf '%s\n' "$links" | sed 's#^\./##' | sort)
   if [ -n "$links" ] && ! command -v readlink >/dev/null 2>&1; then  # no readlink
     echo "$me: not listed: the tree holds a symbolic link, and readlink, which the reader needs to follow one, is not installed" >&2
     exit 4
@@ -2016,7 +2023,7 @@ tree_dirs() {
     if printf '%s\n' "$TREE_DIRS" | grep -qxF -e "$td_d"; then continue; fi
     TREE_DIRS="$TREE_DIRS$td_d$NL"
     if nl_inside "$td_d"; then refuse "not a local file"; fi
-    td_links=$(find "$td_d" -type l -print)
+    td_links=$(find "$td_d" -type l -print 2>/dev/null) || refuse "not a local file"
     while IFS= read -r td_l; do
       [ -n "$td_l" ] || continue
       td_s=0
@@ -2097,7 +2104,7 @@ $1" ;;
     printf '%s\n' "$names" | while IFS= read -r dn; do
       [ -n "$dn" ] || continue
       printf '%s\n' "$dn" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9_.-]*' || { echo bad; break; }
-      case "$dn" in *..*) echo bad; break ;; esac
+      case "$dn" in (*..*) echo bad; break ;; esac
       [ -d "$cdir/charts/$dn" ] && continue
       found=0
       for t in "$cdir/charts/$dn"-*.tgz; do [ -f "$t" ] && found=1; done

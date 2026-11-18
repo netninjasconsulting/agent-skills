@@ -9,7 +9,7 @@
 # Usage:
 #   sh read-cluster-usage.sh --context                print the current context name,
 #                                                     with no request to the cluster
-#   sh read-cluster-usage.sh NAMESPACE [NAMESPACE ...]
+#   sh read-cluster-usage.sh --expect-context CONTEXT NAMESPACE [NAMESPACE ...]
 #                                                     print one table for each namespace
 #
 # Exit codes: 0 success, 1 the table of a namespace could not be printed
@@ -330,7 +330,7 @@ export PATH
 
 # ---- The front door ----
 
-[ $# -gt 0 ] || die 2 "usage: $me --context | NAMESPACE [NAMESPACE ...]"
+[ $# -gt 0 ] || die 2 "usage: $me --context | --expect-context CONTEXT NAMESPACE [NAMESPACE ...]"
 mode=namespaces
 case $1 in
   -h | --help)
@@ -342,11 +342,15 @@ case $1 in
     [ $# -eq 1 ] || die 2 "--context takes no other argument"
     mode=context
     ;;
-  *)
+  --expect-context)
+    [ $# -ge 3 ] || die 2 "--expect-context needs the approved context and at least one namespace"
+    approved_context=$2
+    shift 2
     for a in "$@"; do
       is_ns "$a" || die 2 "an argument is not a namespace name (lower case letters, digits, and -, at most 63 characters, starting and ending with a letter or a digit)"
     done
     ;;
+  *) die 2 "pass --expect-context with the approved context before the namespaces" ;;
 esac
 
 # ---- The commands ----
@@ -388,6 +392,7 @@ fi
 # The tables come from the context the header names: the name read above
 # is passed on as --context. A name outside its shape stops the run.
 [ "$ctx" = "$raw" ] || die 5 "the current context name does not fit the shape the script passes on"  # a context name out of shape: exit 5
+[ "$ctx" = "$approved_context" ] || die 5 "the current context differs from the approved context; no namespace was queried"
 CTX=$ctx
 
 echo "# context $ctx"

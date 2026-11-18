@@ -3087,6 +3087,13 @@ x"
   printf 'resources:\n  - ../base\n' > "$lx/a/deploy/kustomization.yaml"
   printf 'resources:\n  - ../../base\n' > "$lx/a/overlays/prod/kustomization.yaml"
   cwd=$lx
+  mkdir -p "$work/failing-find"
+  printf '%s\n' '#!/bin/sh' 'echo ./base/deployment.yaml' 'exit 1' > "$work/failing-find/find"
+  chmod +x "$work/failing-find/find"
+  RPATH=$work/failing-find:$PATH
+  rd a
+  [ "$code" -eq 4 ] && [ -z "$out" ] || fail "partial traversal returned an inventory"
+  RPATH=$PATH
   rd a
   expected='base/deployment.yaml:manifest:no-git
 base:kustomize-base:no-git

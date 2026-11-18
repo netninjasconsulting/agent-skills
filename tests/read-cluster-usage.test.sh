@@ -195,13 +195,18 @@ bad_args() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   for a in "" "a b" "-n" "-A" "--all-namespaces" "--namespace=x" "a;b" "a/b" "../etc" "Abc" "a_b" "a-" "-a" "a.b" "a${NL}b" "a${NL}" "a${TAB}b" "a${CR}" "default;rm" '$(id)' '*' "$long" "kube-system${NL}"; do
     i=$((i + 1))
-    run "$s" "" "$a"
+    run "$s" "" --expect-context fleetboard-stand-in "$a"
     [ "$rc" -eq 2 ] || fail "front door: argument $i expected exit 2, got $rc"
     [ -z "$(log_text)" ] || fail "front door: argument $i logged a command"
   done
-  run "$s" "" fleetboard-production "a b"
+  run "$s" "" --expect-context fleetboard-stand-in fleetboard-production "a b"
   [ "$rc" -eq 2 ] || fail "front door: a good name then a bad one expected exit 2, got $rc"
   [ -z "$(log_text)" ] || fail "front door: a good name then a bad one logged a command"
+  run "$s" "" fleetboard-production
+  [ "$rc" -eq 2 ] && [ -z "$(log_text)" ] || fail "namespace mode needs an approved context"
+  run "$s" "" --expect-context previous-context fleetboard-production
+  [ "$rc" -eq 5 ] && [ ! -s "$work/out" ] || fail "changed context should stop before printing a table"
+  [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "changed context queried a namespace"
   run "$s" "" --context fleetboard-production
   [ "$rc" -eq 2 ] || fail "front door: --context with a name expected exit 2, got $rc"
   [ -z "$(log_text)" ] || fail "front door: --context with a name logged a command"
@@ -209,7 +214,7 @@ bad_args() {
   [ "$rc" -eq 2 ] || fail "front door: no argument expected exit 2, got $rc"
   [ -z "$(log_text)" ] || fail "front door: no argument logged a command"
   # 63 characters is the most a name may have.
-  run "$s" "" "${long%a}"
+  run "$s" "" --expect-context fleetboard-stand-in "${long%a}"
   [ "$rc" -eq 0 ] || fail "front door: a name of 63 characters expected exit 0, got $rc"
 }
 
@@ -252,9 +257,10 @@ suite() {
   [ "$(cat "$work/out")" = "fleetboard-stand-in" ] || fail "context: the output is not the context name"
   writes_nothing "context"
   no_marker "context"
-  run "$s" "odd-context" fleetboard-production
+  run "$s" "odd-context" --expect-context fleetboard-stand-in fleetboard-production
   [ "$rc" -eq 5 ] || fail "a context name that is not a name, namespace mode: expected exit 5, got $rc"
   [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "a context name that is not a name, namespace mode: a command ran after the context"
+  grep -q "does not fit the shape" "$work/err" || fail "out-of-shape context was not rejected by the shape check"
   no_marker "odd context, namespace mode"
   run "$s" "odd-context" --context
   [ "$(cat "$work/out")" = "other" ] || fail "context: a context name that is not a name printed as it came"
@@ -270,7 +276,7 @@ suite() {
   grep -q "kubectl config current-context printed no context name" "$work/err" || fail "an empty context answer: the message does not say so"
   run "$s" "blank-context" --context
   [ "$rc" -eq 5 ] || fail "a context answer of spaces: expected exit 5, got $rc"
-  run "$s" "no-context" fleetboard-production
+  run "$s" "no-context" --expect-context fleetboard-stand-in fleetboard-production
   [ "$rc" -eq 5 ] || fail "no context, namespace mode: expected exit 5, got $rc"
   [ "$(log_text)" = "8 config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=" ] || fail "no context, namespace mode: a command ran after the context failed"
   no_marker "no context, namespace mode"
@@ -278,7 +284,7 @@ suite() {
   # kubectl missing: exit 5.
   mkdir -p "$work/nokube"
   rc=0
-  env -i PATH="$work/nokube" HOME="$home" FAKE_KUBECTL_LOG="$home/log" /bin/sh "$s" fleetboard-production > "$work/out" 2> "$work/err" || rc=$?
+  env -i PATH="$work/nokube" HOME="$home" FAKE_KUBECTL_LOG="$home/log" /bin/sh "$s" --expect-context fleetboard-stand-in fleetboard-production > "$work/out" 2> "$work/err" || rc=$?
   [ "$rc" -eq 5 ] || fail "kubectl missing: expected exit 5, got $rc"
   grep -q "kubectl is not installed" "$work/err" || fail "kubectl missing: the message does not say kubectl is not installed"
 
@@ -302,7 +308,9 @@ suite() {
       rc=0
       rest=$work/kminbin; want="kubectl is not installed"
       if [ "$entry" = "$work/klink" ]; then rest=$PATH; want="inside the current directory"; fi
-      (cd "$work/cwd-repo" && env -i PATH="$entry:$rest" HOME="$home" FAKE_KUBECTL_LOG="$home/log" sh "$s" "$mode") > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+      set -- "$mode"
+      if [ "$mode" != --context ]; then set -- --expect-context fleetboard-stand-in "$mode"; fi
+      (cd "$work/cwd-repo" && env -i PATH="$entry:$rest" HOME="$home" FAKE_KUBECTL_LOG="$home/log" sh "$s" "$@") > "$work/out" 2> "$work/err" < /dev/null || rc=$?
       [ "$rc" -eq 5 ] || fail "a kubectl inside the current directory, PATH with $entry, $mode: expected exit 5, got $rc"
       grep -q "$want" "$work/err" || fail "a kubectl inside the current directory, PATH with $entry, $mode: the message does not say $want"
       [ ! -s "$home/log" ] || fail "a kubectl inside the current directory, PATH with $entry, $mode: kubectl ran"
@@ -377,7 +385,7 @@ suite() {
 
   # The fixture's namespaces.
   # shellcheck disable=SC2086 # the namespace list
-  run "$s" "" $FIXTURE_NS
+  run "$s" "" --expect-context fleetboard-stand-in $FIXTURE_NS
   [ "$rc" -eq 0 ] || fail "fixture: expected exit 0, got $rc"
   # shellcheck disable=SC2086 # the namespace list
   log_only "fixture" $FIXTURE_NS
@@ -400,7 +408,7 @@ suite() {
   expect_line "fixture" "# rows not placed: top=0 pods=0 vpa=0 hpa=0"
 
   # One namespace, the whole output.
-  run "$s" "" fleetboard-staging
+  run "$s" "" --expect-context fleetboard-stand-in fleetboard-staging
   cat > "$work/want" <<'EOF'
 # context fleetboard-stand-in
 # Measured in the cluster: one sample from kubectl top, which is one moment in time.
@@ -419,13 +427,13 @@ EOF
   cmp -s "$work/out" "$work/want" || { fail "one namespace: the output differs from the expected table"; diff "$work/want" "$work/out" | sed -n 1,10p; }
 
   # A namespace with no pods.
-  run "$s" "" empty-ns
+  run "$s" "" --expect-context fleetboard-stand-in empty-ns
   [ "$rc" -eq 0 ] || fail "empty namespace: expected exit 0, got $rc"
   expect_line "empty namespace" "# pods: none in this namespace"
   log_only "empty namespace" empty-ns
 
   # The hostile rows.
-  run "$s" "" stand-in-rows
+  run "$s" "" --expect-context fleetboard-stand-in stand-in-rows
   [ "$rc" -eq 0 ] || fail "hostile rows: expected exit 0, got $rc"
   no_marker "hostile rows"
   log_only "hostile rows" stand-in-rows
@@ -469,32 +477,32 @@ EOF
   expect_line "rows not placed are counted" "# rows not placed: top=4 pods=10 vpa=1 hpa=0"
 
   # top fails: exit 6 with a plain message, and nothing kubectl wrote.
-  run "$s" "no-top" fleetboard-production
+  run "$s" "no-top" --expect-context fleetboard-stand-in fleetboard-production
   [ "$rc" -eq 6 ] || fail "no metrics: expected exit 6, got $rc"
   grep -q "kubectl top pod failed for namespace fleetboard-production" "$work/err" || fail "no metrics: the message does not name the failed command"
   no_marker "no metrics"
   # top fails in the second of three: the first table stays, and the
   # message names the namespaces not read. No command runs for the third.
-  run "$s" "no-top-production" fleetboard-staging fleetboard-production dispatch-staging
+  run "$s" "no-top-production" --expect-context fleetboard-stand-in fleetboard-staging fleetboard-production dispatch-staging
   [ "$rc" -eq 6 ] || fail "no metrics in the second namespace: expected exit 6, got $rc"
   expect_line "no metrics in the second namespace" "# namespace fleetboard-staging"
   no_line "no metrics in the second namespace" "# namespace fleetboard-production"
   grep -q "Namespaces not read: fleetboard-production dispatch-staging$" "$work/err" || fail "no metrics in the second namespace: the message does not name the namespaces not read"
   if grep -q "dispatch-staging" "$home/log"; then fail "no metrics in the second namespace: a command ran for a later namespace"; fi
   # The VPA query fails: a trace, never the same as none.
-  run "$s" "no-vpa" fleetboard-production
+  run "$s" "no-vpa" --expect-context fleetboard-stand-in fleetboard-production
   [ "$rc" -eq 0 ] || fail "vpa query fails: expected exit 0, got $rc"
   expect_line "vpa query fails" "# vpa: not read, the query failed or the server has no such type"
   no_line "vpa query fails" "# vpa: none in this namespace"
   no_marker "vpa query fails"
   # The HPA query fails: the same.
-  run "$s" "no-hpa" dispatch-staging
+  run "$s" "no-hpa" --expect-context fleetboard-stand-in dispatch-staging
   [ "$rc" -eq 0 ] || fail "hpa query fails: expected exit 0, got $rc"
   expect_line "hpa query fails" "# hpa: not read, the query failed or the server has no such type"
   no_line "hpa query fails" "hpa dispatch"
   no_marker "hpa query fails"
   # get pods fails: measured use still prints, the rest is not-read.
-  run "$s" "no-pods" fleetboard-staging
+  run "$s" "no-pods" --expect-context fleetboard-stand-in fleetboard-staging
   [ "$rc" -eq 0 ] || fail "no pods: expected exit 0, got $rc"
   expect_line "get pods fails" "# pods: not read, the query failed"
   expect_line "get pods fails" "container api-6b8c7d9e5-p3lmk api not-read not-read not-read not-read 2m 48Mi not-read not-read"
@@ -502,7 +510,7 @@ EOF
 
   # Output as a kuberc default would change it: a column added to top and
   # to every pod row, and a header line. A trace, and no value printed.
-  run "$s" "kuberc" fleetboard-staging
+  run "$s" "kuberc" --expect-context fleetboard-stand-in fleetboard-staging
   [ "$rc" -eq 0 ] || fail "output changed by kuberc: expected exit 0, got $rc"
   no_marker "output changed by kuberc"
   no_line "output changed by kuberc: a value printed" "api-6b8c7d9e5-p3lmk"
@@ -510,17 +518,17 @@ EOF
   expect_line "output changed by kuberc" "# rows not placed: top=2 pods=2 vpa=0 hpa=0"
 
   # Standard input never reaches kubectl.
-  run "$s" "read-stdin" fleetboard-staging
+  run "$s" "read-stdin" --expect-context fleetboard-stand-in fleetboard-staging
   if grep -q '^stdin ' "$home/log"; then fail "standard input reached kubectl"; fi
 
   # The environment kubectl sees: the caller's, with LC_ALL set to C, and
   # KUBERC as the caller had it.
-  run "$s" "" fleetboard-staging
+  run "$s" "" --expect-context fleetboard-stand-in fleetboard-staging
   grep -qxF -e "value CANARY=canary-value" "$home/env" || fail "environment: the caller's variable did not reach kubectl"
   grep -qxF -e "value KUBECONFIG=$work/kubeconfig" "$home/env" || fail "environment: KUBECONFIG did not reach kubectl"
   grep -qxF -e "value KUBERC=$work/kuberc" "$home/env" || fail "environment: KUBERC changed"
   grep -qxF -e "value LC_ALL=C" "$home/env" || fail "environment: LC_ALL is not C"
-  run_bare "$s" fleetboard-staging
+  run_bare "$s" --expect-context fleetboard-stand-in fleetboard-staging
   [ "$rc" -eq 0 ] || fail "environment, bare: expected exit 0, got $rc"
   grep -qxF -e "value KUBERC=" "$home/env" || fail "environment, bare: KUBERC changed"
   if grep -qxF -e "name KUBERC" "$home/env"; then fail "environment, bare: KUBERC changed"; fi
@@ -584,7 +592,7 @@ classify_check
 # through the safeguard it switches off.
 copy_works() {
   sh -n "$1" 2>/dev/null || return 1
-  run "$1" "" fleetboard-staging
+  run "$1" "" --expect-context fleetboard-stand-in fleetboard-staging
   [ "$rc" -eq 0 ] || return 1
   grep -qxF -e "container api-6b8c7d9e5-p3lmk api 100m 500m 128Mi 192Mi 2m 48Mi 0 -" "$work/out"
 }
@@ -694,7 +702,7 @@ pins() {
   pin "the context read is passed on" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --context=<context> /\1 /' "a command lacks the neutral flag --context=fleetboard-stand-in"
   pin "an empty kubeconfig on get" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^\(CMD_VPA=.*\) --kubeconfig= /\1 /' "a command lacks the neutral flag --kubeconfig="
   pin "an empty template on get" "CMD_HPA='kubectl get horizontalpodautoscalers" 's/^\(CMD_HPA=.*\) --template= /\1 /' "a command lacks the neutral flag --template="
-  pin "a context name out of shape stops the run" '# a context name out of shape: exit 5' 's/^\(.*\) || die 5 .*  # a context name out of shape: exit 5$/:/' "a context name that is not a name, namespace mode: expected exit 5"
+  pin "a context name out of shape stops the run" '# a context name out of shape: exit 5' 's/^\(.*\) || die 5 .*  # a context name out of shape: exit 5$/:/' "out-of-shape context was not rejected by the shape check"
   pin "the fixed command list" "CMD_VPA='kubectl get verticalpodautoscalers" 's/^CMD_VPA=.kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> /CMD_VPA='"'"'kubectl get secrets --all-namespaces /' "the fixed command list of the script differs from fields.md"
 }
 copy_works "$real_script" || { echo "FAIL: the control case fails on the script itself"; total=$((total + 1)); }
