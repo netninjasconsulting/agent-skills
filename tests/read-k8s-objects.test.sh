@@ -2921,8 +2921,8 @@ x"
   # the repository: a plugin-shaped program there is not reachable. The
   # stand-in tool, outside the repository, records what command -v finds
   # for the program, and prints one object so that the render succeeds.
-  mkdir -p "$tr_/rel" "$tr_/abs" "$work/plugbin"
-  for d in "$tr_" "$tr_/rel" "$tr_/abs"; do
+  mkdir -p "$tr_/rel" "$tr_/abs" "$work/plugbin" "$work/plugout"
+  for d in "$tr_" "$tr_/rel" "$tr_/abs" "$work/plugout"; do
     printf '#!/bin/sh\necho plugin-ran >> "%s"\n' "$work/fake-calls" > "$d/x-plugin"
     chmod +x "$d/x-plugin"
   done
@@ -2931,7 +2931,7 @@ x"
     printf '#!/bin/sh\necho "[$(command -v x-plugin)]" >> "%s"\nprintf '"'"'apiVersion: v1\\nkind: ConfigMap\\nmetadata:\\n  name: plug\\n'"'"'\n' "$work/plugin-seen" > "$work/plugbin/$tool"
     chmod +x "$work/plugbin/$tool"
   done
-  for entry in . rel "$tr_/abs" ""; do
+  for entry in . rel "$tr_/abs" "" ../plugout; do
     rm -f "$work/plugin-seen"
     RPATH="$entry:$work/plugbin:$PATH"
     rd --render helm chart chart/values.yaml
@@ -2960,7 +2960,7 @@ x"
   else
     echo "skipped: a command -v answer that is not a path (bash is not installed)"
   fi
-  rm -rf "$tr_" "$work/linkbin" "$work/nokz" "$work/plugbin" "$work/plugin-seen"
+  rm -rf "$tr_" "$work/linkbin" "$work/nokz" "$work/plugbin" "$work/plugout" "$work/plugin-seen"
   cwd=$rr
   RPATH=$PATH
   fi

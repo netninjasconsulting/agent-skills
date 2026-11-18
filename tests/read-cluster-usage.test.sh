@@ -305,22 +305,22 @@ suite() {
   # current directory: a plugin-shaped program there is not reachable. The
   # stand-in, outside the current directory, records what command -v finds
   # for the program, then answers as the stand-in.
-  mkdir -p "$work/plug-repo/rel" "$work/plug-repo/abs" "$work/plugbin"
-  for d in "$work/plug-repo" "$work/plug-repo/rel" "$work/plug-repo/abs"; do
+  mkdir -p "$work/plug-repo/rel" "$work/plug-repo/abs" "$work/plugbin" "$work/plugout"
+  for d in "$work/plug-repo" "$work/plug-repo/rel" "$work/plug-repo/abs" "$work/plugout"; do
     printf '#!/bin/sh\necho plugin-ran\n' > "$d/kubectl-x_plugin"
     chmod +x "$d/kubectl-x_plugin"
   done
   # shellcheck disable=SC2016 # the stand-in's own command substitution and arguments
   printf '#!/bin/sh\necho "[$(command -v kubectl-x_plugin)]" >> "%s"\nexec "%s" "$@"\n' "$work/plugin-seen" "$fake/kubectl" > "$work/plugbin/kubectl"
   chmod +x "$work/plugbin/kubectl"
-  for entry in . rel "$work/plug-repo/abs" ""; do
+  for entry in . rel "$work/plug-repo/abs" "" ../plugout; do
     rm -f "$work/plugin-seen"
     rc=0
     (cd "$work/plug-repo" && env -i PATH="$entry:$work/plugbin:$PATH" HOME="$home" sh "$s" --context) > "$work/out" 2> "$work/err" < /dev/null || rc=$?
     [ "$rc" -eq 0 ] || fail "a plugin on PATH with '$entry': expected exit 0, got $rc"
     [ "$(cat "$work/plugin-seen" 2>/dev/null)" = "[]" ] || fail "a plugin on PATH with '$entry': kubectl found $(cat "$work/plugin-seen" 2>/dev/null)"
   done
-  rm -rf "$work/plug-repo" "$work/plugbin" "$work/plugin-seen"
+  rm -rf "$work/plug-repo" "$work/plugbin" "$work/plugout" "$work/plugin-seen"
 
   # A command -v answer that is not a path: bash takes a function named
   # kubectl from its environment, and command -v then answers with the
