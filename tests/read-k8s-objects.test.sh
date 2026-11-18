@@ -359,7 +359,7 @@ conform() {
         n = split(key, s, "."); last = s[n]; prev = (n > 1) ? s[n - 1] : ""
         if (last == "cpu" && (prev == "requests" || prev == "limits")) sh = "qty-cpu"
         else if (last == "memory" && (prev == "requests" || prev == "limits")) sh = "qty-mem"
-        else if (last ~ /^(privileged|allowPrivilegeEscalation|readOnlyRootFilesystem|runAsNonRoot)$/) sh = "bool"
+        else if (last ~ /^(privileged|allowPrivilegeEscalation|readOnlyRootFilesystem|runAsNonRoot|hostProcess)$/) sh = "bool"
         else if (last ~ /^(runAsUser|runAsGroup|replicaCount|replicas|minReplicas|maxReplicas)$/) sh = "int"
         else if ((last == "drop" || last == "add") && prev == "capabilities") sh = "cap-name"
         else if (last == "tag" && prev == "image") { if (v !~ /^(latest|tag)$/) bad("an image tag value"); next }
@@ -404,7 +404,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/hostproc" "$work/toolrepo" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/jsonpatch" "$work/hostproc" "$work/toolrepo" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -742,6 +742,10 @@ $out"
   for want in "dep.yaml:10:Deployment/-/win:-:host-process=other" "dep.yaml:16:Deployment/-/win:app:host-process=true"; do
     expect_line "$out" "$want" "hostProcess"
   done
+  printf 'securityContext:\n  windowsOptions:\n    hostProcess: true\npod:\n  securityContext:\n    windowsOptions:\n      hostProcess: "true"\n' > "$work/hostproc/values.yaml"
+  rd --values values.yaml
+  expect_line "$out" "values.yaml:3:Values/-/-:-:values.securityContext.windowsOptions.hostProcess=true" "hostProcess in a values file"
+  expect_line "$out" "values.yaml:7:Values/-/-:-:values.pod.securityContext.windowsOptions.hostProcess=other" "hostProcess in a values file"
 
   fi
 
@@ -2220,7 +2224,14 @@ $out"
   for f in json-in-yaml.yaml pod.json pretty.json bom.yaml spacecolon.yaml complexkey.yaml esckey.yaml xesc.yml uesc.yaml docflow.yaml; do
     rd --fields "$f"
     [ "$code" -eq 4 ] && [ -z "$out" ] || fail "files that look like manifests: --fields $f exit $code, printed $out"
+    grep -q 'looks like a manifest' "$work/err" || fail "files that look like manifests: --fields $f: standard error does not say the file only looks like a manifest"
   done
+  # A file with top-level keys and a layout the reader cannot place is a
+  # manifest by its keys, and its reason stays the layout.
+  printf 'apiVersion: v1\nkind: Pod\nmetadata: &m\n  name: anchored\n' > "$u/anchored.yaml"
+  rd --fields anchored.yaml
+  [ "$code" -eq 4 ] || fail "a manifest by its keys, not read: exit $code"
+  if grep -q 'looks like a manifest' "$work/err"; then fail "a manifest by its keys, not read: standard error says it only looks like one"; fi
   printf '%s\n' "$list_u" | grep -qxF -e "chart:chart:no-git" || fail "files that look like manifests: missing line chart:chart:no-git"
   # A JSON file through a link that points outside is a link line, and a
   # JSON file with a path the list cannot carry is counted.
@@ -2409,6 +2420,27 @@ EOF
     printf '%s\n' "$out" | grep -q '^linkov:[0-9]*:Deployment/[^/]*/api:api:container-kind=main$' ||
       fail "render an overlay with a link inside the repository: no api container"
   fi
+  fi
+
+  if want render && [ "$have_kustomize" -eq 1 ]; then
+  # An overlay with a JSON patch that names apiVersion and kind: the list
+  # lists the patch as a manifest that looks like one, --fields does not
+  # read it, and the overlay renders, with the patch applied.
+  mkdir -p "$work/jsonpatch/ov"
+  printf 'resources:\n  - cm.yaml\npatches:\n  - path: patch.json\n' > "$work/jsonpatch/ov/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: jp\ndata:\n  LOG_LEVEL: info\n' > "$work/jsonpatch/ov/cm.yaml"
+  printf '{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "jp"}, "data": {"MODE": "fast"}}\n' > "$work/jsonpatch/ov/patch.json"
+  cwd=$work/jsonpatch
+  rd .
+  expect_line "$out" "ov/patch.json:manifest:no-git" "an overlay with a JSON patch"
+  expect_line "$out" "ov:overlay:no-git" "an overlay with a JSON patch"
+  rd --fields ov/patch.json
+  [ "$code" -eq 4 ] || fail "an overlay with a JSON patch: --fields exit $code"
+  grep -q 'looks like a manifest' "$work/err" || fail "an overlay with a JSON patch: the reason does not say it only looks like a manifest"
+  rd --render kustomize ov
+  [ "$code" -eq 0 ] || fail "an overlay with a JSON patch: the render exit $code"
+  expect_line "$out" "ov:4:ConfigMap/-/jp:-:configmap-data.MODE=scalar" "an overlay with a JSON patch"
+  cwd=$repo
   fi
 
   if want refusals; then
@@ -2885,7 +2917,50 @@ x"
   RPATH=".:$work/nokz"
   refuse "ov:overlay:tool inside the repository" "render with a kubectl the repository supplies" \
     --render kustomize ov
-  rm -rf "$tr_" "$work/linkbin" "$work/nokz"
+  # The PATH a render tool gets holds no relative entry and no entry inside
+  # the repository: a plugin-shaped program there is not reachable. The
+  # stand-in tool, outside the repository, records what command -v finds
+  # for the program, and prints one object so that the render succeeds.
+  mkdir -p "$tr_/rel" "$tr_/abs" "$work/plugbin"
+  for d in "$tr_" "$tr_/rel" "$tr_/abs"; do
+    printf '#!/bin/sh\necho plugin-ran >> "%s"\n' "$work/fake-calls" > "$d/x-plugin"
+    chmod +x "$d/x-plugin"
+  done
+  for tool in helm kustomize; do
+    # shellcheck disable=SC2016 # the stand-in's own command substitution
+    printf '#!/bin/sh\necho "[$(command -v x-plugin)]" >> "%s"\nprintf '"'"'apiVersion: v1\\nkind: ConfigMap\\nmetadata:\\n  name: plug\\n'"'"'\n' "$work/plugin-seen" > "$work/plugbin/$tool"
+    chmod +x "$work/plugbin/$tool"
+  done
+  for entry in . rel "$tr_/abs" ""; do
+    rm -f "$work/plugin-seen"
+    RPATH="$entry:$work/plugbin:$PATH"
+    rd --render helm chart chart/values.yaml
+    [ "$code" -eq 0 ] || fail "a plugin on PATH with '$entry', helm: exit $code"
+    [ "$(cat "$work/plugin-seen" 2>/dev/null)" = "[]" ] || fail "a plugin on PATH with '$entry': helm found $(cat "$work/plugin-seen" 2>/dev/null)"
+    rm -f "$work/plugin-seen"
+    rd --render kustomize ov
+    [ "$code" -eq 0 ] || fail "a plugin on PATH with '$entry', kustomize: exit $code"
+    [ "$(cat "$work/plugin-seen" 2>/dev/null)" = "[]" ] || fail "a plugin on PATH with '$entry': kustomize found $(cat "$work/plugin-seen" 2>/dev/null)"
+  done
+  # A command -v answer that is not a path: bash takes a function named
+  # helm or kustomize from its environment, and command -v then answers
+  # with the bare name. The reader refuses, and the function never runs.
+  if command -v bash >/dev/null 2>&1; then
+    RPATH="$work/fake:$PATH"
+    for tool in helm kustomize; do
+      rm -f "$work/fake-calls"
+      code=0
+      if [ "$tool" = helm ]; then set -- --render helm chart chart/values.yaml; lab=chart:chart; else set -- --render kustomize ov; lab=ov:overlay; fi
+      out=$(cd "$tr_" && env "BASH_FUNC_$tool%%=() { echo $tool-function >> \"$work/fake-calls\"; }" PATH="$RPATH" bash "$reader" "$@" 2>"$work/err") || code=$?
+      printf '%s\n' "$out" >> "$work/stdout.all"
+      [ "$code" -eq 3 ] && [ "$out" = "$lab:tool inside the repository" ] || fail "a $tool that is a shell function: expected $lab:tool inside the repository, got exit $code: $out"
+      [ ! -e "$work/fake-calls" ] || fail "a $tool that is a shell function: the render tool ran before the refusal"
+    done
+    set --
+  else
+    echo "skipped: a command -v answer that is not a path (bash is not installed)"
+  fi
+  rm -rf "$tr_" "$work/linkbin" "$work/nokz" "$work/plugbin" "$work/plugin-seen"
   cwd=$rr
   RPATH=$PATH
   fi

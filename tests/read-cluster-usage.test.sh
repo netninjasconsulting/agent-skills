@@ -301,6 +301,41 @@ suite() {
   done
   rm -rf "$work/cwd-repo" "$work/klink"
 
+  # The PATH kubectl gets holds no relative entry and no entry inside the
+  # current directory: a plugin-shaped program there is not reachable. The
+  # stand-in, outside the current directory, records what command -v finds
+  # for the program, then answers as the stand-in.
+  mkdir -p "$work/plug-repo/rel" "$work/plug-repo/abs" "$work/plugbin"
+  for d in "$work/plug-repo" "$work/plug-repo/rel" "$work/plug-repo/abs"; do
+    printf '#!/bin/sh\necho plugin-ran\n' > "$d/kubectl-x_plugin"
+    chmod +x "$d/kubectl-x_plugin"
+  done
+  # shellcheck disable=SC2016 # the stand-in's own command substitution and arguments
+  printf '#!/bin/sh\necho "[$(command -v kubectl-x_plugin)]" >> "%s"\nexec "%s" "$@"\n' "$work/plugin-seen" "$fake/kubectl" > "$work/plugbin/kubectl"
+  chmod +x "$work/plugbin/kubectl"
+  for entry in . rel "$work/plug-repo/abs" ""; do
+    rm -f "$work/plugin-seen"
+    rc=0
+    (cd "$work/plug-repo" && env -i PATH="$entry:$work/plugbin:$PATH" HOME="$home" sh "$s" --context) > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+    [ "$rc" -eq 0 ] || fail "a plugin on PATH with '$entry': expected exit 0, got $rc"
+    [ "$(cat "$work/plugin-seen" 2>/dev/null)" = "[]" ] || fail "a plugin on PATH with '$entry': kubectl found $(cat "$work/plugin-seen" 2>/dev/null)"
+  done
+  rm -rf "$work/plug-repo" "$work/plugbin" "$work/plugin-seen"
+
+  # A command -v answer that is not a path: bash takes a function named
+  # kubectl from its environment, and command -v then answers with the
+  # bare name. The script exits 5, and the function never runs.
+  if command -v bash >/dev/null 2>&1; then
+    rm -f "$work/function-ran"
+    rc=0
+    env -i "BASH_FUNC_kubectl%%=() { echo ran >> \"$work/function-ran\"; }" PATH="$fake:$PATH" HOME="$home" bash "$s" --context > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+    [ "$rc" -eq 5 ] || fail "a kubectl that is a shell function: expected exit 5, got $rc"
+    grep -q "not a file path" "$work/err" || fail "a kubectl that is a shell function: the message does not say so"
+    [ ! -e "$work/function-ran" ] || fail "a kubectl that is a shell function: the function ran"
+  else
+    echo "skipped: a command -v answer that is not a path (bash is not installed)"
+  fi
+
   # The fixture's namespaces.
   # shellcheck disable=SC2086 # the namespace list
   run "$s" "" $FIXTURE_NS
