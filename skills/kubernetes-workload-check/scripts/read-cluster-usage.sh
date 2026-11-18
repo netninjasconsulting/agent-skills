@@ -308,6 +308,26 @@ context_name() {
     }'
 }
 
+# ---- The PATH ----
+
+# Before the script runs any program (readlink, sed, awk, tr, or kubectl),
+# it cleans PATH and exports it: the caller's, without an empty entry, ".",
+# an entry that does not start with "/", an entry that is not a directory,
+# and an entry that resolves inside the current directory, so that no
+# program the repository supplies is reachable by name (a readlink, a
+# kubectl plugin, a credential helper). Only shell builtins run here.
+here=$(pwd -P) || die 5 "the current directory does not resolve"
+kpath=; krest=$PATH:
+while [ -n "$krest" ]; do
+  ke=${krest%%:*}; krest=${krest#*:}
+  case $ke in /*) ;; *) continue ;; esac  # a relative PATH entry
+  ked=$(cd -P -- "$ke" 2>/dev/null && pwd -P) || continue
+  case $ked in "$here" | "$here"/*) continue ;; esac  # a PATH entry inside the current directory
+  kpath=${kpath:+$kpath:}$ke
+done
+PATH=$kpath
+export PATH
+
 # ---- The front door ----
 
 [ $# -gt 0 ] || die 2 "usage: $me --context | NAMESPACE [NAMESPACE ...]"
@@ -350,26 +370,10 @@ while [ -L "$kp" ]; do
   case $kt in /*) kp=$kt ;; *) kp=${kp%/*}/$kt ;; esac
 done
 kd=$(cd -P -- "${kp%/*}/" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
-here=$(pwd -P) || die 5 "the current directory does not resolve"
 case $kd/${kp##*/} in "$here" | "$here"/*) die 5 "the kubectl on PATH resolves inside the current directory, so the repository may supply it; it was not run" ;; esac  # a kubectl inside the current directory: exit 5
 kcd=$(cd -P -- "${kc%/*}/" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
 KUBECTL=${kcd%/}/${kc##*/}
 
-# The PATH from here on, for kubectl and for every program the script and
-# kubectl run: the caller's, without an empty entry, ".", an entry that does
-# not start with "/", an entry that is not a directory, and an entry that
-# resolves inside the current directory, so that no program the repository
-# supplies is reachable by name (a kubectl plugin, a credential helper).
-kpath=; krest=$PATH:
-while [ -n "$krest" ]; do
-  ke=${krest%%:*}; krest=${krest#*:}
-  case $ke in /*) ;; *) continue ;; esac  # a relative PATH entry
-  ked=$(cd -P -- "$ke" 2>/dev/null && pwd -P) || continue
-  case $ked in "$here" | "$here"/*) continue ;; esac  # a PATH entry inside the current directory
-  kpath=${kpath:+$kpath:}$ke
-done
-PATH=$kpath
-export PATH
 
 kube "$CMD_CONTEXT" "" || die 5 "kubectl config current-context failed"  # no context: exit 5
 raw=$(printf '%s' "$KOUT")

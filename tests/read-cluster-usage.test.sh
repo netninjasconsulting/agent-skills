@@ -289,17 +289,26 @@ suite() {
   cp "$fake/kubectl" "$work/cwd-repo/kubectl"
   cp "$fake/kubectl" "$work/cwd-repo/bin/kubectl"
   ln -sf "$work/cwd-repo/kubectl" "$work/klink/kubectl"
+  # PATH is cleaned first, so with ".", "bin", or an absolute directory
+  # inside it, that kubectl is never found (the rest of PATH holds none
+  # here); a link outside to a kubectl inside is found, and refused.
+  mkdir -p "$work/kminbin"
+  for t in sh awk sed tr readlink cat; do
+    tp=$(command -v "$t") && ln -sf "$tp" "$work/kminbin/$t"
+  done
   for entry in . bin "$work/cwd-repo/bin" "$work/klink"; do
     for mode in --context fleetboard-production; do
       rm -f "$home/log"
       rc=0
-      (cd "$work/cwd-repo" && env -i PATH="$entry:$PATH" HOME="$home" FAKE_KUBECTL_LOG="$home/log" sh "$s" "$mode") > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+      rest=$work/kminbin; want="kubectl is not installed"
+      if [ "$entry" = "$work/klink" ]; then rest=$PATH; want="inside the current directory"; fi
+      (cd "$work/cwd-repo" && env -i PATH="$entry:$rest" HOME="$home" FAKE_KUBECTL_LOG="$home/log" sh "$s" "$mode") > "$work/out" 2> "$work/err" < /dev/null || rc=$?
       [ "$rc" -eq 5 ] || fail "a kubectl inside the current directory, PATH with $entry, $mode: expected exit 5, got $rc"
-      grep -q "inside the current directory" "$work/err" || fail "a kubectl inside the current directory, PATH with $entry, $mode: the message does not say so"
+      grep -q "$want" "$work/err" || fail "a kubectl inside the current directory, PATH with $entry, $mode: the message does not say $want"
       [ ! -s "$home/log" ] || fail "a kubectl inside the current directory, PATH with $entry, $mode: kubectl ran"
     done
   done
-  rm -rf "$work/cwd-repo" "$work/klink"
+  rm -rf "$work/cwd-repo" "$work/klink" "$work/kminbin"
 
   # The script cleans PATH before it runs any program, so a readlink or a
   # sed the repository supplies on a "." entry never runs. With a kubectl
@@ -661,12 +670,14 @@ pins() {
   pin "no context exits 5" '# no context: exit 5' 's/|| die 5 .*  # no context: exit 5$/|| :/' "no context: the message does not name the failed command"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "an empty context answer exits 5" '# an empty context answer: exit 5' 's/^case "\$raw" in .*  # an empty context answer: exit 5$/:/' "a context answer of spaces: expected exit 5"
-  pin "a kubectl inside the current directory exits 5" '# a kubectl inside the current directory: exit 5' 's/) die 5 "the kubectl on PATH resolves inside[^"]*" ;; esac/) : ;; esac/' "a kubectl inside the current directory, PATH with ., --context: expected exit 5"
+  pin "a kubectl inside the current directory exits 5" '# a kubectl inside the current directory: exit 5' 's/) die 5 "the kubectl on PATH resolves inside[^"]*" ;; esac/) : ;; esac/' "/klink, --context: expected exit 5"
   pin "a relative PATH entry is dropped" '# a relative PATH entry' '/# a relative PATH entry$/s/\*) continue ;;/*) ;;/' "a plugin on PATH with '../plugout': kubectl found"
   pin "a PATH entry inside the current directory is dropped" '# a PATH entry inside the current directory' '/# a PATH entry inside the current directory$/s/) continue ;;/) ;;/' "kubectl found [/"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "the cleaned PATH is the PATH" 'PATH=$kpath' '/^PATH=\$kpath$/d' "a plugin on PATH with '.': kubectl found"
   pin "a command -v answer that is not a path exits 5" '"the kubectl on PATH is not a file path' 's/\*) die 5 "the kubectl on PATH is not a file path[^"]*" ;;/*) ;;/' "a kubectl that is a shell function: the message does not say so"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "PATH is cleaned before readlink, sed, or kubectl runs" 'PATH=$kpath' '/^PATH=\$kpath$/d' "a readlink, a sed, or a kubectl of the repository ran"
   pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a row with a control character" '# a row with a control character' 's/ -e "\/\[\[:cntrl:\]\]\/s\/^$1 \/$1X \/"  # a row with a control character//' "a row with a carriage return: printed: crlf-1"
