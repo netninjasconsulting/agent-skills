@@ -41,7 +41,7 @@ An absent field is "not found" too, with the exceptions in this table. Each exce
 | R7 | `active-deadline-seconds` and `pod-active-deadline-seconds` | No deadline set | K7 |
 | R7 | `concurrency-policy` on a CronJob | `Allow`, the default | K8 |
 | K1 | `privileged` at the container | Not privileged (defaults to false) | K1 |
-| K1 | `host-process` at the container and at the pod | Not a HostProcess container | K1 |
+| K1 | `host-process` at the container and at the pod | Not a HostProcess container (verify: the pages read state no default) | K1 |
 | K2 | `allow-privilege-escalation` | Escalation not blocked (defaults to true) | K3 |
 | K2 | `cap-drop` | Nothing dropped | K1 |
 | K3 | `read-only-root-fs` | Root filesystem writable (defaults to false) | K1 |

@@ -3335,6 +3335,17 @@ pins() {
   pin "a render tool inside the repository is refused" '# a tool inside the repository' '/# a tool inside the repository$/s/if inside_root "$RP"; then refuse "tool inside the repository"; fi/:/' refusals "render with a helm the repository supplies, PATH with .: the render tool ran before the refusal"
   pin "hostProcess at the pod level" '"pod|securityContext>windowsOptions>hostProcess|' '/"pod|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:9:Pod/-/win:-:host-process=true"
   pin "hostProcess at the container level" '"c|securityContext>windowsOptions>hostProcess|' '/"c|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:15:Pod/-/win:init:host-process=false"
+  pin "a relative PATH entry is not passed to a render tool" '# a relative PATH entry' '/# a relative PATH entry$/s/\*) continue ;;/*) ;;/' refusals "a plugin on PATH with '../plugout': helm found"
+  pin "a PATH entry inside the repository is not passed to a render tool" '# a PATH entry inside the repository' '/# a PATH entry inside the repository$/s/then continue; fi/then :; fi/' refusals "helm found [/"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "helm gets the cleaned PATH" '# helm: drop standard error' '/# helm: drop standard error$/s/PATH="\$CLEANPATH"/PATH="$PATH"/' refusals "a plugin on PATH with '.': helm found"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "kustomize gets the cleaned PATH" '# kustomize: drop standard error' '/# kustomize: drop standard error$/s/PATH="\$CLEANPATH"/PATH="$PATH"/' refusals "a plugin on PATH with '.': kustomize found"
+  if command -v bash >/dev/null 2>&1; then
+    pin_behind "a command -v answer that is not a path" '# a command -v answer that is not a path' '/# a tool that does not resolve$/s/|| refuse "tool inside the repository"/|| :/' '/# a command -v answer that is not a path$/s/\*) refuse "tool inside the repository" ;;/*) ;;/' refusals "a helm that is a shell function: expected chart:chart:tool inside the repository"
+  fi
+  pin "the reason of a file listed by its look" '# listed by its look' '/# listed by its look$/s/= maybe \]/= never ]/' links "standard error does not say the file only looks like a manifest"
+  pin "hostProcess in a values file" '|runAsNonRoot|hostProcess)$/) sid = "bool"' 's/|runAsNonRoot|hostProcess)\$\/) sid = "bool"/|runAsNonRoot)$\/) sid = "bool"/' fields "missing line values.yaml:3:Values/-/-:-:values.securityContext.windowsOptions.hostProcess=true"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"

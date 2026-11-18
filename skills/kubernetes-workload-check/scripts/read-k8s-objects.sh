@@ -47,7 +47,8 @@
 # refusal tests of fields.md, with a cleared environment and the fixed
 # arguments of fields.md, drops what the tool writes to standard error, and
 # pipes its standard output into the same extractor. It refuses a tool that
-# resolves inside the repository, and runs the tool by the path it tested.
+# resolves inside the repository, runs the tool by the path it tested, and
+# gives it a PATH with no relative entry and no entry inside the repository.
 
 set -u
 LC_ALL=C
@@ -1052,7 +1053,7 @@ function vkey(I, ln, p, k,    pp, n, s, last, prev, sid, v, q, t, i, w) {
   v = LVAL[I, k]; q = LQ[I, k]; t = LT[I, k]; sid = ""
   if (last == "cpu" && (prev == "requests" || prev == "limits")) sid = "qty-cpu"
   else if (last == "memory" && (prev == "requests" || prev == "limits")) sid = "qty-mem"
-  else if (last ~ /^(privileged|allowPrivilegeEscalation|readOnlyRootFilesystem|runAsNonRoot)$/) sid = "bool"
+  else if (last ~ /^(privileged|allowPrivilegeEscalation|readOnlyRootFilesystem|runAsNonRoot|hostProcess)$/) sid = "bool"
   else if (last ~ /^(runAsUser|runAsGroup|replicaCount|replicas|minReplicas|maxReplicas)$/) sid = "int"
   else if ((last == "drop" || last == "add") && prev == "capabilities" && t == "flow") {
     w = flowitems(v)
@@ -1906,8 +1907,12 @@ read_file_mode() {
     exit 4
   fi
   rf=$RP
+  # A file the list took for a manifest by its look alone (no top-level
+  # apiVersion and kind lines it could see) says so in its reason.
+  look=
+  if [ "$(top_kind "$rf")" = maybe ]; then look=" (a file that looks like a manifest, listed by its look)"; fi  # listed by its look
   if not_text "$rf"; then
-    echo "$me: not read, not a text file: $f" >&2
+    echo "$me: not read, not a text file$look: $f" >&2
     exit 4
   fi
   dir_part "$f"; REMOTES=$(remotes_of "$DIR")  # the directory of the file, with a line break at its end
@@ -1918,7 +1923,7 @@ read_file_mode() {
     exit 4
   fi
   if [ "$status" -ne 0 ]; then
-    echo "$me: not read, a layout the reader cannot place: $f" >&2
+    echo "$me: not read, a layout the reader cannot place$look: $f" >&2
     exit 4
   fi
 }
@@ -1992,6 +1997,7 @@ TREE
 # still sees it.
 tool_path() {
   tp_c=$(command -v "$1" 2>/dev/null) || refuse "tool not installed"
+  case "$tp_c" in */*) ;; *) refuse "tool inside the repository" ;; esac  # a command -v answer that is not a path
   tp_s=0
   resolve "$tp_c" || tp_s=$?
   [ "$tp_s" -eq 0 ] || refuse "tool inside the repository"  # a tool that does not resolve
@@ -1999,6 +2005,23 @@ tool_path() {
   dir_part "$tp_c"
   tp_d=$(phys "$DIR") || refuse "tool inside the repository"
   TOOLRUN="${tp_d%/}/$BASE"
+  clean_path
+}
+
+# The PATH a render tool gets, in CLEANPATH: the caller's, without an
+# empty entry, ".", an entry that does not start with "/", an entry that is
+# not a directory, and an entry that resolves inside the repository, so
+# that no program the repository supplies is reachable by name.
+clean_path() {
+  cl_rest=$PATH:; CLEANPATH=
+  while [ -n "$cl_rest" ]; do
+    cl_e=${cl_rest%%:*}; cl_rest=${cl_rest#*:}
+    case "$cl_e" in /*) ;; *) continue ;; esac  # a relative PATH entry
+    [ -d "$cl_e" ] || continue
+    cl_p=$(phys "$cl_e") || continue
+    if inside_root "$cl_p"; then continue; fi  # a PATH entry inside the repository
+    CLEANPATH=${CLEANPATH:+$CLEANPATH:}$cl_e
+  done
 }
 
 render_helm() {
@@ -2063,7 +2086,7 @@ $1" ;;
   set -- "$@" --namespace "$ns"
   REMOTES=$(remotes_of "$ROOTP")
   status=0
-  rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" "$@" 2>/dev/null) || status=$?  # helm: drop standard error
+  rendered=$(cd "$ROOTP" && env -i PATH="$CLEANPATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" "$@" 2>/dev/null) || status=$?  # helm: drop standard error
   if [ "$status" -ne 0 ]; then
     echo "$me: helm template exited with status $status" >&2
     refuse "render failed"
@@ -2160,9 +2183,9 @@ EOF
   dp=$(phys "$dir")
   status=0
   if [ "$tool" = kustomize ]; then
-    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
+    rendered=$(cd "$ROOTP" && env -i PATH="$CLEANPATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
   else
-    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
+    rendered=$(cd "$ROOTP" && env -i PATH="$CLEANPATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
   fi
   if [ "$status" -ne 0 ]; then
     echo "$me: $tool exited with status $status" >&2

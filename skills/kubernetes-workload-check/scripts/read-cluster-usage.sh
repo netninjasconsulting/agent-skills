@@ -19,7 +19,8 @@
 #
 # It runs only the commands of the fixed list below (references/fields.md,
 # "Command section 3: the cluster commands"), in the caller's environment
-# as it is (LC_ALL=C on top), with no input, and drops what kubectl writes
+# as it is (LC_ALL=C on top, and a PATH with no relative entry and no entry
+# inside the current directory), with no input, and drops what kubectl writes
 # to standard error. It never switches the caller's kuberc off. It never reads a Secret
 # and never writes: every command carries --profile=none and --cache-dir=,
 # so a kuberc default makes kubectl write no profile file and no discovery
@@ -353,6 +354,22 @@ here=$(pwd -P) || die 5 "the current directory does not resolve"
 case $kd/${kp##*/} in "$here" | "$here"/*) die 5 "the kubectl on PATH resolves inside the current directory, so the repository may supply it; it was not run" ;; esac  # a kubectl inside the current directory: exit 5
 kcd=$(cd -P -- "${kc%/*}/" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
 KUBECTL=${kcd%/}/${kc##*/}
+
+# The PATH from here on, for kubectl and for every program the script and
+# kubectl run: the caller's, without an empty entry, ".", an entry that does
+# not start with "/", an entry that is not a directory, and an entry that
+# resolves inside the current directory, so that no program the repository
+# supplies is reachable by name (a kubectl plugin, a credential helper).
+kpath=; krest=$PATH:
+while [ -n "$krest" ]; do
+  ke=${krest%%:*}; krest=${krest#*:}
+  case $ke in /*) ;; *) continue ;; esac  # a relative PATH entry
+  ked=$(cd -P -- "$ke" 2>/dev/null && pwd -P) || continue
+  case $ked in "$here" | "$here"/*) continue ;; esac  # a PATH entry inside the current directory
+  kpath=${kpath:+$kpath:}$ke
+done
+PATH=$kpath
+export PATH
 
 kube "$CMD_CONTEXT" "" || die 5 "kubectl config current-context failed"  # no context: exit 5
 raw=$(printf '%s' "$KOUT")

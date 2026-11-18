@@ -129,7 +129,7 @@ In an environment that is not fully seen, a cell that is not "broad" from a deci
 
 ## Not checked
 
-- <Each file that was not read (exit code 4), by path, with the reason the reader gave.>
+- <Each file that was not read (exit code 4), by path, with the reason the reader gave. A file listed by its look, inside a chart or overlay tree that rendered with success: "<path>: a file the reader could not read, inside a tree that rendered". It leaves no environment not fully seen.>
 - <Each manifest that holds only kinds the reader does not read, by path, as "a kind the reader does not read".>
 - <Each field that printed `other`, by file, line, and field.>
 - <Each chart or overlay that was not rendered, and each file that was not read, with its reason, and the checks it leaves at "ask the team" with no question of their own.>

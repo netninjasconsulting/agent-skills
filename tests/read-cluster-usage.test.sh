@@ -632,6 +632,11 @@ pins() {
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "an empty context answer exits 5" '# an empty context answer: exit 5' 's/^case "\$raw" in .*  # an empty context answer: exit 5$/:/' "a context answer of spaces: expected exit 5"
   pin "a kubectl inside the current directory exits 5" '# a kubectl inside the current directory: exit 5' 's/) die 5 "the kubectl on PATH resolves inside[^"]*" ;; esac/) : ;; esac/' "a kubectl inside the current directory, PATH with ., --context: expected exit 5"
+  pin "a relative PATH entry is dropped" '# a relative PATH entry' '/# a relative PATH entry$/s/\*) continue ;;/*) ;;/' "a plugin on PATH with '../plugout': kubectl found"
+  pin "a PATH entry inside the current directory is dropped" '# a PATH entry inside the current directory' '/# a PATH entry inside the current directory$/s/) continue ;;/) ;;/' "kubectl found [/"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "the cleaned PATH is the PATH" 'PATH=$kpath' '/^PATH=\$kpath$/d' "a plugin on PATH with '.': kubectl found"
+  pin "a command -v answer that is not a path exits 5" '"the kubectl on PATH is not a file path' 's/\*) die 5 "the kubectl on PATH is not a file path[^"]*" ;;/*) ;;/' "a kubectl that is a shell function: the message does not say so"
   pin "kubectl missing exits 5" '# kubectl missing: exit 5' 's/^\(.*\)  # kubectl missing: exit 5$/: /' "kubectl missing: the message does not say kubectl is not installed"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a row with a control character" '# a row with a control character' 's/ -e "\/\[\[:cntrl:\]\]\/s\/^$1 \/$1X \/"  # a row with a control character//' "a row with a carriage return: printed: crlf-1"
