@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleetboard-production
+  namespace: argocd
+spec:
+  project: fleetboard
+  source:
+    repoURL: https://github.com/example-fleetboard/fleetboard.git
+    targetRevision: main
+    path: kustomize/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleetboard-production
+  syncPolicy:
+    automated:
+      prune: true

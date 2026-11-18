@@ -1,0 +1,23 @@
+replicaCount: 1
+
+image:
+  digest: sha256:41c36275eeac5ff05edc158156a187e7806bd5c6d0b01f16c8de24fc05429c20
+
+resources:
+  requests:
+    cpu: 100m
+  limits:
+    cpu: 500m
+
+scratch:
+  sizeLimit: 64Mi
+
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 2
+
+migrate:
+  activeDeadlineSeconds: 900
+
+networkPolicy:
+  enabled: true

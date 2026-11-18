@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dispatch-migrate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: dispatch-migrate
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  {{- if .Values.migrate.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ .Values.migrate.activeDeadlineSeconds }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: dispatch-migrate
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.serviceAccount.migrateName }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      containers:
+        - name: migrate
+          image: {{ include "dispatch.image" . | quote }}
+          args:
+            - migrate
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}

@@ -25,6 +25,24 @@ const verdict = '| Not ready to deploy | Any of S1 to S5 is a fail. |';
 const verdict2 = '| Ready after the first three | No fail in S1 to S5, and at least one of the eighteen checks is a fail or a warn. |';
 const statusRow = '| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |';
 const order = 'Order: S3, S4, S1, S5, S2, S6, S7, E3, S8, S9, S10, E1, E2, E4, E5, E6, E7, E8.';
+// The Kubernetes workload check pins its eighteen checks, its status and verdict tables, the order
+// of the first three, and the fixed command list of its cluster script.
+const kubernetes = 'skills/kubernetes-workload-check/';
+const r1 = 'R1. Every container sets a CPU request and a memory request, init containers and sidecars included.';
+const r2 = 'R2. Every container sets a memory limit.';
+const k7 = 'K7. Secrets stay out of manifests and values files.';
+const k8sVerdicts = [
+  '| Not ready for production | Any of K1, K4, K6, or K7 is a fail. |',
+  '| Ready after the first three | None of K1, K4, K6, or K7 is a fail, and at least one of the eighteen checks is a fail or a warn. |',
+  '| Ready from what the repository shows | No check is a fail or a warn. |',
+];
+const k8sStatusRow = '| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |';
+const k8sOrder = 'Order: K7, K6, K4, K1, K8, K5, K2, K10, R1, R2, K9, K3, R3, R4, R5, R6, R7.';
+const cmdEnd = '# END the fixed command list';
+const k8sWeakest = 'With several workloads in an environment, judge each one. The check gets the weakest status: fail, then warn, then "ask the team", then pass. The evidence names the workload that earned it. A workload whose part does not apply leaves the comparison.';
+const k8sTwice = 'R8 cannot pass from the repository. When R1 fails, R8 does not apply. Otherwise R8 is "ask the team", and the cluster pass is how it is answered. R3 uses a line of this skill\'s own, not a Kubernetes rule: a memory limit of more than twice its request is a warn.';
+const k8sLastStatus = '| does not apply | The environment holds nothing that the check judges. | not counted |';
+const k7Row = '| A Secret with values in the repository | A `Secret` object that prints at least one `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |';
 const cases = [
   ['reword check', 'SKILL.md', s => s.replace(first, first.replace('works', 'runs'))],
   ['renumber check', 'SKILL.md', s => s.replace(first, first.replace('1.', '21.'))],
@@ -52,6 +70,45 @@ const cases = [
   ['serverless: reword status row', 'SKILL.md', s => s.replace(statusRow, statusRow.replace('sits outside it', 'is unknown')), serverless],
   ['serverless: change first-three order', 'SKILL.md', s => s.replace(order, order.replace('S3, S4, S1', 'S4, S3, S1')), serverless],
   ['serverless: change first-three order in checks.md', 'references/checks.md', s => s.replace(order, order.replace('S7, E3', 'E3, S7')), serverless],
+  ['kubernetes: reword check', 'SKILL.md', s => s.replace(r2, r2.replace('sets', 'has')), kubernetes],
+  ['kubernetes: reword check heading', 'references/checks.md', s => s.replace('### ' + k7, '### ' + k7.replace('stay out of', 'are kept out of')), kubernetes],
+  ['kubernetes: renumber check', 'SKILL.md', s => s.replace(r2, r2.replace('R2.', 'R9.')), kubernetes],
+  ['kubernetes: renumber check heading', 'references/checks.md', s => s.replace('### ' + k7, '### ' + k7.replace('K7.', 'K11.')), kubernetes],
+  ['kubernetes: swap two checks', 'SKILL.md', s => s.replace(r1, '@@R1@@').replace(r2, r1).replace('@@R1@@', r2), kubernetes],
+  ['kubernetes: swap two check headings', 'references/checks.md', s => s.replace('### ' + r1, '@@R1@@').replace('### ' + r2, '### ' + r1).replace('@@R1@@', '### ' + r2), kubernetes],
+  ['kubernetes: duplicate check', 'SKILL.md', s => s.replace(r1, r1 + '\n' + r1), kubernetes],
+  ['kubernetes: decoy original check in a code fence', 'SKILL.md', s => s.replace(r2, r2.replace('sets', 'has')) + '\n```text\n' + r2 + '\n```\n', kubernetes],
+  ['kubernetes: reword the first verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[0], k8sVerdicts[0].replace('Not ready for production', 'Not ready to ship')), kubernetes],
+  ['kubernetes: reword the second verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[1], k8sVerdicts[1].replace('at least one of the eighteen checks', 'any other check')), kubernetes],
+  ['kubernetes: reword the third verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[2], k8sVerdicts[2].replace('No check is a fail or a warn.', 'No check is a fail.')), kubernetes],
+  ['kubernetes: reword status row', 'SKILL.md', s => s.replace(k8sStatusRow, k8sStatusRow.replace('sits outside it', 'is unknown')), kubernetes],
+  ['kubernetes: change first-three order', 'SKILL.md', s => s.replace(k8sOrder, k8sOrder.replace('K7, K6', 'K6, K7')), kubernetes],
+  ['kubernetes: change first-three order in checks.md', 'references/checks.md', s => s.replace(k8sOrder, k8sOrder.replace('R6, R7', 'R7, R6')), kubernetes],
+  ['kubernetes: an extra status row', 'SKILL.md', s => s.replace(k8sLastStatus, k8sLastStatus + '\n| skip | The team says so. | 1 |'), kubernetes],
+  ['kubernetes: an extra verdict row', 'SKILL.md', s => s.replace(k8sVerdicts[2], k8sVerdicts[2] + '\n| Good enough | The team says so. |'), kubernetes],
+  ['kubernetes: a second order line', 'SKILL.md', s => s.replace('## The verdict\n', '## The verdict\n\nOrder: R1, R2.\n'), kubernetes],
+  ['kubernetes: a second order line in checks.md', 'references/checks.md', s => s.replace('## Known limits\n', '## Known limits\n\nOrder: R1, R2.\n'), kubernetes],
+  ['kubernetes: R8 moved under Security', 'SKILL.md', s => s.replace('R8. Requests match measured use.\n\n**Security**\n', '\n**Security**\n\nR8. Requests match measured use.\n'), kubernetes],
+  ['kubernetes: R8 heading moved under Security', 'references/checks.md', s => s.replace('\n## Security\n', '\n').replace('### R8. ', '## Security\n\n### R8. '), kubernetes],
+  ['kubernetes: a K7 case with another status', 'references/checks.md', s => s.replace(k7Row, k7Row.replace('| fail |', '| ask the team |')), kubernetes],
+  ['kubernetes: a K7 case added', 'references/checks.md', s => s.replace(k7Row, k7Row + '\n| A Secret the team trusts | `secret-type` | pass |'), kubernetes],
+  ['kubernetes: the R3 line reworded', 'SKILL.md', s => s.replace(k8sTwice, k8sTwice.replace('more than twice', 'more than four times')), kubernetes],
+  ['kubernetes: the weakest-status rule reworded', 'SKILL.md', s => s.replace(k8sWeakest, k8sWeakest.replace('the weakest status', 'the most common status')), kubernetes],
+  ['kubernetes: a fail-list word dropped', 'references/checks.md', s => s.replace("`pwd`, `pw`, `passphrase`", "`pwd`, `passphrase`"), kubernetes],
+  ['kubernetes: an exact-name exclusion dropped', 'references/checks.md', s => s.replace('`PWD` (a working directory), `OLDPWD`, and `NOPASSWD`', '`PWD` (a working directory) and `OLDPWD`'), kubernetes],
+  ['kubernetes: the service-account user form dropped', 'references/checks.md', s => s.replace(', a `User` in the service-account form (`subject.<n>.user-form=service-account`),', ','), kubernetes],
+  ['kubernetes: the subject rule renamed', 'references/checks.md', s => s.replace('- **The subject rule.**', '- **A note on subjects.**'), kubernetes],
+  ['kubernetes: a plain User counted as a workload', 'references/checks.md', s => s.replace('is a person or a system user, not a workload, and is not a K6 case', 'counts like a ServiceAccount'), kubernetes],
+  ['kubernetes: an unread User form let through', 'references/checks.md', s => s.replace('A `User` with `user-form=other` is "ask the team"', 'A `User` with `user-form=other` is not a K6 case'), kubernetes],
+  ['kubernetes: reach map: a plain User counted as a workload', 'references/reach-map.md', s => s.replace('is a person or a system user, and reaches no workload', 'counts like a ServiceAccount'), kubernetes],
+  ['kubernetes: reach map: groups left out', 'references/reach-map.md', s => s.replace('The reader prints no group name, so every group counts', 'The reader prints no group name, so no group counts'), kubernetes],
+  ['kubernetes: reach map: a user form narrowed to the binding namespace', 'references/reach-map.md', s => s.replace("(`subject.<n>.user-form=service-account`) reaches the account of every workload of the environment, whatever the binding's kind or namespace.", '(`subject.<n>.user-form=service-account`) reaches the account of every workload in the namespace of a RoleBinding.'), kubernetes],
+  ['kubernetes: reach map: not found put before broad', 'references/reach-map.md', s => s.replace('both hold for the cell, the cell is "broad"', 'both hold for the cell, the cell is "not found in the repository"'), kubernetes],
+  ['kubernetes: a read-only hostPath let through', 'references/checks.md', s => s.replace('or it has a `hostPath` volume, read-only or not.', 'or it has a `hostPath` volume mounted read-write.'), kubernetes],
+  ['kubernetes: the cluster-admin binding softened', 'references/checks.md', s => s.replace('A binding to `cluster-admin` fails K6 when', 'A binding to `cluster-admin` warns on K6 when'), kubernetes],
+  ['kubernetes: rule 10 without its pointer', 'SKILL.md', s => s.replace('The one exception is the table "Absent fields" in `references/checks.md`', 'The one exception is a key that is absent'), kubernetes],
+  ['kubernetes: a command added to the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace(cmdEnd, "CMD_SECRETS='kubectl get secrets --namespace=<name> -o yaml'\n" + cmdEnd), kubernetes],
+  ['kubernetes: a command changed in the fixed list', 'scripts/read-cluster-usage.sh', s => s.replace('--request-timeout=20s -o custom-columns=HPA:', '--request-timeout=20s -o yaml -o custom-columns=HPA:'), kubernetes],
   // The guided app starter: the guards for the security scan corrections of 15 November 2026.
   ['starter: a request body in a file', starter + 'references/ci-cd-baseline.md', s => s.replace("--input - <<'JSON'", '--input body.json <<\'JSON\'')],
   ['starter: a named request body file', starter + 'references/ci-cd-baseline.md', s => s + '\nWrite `ruleset.json` to a temporary folder.\n'],

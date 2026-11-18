@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dispatch-staging
+  namespace: argocd
+spec:
+  project: fleetboard
+  source:
+    repoURL: https://github.com/example-fleetboard/fleetboard.git
+    targetRevision: main
+    path: chart
+    helm:
+      valueFiles:
+        - values-staging.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dispatch-staging
+  syncPolicy:
+    automated:
+      prune: true

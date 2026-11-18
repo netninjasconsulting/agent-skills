@@ -1,0 +1,30 @@
+replicaCount: 4
+
+image:
+  tag: latest
+
+serviceAccount:
+  automount: true
+
+podAnnotations:
+  fleetboard.example.com/deploy-token: FIXTUREVALUE-deploy-annotation-token
+
+extraArgs:
+  - --partner-api-key=FIXTUREVALUE-partner-arg-key
+
+database:
+  host: db.production.fleetboard.example.com
+  password: FIXTUREVALUE-production-db-password
+
+resources:
+  requests:
+    memory: 256Mi
+  limits:
+    memory: 384Mi
+
+securityContext:
+  privileged: true
+
+autoscaling:
+  minReplicas: 4
+  maxReplicas: 12

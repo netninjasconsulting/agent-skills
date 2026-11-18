@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: dispatch
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: dispatch
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: dispatch
+  workloadRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dispatch
+    scaleDown: onsuccess
+  strategy:
+    canary:
+      steps:
+        - setWeight: 25
+        - pause:
+            duration: 5m

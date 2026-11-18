@@ -410,6 +410,162 @@ if (existsSync(serverlessSkill)) {
   });
 }
 
+// The Kubernetes workload check keeps one wording for its eighteen checks, its statuses, its verdicts,
+// and the order of the first three, and one fixed command list for its cluster script.
+const kubernetesChecks = [
+  "R1. Every container sets a CPU request and a memory request, init containers and sidecars included.",
+  "R2. Every container sets a memory limit.",
+  "R3. Each memory limit sits close to its request.",
+  "R4. Every autoscaler has what it needs to work.",
+  "R5. Every namespace sets defaults or ceilings for CPU and memory.",
+  "R6. Scratch space has a ceiling.",
+  "R7. Batch work has a deadline, and scheduled runs do not pile up.",
+  "R8. Requests match measured use.",
+  "K1. No container runs as root or privileged.",
+  "K2. Every container drops all capabilities and blocks privilege escalation.",
+  "K3. Every container's root filesystem is read-only.",
+  "K4. No pod shares the host's network, processes, or files.",
+  "K5. Each workload has its own ServiceAccount, and mounts a token only when it calls the API.",
+  "K6. RBAC rules name their verbs and their resources.",
+  "K7. Secrets stay out of manifests and values files.",
+  "K8. A NetworkPolicy covers every workload.",
+  "K9. Every image is pinned by digest and comes from a named registry.",
+  "K10. Every namespace enforces the restricted Pod Security level.",
+];
+const kubernetesStatuses = [
+  "| pass | Every part of the check is met, from what the reader printed. | 1 |",
+  "| warn | The check is met in part, and the missing part would be in the repository. | 0 |",
+  "| fail | A printed field breaks the check, or a setting it needs is absent. | 0 |",
+  "| ask the team | The part that the repository can show is met, and the rest sits outside it. | 0 |",
+  "| does not apply | The environment holds nothing that the check judges. | not counted |",
+];
+const kubernetesVerdicts = [
+  "| Not ready for production | Any of K1, K4, K6, or K7 is a fail. |",
+  "| Ready after the first three | None of K1, K4, K6, or K7 is a fail, and at least one of the eighteen checks is a fail or a warn. |",
+  "| Ready from what the repository shows | No check is a fail or a warn. |",
+];
+const kubernetesOrder = "Order: K7, K6, K4, K1, K8, K5, K2, K10, R1, R2, K9, K3, R3, R4, R5, R6, R7.";
+const kubernetesRules = [
+  'With several workloads in an environment, judge each one. The check gets the weakest status: fail, then warn, then "ask the team", then pass. The evidence names the workload that earned it. A workload whose part does not apply leaves the comparison.',
+  'R8 cannot pass from the repository. When R1 fails, R8 does not apply. Otherwise R8 is "ask the team", and the cluster pass is how it is answered. R3 uses a line of this skill\'s own, not a Kubernetes rule: a memory limit of more than twice its request is a warn.',
+];
+// The rulings of the review: the K7 fail list, K4 on any hostPath, K6 on a cluster-admin binding and its subject rule,
+// each once in checks.md, and ground rule 10 with its pointer to the absent-fields table.
+const kubernetesRulings = [
+  "  - **The fail list.** A name whose last word is `password`, `passwd`, `pass`, `pwd`, `pw`, `passphrase`, `secret`, `token`, `apikey`, `privatekey`, `accesskey`, `secretkey`, `credential`, or `credentials`; or whose last two words are `api key`, `private key`, `access key`, or `secret key`; or that is a single word ending in `password` or `passwd` (`PGPASSWORD`). These names are never on it: `existingSecret`, `secretName`, `secretRef`, `secretKeyRef`, `automountServiceAccountToken`, any name whose word before the last is `existing`, and these exact whole names, in any case: `PWD` (a working directory), `OLDPWD`, and `NOPASSWD`. They stay on the ask list where the reader's wide list marks them. So `DB_PASSWORD`, `smtp.password`, `MAP_TILES_API_KEY`, `partner-api-token`, `PGPASSWORD`, `RABBITMQ_DEFAULT_PASS`, `MYSQL_PWD`, `ADMIN_PW`, and `PASSPHRASE` are on the fail list, and `DB_PASSWORD_FILE`, `TOKEN_TTL`, `tls.secretName`, `existingSecret`, and `auth.enabled` are not.",
+  "- **Fail:** a pod prints `host-network=true`, `host-pid=true`, or `host-ipc=true`; or it has a `hostPath` volume, read-only or not. A read-only mount narrows what the pod can change on the node and still shares the node's files (K15). The evidence names each `mount.<volume-name>` line.",
+  "- **The `cluster-admin` binding.** A binding to `cluster-admin` fails K6 when any subject reaches a workload: a ServiceAccount (`subject.<n>.kind=ServiceAccount`, the `default` account included), a `User` in the service-account form (`subject.<n>.user-form=service-account`), or a group (`subject.<n>.kind=Group`). Kubernetes authenticates a ServiceAccount as the user `system:serviceaccount:<namespace>:<name>`, RBAC grants a role to the user that a `User` subject names, and every ServiceAccount belongs to the group `system:serviceaccounts` (checked, K16, K27, and K35, 16 Nov 2026). The reader prints no group name, so every group counts.",
+  "- **The subject rule.** A subject that reaches a workload is one of the three above. A `User` with `user-form=plain` is a person or a system user, not a workload, and is not a K6 case. A `User` with `user-form=other` is \"ask the team\" in K6, and \"not found in the repository\" in the reach map. The subject rule decides two things only: the built-in roles (the `cluster-admin` fail, and the `admin` and `edit` warn), and the marks of the reach map. A Role or ClusterRole defined in the repository is judged on its own rules, whatever binds it.",
+];
+// The subject rules of the reach map: what each subject reaches, and the order inside the cell.
+const kubernetesReachRules = [
+  "- A ServiceAccount subject (`subject.<n>.kind=ServiceAccount`) reaches exactly the account that its `subject.<n>.name` and `subject.<n>.namespace` give, whatever kind of binding holds it and wherever the binding lives.",
+  "- A `User` in the service-account form (`subject.<n>.user-form=service-account`) reaches the account of every workload of the environment, whatever the binding's kind or namespace. The reader never prints a `User` name, and the name can give an account in any namespace, so the reader cannot tie the subject to one account.",
+  "- A group (`subject.<n>.kind=Group`) reaches the account of every workload of the environment, whatever the binding's kind or namespace. The reader prints no group name, so every group counts.",
+  "A `User` with `user-form=other` may be a ServiceAccount in the user form, and the reader could not tell. Every workload of the environment, whatever the binding's kind or namespace, gets \"not found in the repository\" in this cell, with the reason. A `User` with `user-form=plain` is a person or a system user, and reaches no workload.",
+  "The kind of the binding decides only where the rights apply: a RoleBinding gives them inside its own namespace, and a ClusterRoleBinding gives them in the whole cluster. The cell says which. The cost of this rule is that workloads other than the one a binding names are marked too, because the reader does not print the name.",
+  "Where \"broad\" and \"not found in the repository\" both hold for the cell, the cell is \"broad\", and it still lists the reason for \"not found in the repository\".",
+];
+const kubernetesRule10 = "10. **A pass needs a field the reader printed.** A README, a comment, or a name never passes a check. A field that is \"not found\" can neither pass nor fail a check: the check is \"ask the team\" at best, and the field is listed under \"Not checked\". The one exception is the table \"Absent fields\" in `references/checks.md`: a key that is absent from an object the reader printed whole means the setting is not made, and the Kubernetes default applies. A field that prints `other`, or sits in a file that was not read, is never the default and never passes.";
+// The K7 table: one status for each case, every row of it.
+const kubernetesK7Rows = [
+  "| Case | Fields | Status |",
+  "| --- | --- | --- |",
+  "| A Secret with values in the repository | A `Secret` object that prints at least one `secret-key.data` or `secret-key.string-data`, and no `sops=present` | fail |",
+  "| A Secret with a SOPS block and a value in clear | `sops=present` and `sops-clear-count` above 0 | fail |",
+  "| A Secret encrypted by SOPS | `sops=present` and `sops-clear-count=0` | pass for that object |",
+  "| A Secret with a SOPS block and no count | `sops=present` with `sops-clear-count=other`, or with no `sops-clear-count` line | ask the team |",
+  "| A Secret whose keys are all empty | only `secret-key.data-empty` or `secret-key.string-data-empty` lines | not a K7 case |",
+  "| A sealed or external secret kind | A kind the reader does not read, such as `SealedSecret` or `ExternalSecret` | not a K7 case: \"Not checked\" |",
+  "| An env var with a written value and a name on the fail list | `env.<NAME>=literal` | fail |",
+  "| An env var with an empty value | `env.<NAME>=literal-empty` | not a K7 case |",
+  "| A ConfigMap key or a values key that looks encrypted | `configmap-data.<key>=encrypted` or `values-key.<path>=encrypted` | not a K7 case |",
+  "| A key with a value in a values file, named on the fail list | `values-key.<path>=scalar` or `values-key.<path>=block-scalar` with the kind `Values` | fail |",
+  "| A key with a value in an `Application`'s inline values, named on the fail list | `values-key.<path>=scalar` or `values-key.<path>=block-scalar` with the kind `Application` or `ApplicationSet` | fail |",
+  "| A key with a value in a ConfigMap, named on the fail list | `configmap-data.<key>=scalar` or `configmap-data.<key>=block-scalar`. A ConfigMap gives no secrecy (K21) | fail |",
+  "| A key in an `ApplicationSet` list generator, named on the fail list | `list-element.<i>.<j>.<key>` | fail |",
+  "| A name on the ask list, in any of the five cases above | `env.<NAME>=literal`, `values-key.<path>=scalar` or `block-scalar`, `configmap-data.<key>=scalar` or `block-scalar`, `list-element.<i>.<j>.<key>` | ask the team |",
+  "| A credential-like command or argument item | `args-credential-like-count` above 0 | ask the team |",
+  "| A credential-like annotation key with a value | `annotation-credential-like-count` above 0 | ask the team |",
+  "| A user part in a repository address | `source.<n>.url-has-user-part=true`. The reader does not tell a user name from a password | ask the team |",
+  "| A key or an env entry the reader could not read | `env-other-count` above 0, `values-key-unreadable-count` above 0, `source.<n>.helm-values=other` | ask the team at best; the file and line go under \"Not checked\" |",
+];
+// The cluster script runs these commands and no others. Each is pinned whole, in order, in the
+// script's own block and in the code block of fields.md, so that a command added, removed, or
+// changed in either place fails here.
+const getColumns = "--no-headers --all-namespaces=false --watch=false --watch-only=false --selector= --field-selector= --ignore-not-found=false --output-watch-events=false --show-kind=false --show-labels=false --show-managed-fields=false --label-columns= --subresource= --allow-missing-template-keys=true --template= --filename= --kustomize= --raw= --request-timeout=20s -o custom-columns=";
+const clusterCommands = [
+  "kubectl config current-context --kubeconfig= --context= --server= --cluster= --profile=none --cache-dir=",
+  "kubectl top pod --containers --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= --no-headers --all-namespaces=false --selector= --field-selector= --show-swap=false --sum=false --request-timeout=20s",
+  "kubectl get pods --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= " + getColumns + "POD:.metadata.name,CONTAINERS:.spec.containers[*].name,CPU_REQ:.spec.containers[*].resources.requests.cpu,MEM_REQ:.spec.containers[*].resources.requests.memory,CPU_LIM:.spec.containers[*].resources.limits.cpu,MEM_LIM:.spec.containers[*].resources.limits.memory,STATUS_NAMES:.status.containerStatuses[*].name,RESTARTS:.status.containerStatuses[*].restartCount,LAST_END:.status.containerStatuses[*].lastState.terminated.reason",
+  "kubectl get verticalpodautoscalers.autoscaling.k8s.io --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= " + getColumns + "VPA:.metadata.name,TARGET_KIND:.spec.targetRef.kind,TARGET:.spec.targetRef.name,MODE:.spec.updatePolicy.updateMode,RECO_CONTAINER:.status.recommendation.containerRecommendations[*].containerName,CPU_TARGET:.status.recommendation.containerRecommendations[*].target.cpu,MEM_TARGET:.status.recommendation.containerRecommendations[*].target.memory,CPU_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.cpu,MEM_LOWER:.status.recommendation.containerRecommendations[*].lowerBound.memory,CPU_UPPER:.status.recommendation.containerRecommendations[*].upperBound.cpu,MEM_UPPER:.status.recommendation.containerRecommendations[*].upperBound.memory",
+  "kubectl get horizontalpodautoscalers.autoscaling --namespace=<name> --context=<context> --kubeconfig= --server= --cluster= --profile=none --cache-dir= " + getColumns + "HPA:.metadata.name,TARGET_KIND:.spec.scaleTargetRef.kind,TARGET:.spec.scaleTargetRef.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CURRENT:.status.currentReplicas,DESIRED:.status.desiredReplicas,METRIC_TYPE:.spec.metrics[*].type,METRIC:.spec.metrics[*].resource.name,UTILIZATION:.spec.metrics[*].resource.target.averageUtilization",
+];
+const kubernetesSkill = path.join(skillsDir, "kubernetes-workload-check");
+if (existsSync(kubernetesSkill)) {
+  const linesOf = (file) => (existsSync(file) ? visibleLines(read(file).split("\n")) : []);
+  const skillFile = path.join(kubernetesSkill, "SKILL.md");
+  const skillLines = linesOf(skillFile);
+  const checksFile = path.join(kubernetesSkill, "references", "checks.md");
+  const checksLines = linesOf(checksFile);
+  const checksSection = sectionLines(skillLines, "## The eighteen checks");
+  // Whole lines, in their own sections, so that "K1. ..." is not found inside "K10. ...".
+  sameLines(skillFile, checksSection.filter((line) => /^[RK]\d+\. /.test(line)), kubernetesChecks, "the eighteen checks");
+  sameLines(checksFile, checksLines.filter((line) => /^#+ [RK]\d+\. /.test(line)), kubernetesChecks.map((check) => `### ${check}`), "the eighteen check headings");
+  sameLines(skillFile, checksSection.filter((line) => /^\| (pass|warn|fail|ask the team|does not apply) \|/.test(line)), kubernetesStatuses, "the status table");
+  sameLines(skillFile, sectionLines(skillLines, "## The verdict").filter((line) => /^\| (Not ready|Ready)/.test(line)), kubernetesVerdicts, "the verdict table");
+  sameLines(skillFile, sectionLines(skillLines, "## The first three to change").filter((line) => /^Order:/.test(line)), [kubernetesOrder], "the order of the first three");
+  sameLines(checksFile, sectionLines(checksLines, "## The first three to change").filter((line) => /^Order:/.test(line)), [kubernetesOrder], "the order of the first three");
+  kubernetesChecks.forEach((check) => {
+    if (!skillLines.includes(check)) fail(skillFile, `a check does not match its fixed wording: ${check}`);
+    if (!checksLines.includes(`### ${check}`)) fail(checksFile, `a check heading does not match its fixed wording: ${check}`);
+  });
+  [...kubernetesStatuses, ...kubernetesVerdicts, kubernetesOrder, ...kubernetesRules].forEach((line) => {
+    if (!skillLines.includes(line)) fail(skillFile, `a line does not match its fixed wording: ${line}`);
+  });
+  // Every row of the two tables, so that an extra row fails whatever its first cell says.
+  sameLines(skillFile, checksSection.filter((line) => /^\| /.test(line)), ["| Status | Meaning | Points |", "| --- | --- | --- |", ...kubernetesStatuses], "every row of the status table");
+  sameLines(skillFile, sectionLines(skillLines, "## The verdict").filter((line) => /^\| /.test(line)), ["| Verdict | Rule |", "| --- | --- |", ...kubernetesVerdicts], "every row of the verdict table");
+  // One order line in each file, and the two rules each once.
+  sameLines(skillFile, skillLines.filter((line) => /Order:/.test(line)), [kubernetesOrder], "the one order line");
+  sameLines(checksFile, checksLines.filter((line) => /Order:/.test(line)), [kubernetesOrder], "the one order line");
+  kubernetesRules.forEach((rule) => sameLines(skillFile, skillLines.filter((line) => line === rule), [rule], "the weakest-status rule and the R3 line"));
+  // Each check sits under its own score.
+  const sizing = kubernetesChecks.filter((check) => check.startsWith("R"));
+  const security = kubernetesChecks.filter((check) => check.startsWith("K"));
+  const between = (lines, from, to) => {
+    const a = lines.indexOf(from);
+    const b = to === null ? lines.length : lines.indexOf(to);
+    return a === -1 || b === -1 || b < a ? [] : lines.slice(a + 1, b);
+  };
+  const isCheck = (line) => /^[RK]\d+\. /.test(line);
+  sameLines(skillFile, between(checksSection, "**Sizing**", "**Security**").filter(isCheck), sizing, "the sizing checks under Sizing");
+  sameLines(skillFile, between(checksSection, "**Security**", null).filter(isCheck), security, "the security checks under Security");
+  sameLines(checksFile, sectionLines(checksLines, "## Sizing").filter((line) => /^#+ [RK]\d+\. /.test(line)), sizing.map((check) => `### ${check}`), "the sizing check headings under Sizing");
+  sameLines(checksFile, sectionLines(checksLines, "## Security").filter((line) => /^#+ [RK]\d+\. /.test(line)), security.map((check) => `### ${check}`), "the security check headings under Security");
+  const reachFile = path.join(kubernetesSkill, "references", "reach-map.md");
+  const reachLines = linesOf(reachFile);
+  kubernetesReachRules.forEach((rule) => sameLines(reachFile, reachLines.filter((line) => line === rule), [rule], "a subject rule of the reach map"));
+  kubernetesRulings.forEach((rule) => sameLines(checksFile, checksLines.filter((line) => line === rule), [rule], "a ruled rule of checks.md"));
+  sameLines(skillFile, skillLines.filter((line) => line === kubernetesRule10), [kubernetesRule10], "ground rule 10 with its pointer to the absent-fields table");
+  sameLines(checksFile, between(checksLines, `### ${kubernetesChecks[14]}`, `### ${kubernetesChecks[15]}`).filter((line) => /^\| /.test(line)), kubernetesK7Rows, "every row of the K7 table");
+  const script = path.join(kubernetesSkill, "scripts", "read-cluster-usage.sh");
+  const scriptLines = existsSync(script) ? read(script).split("\n") : [];
+  const begin = scriptLines.indexOf("# BEGIN the fixed command list");
+  const end = scriptLines.indexOf("# END the fixed command list");
+  const scriptBlock = begin === -1 || end < begin ? [] : scriptLines.slice(begin + 1, end);
+  // Every line of the block is one command, CMD_<NAME>='<command>', and nothing else.
+  const scriptCommands = scriptBlock.map((line) => /^CMD_[A-Z]+='([^']*)'$/.exec(line)?.[1] ?? `not a command line: ${line}`);
+  sameLines(script, scriptCommands, clusterCommands, "the fixed command list of the cluster script");
+  const fieldsFile = path.join(kubernetesSkill, "references", "fields.md");
+  const fieldsLines = existsSync(fieldsFile) ? read(fieldsFile).split("\n") : [];
+  const intro = fieldsLines.findIndex((line) => line.startsWith("The fixed command list of the cluster script"));
+  const open = fieldsLines.findIndex((line, i) => i > intro && line === "```text");
+  const close = fieldsLines.findIndex((line, i) => i > open && line === "```");
+  const fieldsCommands = intro === -1 || open === -1 || close === -1 ? [] : fieldsLines.slice(open + 1, close);
+  sameLines(fieldsFile, fieldsCommands, clusterCommands, "the fixed command list of the cluster script");
+}
+
 // The nine rows of the agent permissions check keep the wording of the published policy.
 const nineRows = [
   ["Repository", "Open branches and pull requests, and comment.", "Push to main, merge, approve its own work, or edit workflow files.", "A branch ruleset with no bypass for the bot, and CODEOWNERS on .github/."],

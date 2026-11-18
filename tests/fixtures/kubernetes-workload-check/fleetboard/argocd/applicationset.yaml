@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fleetboard-clusters
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            fleetboard: enabled
+  template:
+    metadata:
+      name: "fleetboard-{{.name}}"
+    spec:
+      project: fleetboard
+      source:
+        repoURL: https://github.com/example-fleetboard/fleetboard.git
+        targetRevision: main
+        path: kustomize/overlays/production
+      destination:
+        server: "{{.server}}"
+        namespace: fleetboard-production
