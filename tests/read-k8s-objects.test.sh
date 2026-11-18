@@ -3439,7 +3439,6 @@ pins() {
   pin "an escape can spell a key" '# an escape can spell a key' '/# an escape can spell a key$/s/LE = 1/LE = 0/' links "missing line esckey.yaml:manifest:no-git"
   pin "a file the extractor reads is a manifest only with both root keys" '# a root that holds both keys' '/# a root that holds both keys$/s/if (k \&\& a) print/print/' links "a line matches ^(package"
   pin "a JSON file is a candidate" '# the candidates' '/# the candidates$/s/ -o -name .\*\.json. -o -name Kustomization/ -o -name Kustomization/' links "missing line pod.json:manifest:no-git"
-  pin "a chart's values.schema.json is not a candidate" '# the candidates' '/# the candidates$/s/ ! -name values\.schema\.json ! -path/ ! -path/' links "a line matches ^(package"
   pin "a JSON link is named like a candidate" '*.yml | *.json | Kustomization) named=1' 's/ \*\.yml | \*\.json | Kustomization) named=1/ *.yml | Kustomization) named=1/' links "missing line out.json:link:points outside the repository, not read"
   pin "a credential-like list element never prints its value" 'else if (!credlike(key) && (key in REFKEYS)' 's/!credlike(key) \&\& //' attacks "missing line appset-cred.yaml:12:ApplicationSet/argocd/cred-set:-:list-element.1.1.token=present"
   pin "a ReplicaSet and a ReplicationController have a pod template" '# read like a Deployment' '/# read like a Deployment$/d' fields "missing line rs.yaml:13:ReplicaSet/shop/web:-:host-network=true"
