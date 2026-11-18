@@ -2204,10 +2204,19 @@ $out"
   printf '"api\\x56ersion": v1\n"kin\\x64": Pod\nmetadata:\n  name: xesc\n' > "$u/xesc.yml"
   printf '"api\\U00000056ersion": v1\n"kin\\U00000064": Pod\nmetadata:\n  name: uesc\n' > "$u/uesc.yaml"
   printf -- '--- {apiVersion: v1, kind: Pod, metadata: {name: f}, spec: {hostNetwork: true}}\n' > "$u/docflow.yaml"
+  # A key spelt with an escaped line break in a double-quoted scalar (YAML
+  # joins the two lines), with a line feed and with a carriage return.
+  printf 'kind: Pod\n? "api\\\n  Version"\n: v1\nmetadata:\n  name: lb1\n' > "$u/lb1.yaml"
+  printf '? "ki\\\n  nd"\n: Pod\n? "api\\\n  Version"\n: v1\nmetadata:\n  name: lb2\n' > "$u/lb2.yaml"
+  printf '? "ki\\\r\n  nd"\r\n: Pod\r\n? "api\\\r\n  Version"\r\n: v1\r\n' > "$u/lb3.yaml"
+  # A JSON Pod named values.schema.json outside every chart is a candidate.
+  printf '{"apiVersion": "v1", "kind": "Pod", "metadata": {"name": "vs"}}\n' > "$u/values.schema.json"
   # Not manifests: a package file, a CI file whose kind is nested, a file
   # with an escape the extractor reads, a chart's schema, and a JSON file in
   # a chart's templates.
   printf '{"name": "web", "version": "1.0.0", "scripts": {"build": "tsc"}}\n' > "$u/package.json"
+  # Escapes that cannot spell a letter of either key word.
+  printf '{"symbol": "\\u00a3", "nbsp": "\\u00A0", "del": "\\x7f", "digit": "\\u0031", "face": "\\U0001F600", "euro": "\\u20AC"}\n' > "$u/locale.json"
   printf 'jobs:\n  deploy:\n    kind: Pod\n    apiVersion: v1\n    script: "kubectl apply -f pod.yaml"\n' > "$u/ci.yml"
   printf 'name: build\npath: "C:\\\\Users\\\\x"\nmatch: "\\x41"\n' > "$u/win-ci.yaml"
   printf 'apiVersion: v2\nname: c\nversion: 0.1.0\n' > "$u/chart/Chart.yaml"
@@ -2216,10 +2225,11 @@ $out"
   cwd=$u
   rd .
   [ "$code" -eq 0 ] || fail "files that look like manifests: the list exit $code"
-  for f in json-in-yaml.yaml pod.json pretty.json bom.yaml spacecolon.yaml complexkey.yaml esckey.yaml xesc.yml uesc.yaml docflow.yaml; do
+  for f in json-in-yaml.yaml pod.json pretty.json bom.yaml spacecolon.yaml complexkey.yaml esckey.yaml xesc.yml uesc.yaml docflow.yaml lb1.yaml lb2.yaml lb3.yaml values.schema.json; do
     expect_line "$out" "$f:manifest:no-git" "files that look like manifests"
   done
   expect_no "$out" '^(package\.json|ci\.yml|win-ci\.yaml|chart/values\.schema\.json|chart/templates/pod\.json):' "files that look like manifests"
+  expect_no "$out" '^locale\.json:' "escapes that cannot spell a key"
   list_u=$out
   for f in json-in-yaml.yaml pod.json pretty.json bom.yaml spacecolon.yaml complexkey.yaml esckey.yaml xesc.yml uesc.yaml docflow.yaml; do
     rd --fields "$f"
@@ -2936,6 +2946,23 @@ x"
   rd .
   [ "$code" -eq 0 ] || fail "a PATH with no git: the list exit $code"
   expect_line "$out" "pod.yaml:manifest:no-git" "a PATH with no git"
+  # A program the scanned repository names in its own Git config is never
+  # run: core.fsmonitor set to a script that records a call.
+  mkdir -p "$work/fsmon"
+  git -C "$work/fsmon" init -q
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\n' > "$work/fsmon/pod.yaml"
+  git -C "$work/fsmon" add pod.yaml
+  printf '#!/bin/sh\necho fsmonitor-of-the-repository >> "%s"\n' "$work/repo-programs" > "$work/fsmon/fsmon.sh"
+  chmod +x "$work/fsmon/fsmon.sh"
+  git -C "$work/fsmon" config core.fsmonitor "$work/fsmon/fsmon.sh"
+  rm -f "$work/repo-programs"
+  cwd=$work/fsmon
+  RPATH=$PATH
+  rd .
+  expect_line "$out" "pod.yaml:manifest:tracked" "a repository whose Git config names an fsmonitor"
+  rd --fields pod.yaml
+  [ ! -e "$work/repo-programs" ] || fail "a repository whose Git config names an fsmonitor: the reader ran it"
+  rm -rf "$work/fsmon"
   # With a path argument, the list cleans PATH against that directory too:
   # an awk inside the listed directory, on a PATH entry that points there,
   # is not called.

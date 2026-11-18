@@ -301,6 +301,36 @@ suite() {
   done
   rm -rf "$work/cwd-repo" "$work/klink"
 
+  # The script cleans PATH before it runs any program, so a readlink or a
+  # sed the repository supplies on a "." entry never runs. With a kubectl
+  # link outside the repository, the script reads the context as usual;
+  # with a kubectl link inside it (to a stand-in that records a call) and a
+  # readlink that lies about it, nothing of the repository runs, and no
+  # kubectl is found.
+  mkdir -p "$work/lie-repo" "$work/lie-out" "$work/minbin"
+  for t in readlink sed; do
+    printf '#!/bin/sh\necho %s-of-the-repository >> "%s"\necho /usr/local/bin/kubectl\n' "$t" "$work/repo-programs" > "$work/lie-repo/$t"
+    chmod +x "$work/lie-repo/$t"
+  done
+  printf '#!/bin/sh\necho kubectl-of-the-repository >> "%s"\necho dev\n' "$work/repo-programs" > "$work/lie-repo/evil"
+  chmod +x "$work/lie-repo/evil"
+  ln -sf evil "$work/lie-repo/kubectl"
+  ln -sf "$fake/kubectl" "$work/lie-out/kubectl"
+  for t in sh awk sed tr readlink cat; do
+    tp=$(command -v "$t") && ln -sf "$tp" "$work/minbin/$t"
+  done
+  rm -f "$work/repo-programs"
+  rc=0
+  (cd "$work/lie-repo" && env -i PATH=".:$work/lie-out:$PATH" HOME="$home" sh "$s" --context) > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+  [ "$rc" -eq 0 ] || fail "a readlink of the repository and a kubectl link outside: expected exit 0, got $rc"
+  rc=0
+  (cd "$work/lie-repo" && env -i PATH=".:$work/minbin" HOME="$home" sh "$s" --context) > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+  [ "$rc" -eq 5 ] || fail "a kubectl link inside the repository and a readlink that lies: expected exit 5, got $rc"
+  rc=0
+  (cd "$work/lie-repo" && env -i PATH=".:$PATH" HOME="$home" sh "$s" --help) > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+  [ ! -e "$work/repo-programs" ] || fail "a readlink, a sed, or a kubectl of the repository ran: $(sort -u "$work/repo-programs" | tr '\n' ' ')"
+  rm -rf "$work/lie-repo" "$work/lie-out" "$work/minbin" "$work/repo-programs"
+
   # The PATH kubectl gets holds no relative entry and no entry inside the
   # current directory: a plugin-shaped program there is not reachable. The
   # stand-in, outside the current directory, records what command -v finds
