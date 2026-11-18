@@ -22,8 +22,9 @@
 #          or "broken, not read".
 # Field line: <file>:<line>:<object kind>/<namespace>/<name>:<container or ->:<field>=<value>
 #
-# Exit codes: 0 success, 2 wrong usage, 3 render refused, failed, or with
-# no object, 4 a file that is not read or a path that is not listed.
+# Exit codes: 0 success, 2 wrong usage or a program the reader needs is
+# missing, 3 render refused, failed, or with no object, 4 a file that is
+# not read or a path that is not listed.
 #
 # Nothing prints by default. A field prints only when references/fields.md
 # names it for its object kind and place, and its value fits the shape that
@@ -47,8 +48,12 @@
 # refusal tests of fields.md, with a cleared environment and the fixed
 # arguments of fields.md, drops what the tool writes to standard error, and
 # pipes its standard output into the same extractor. It refuses a tool that
-# resolves inside the repository, runs the tool by the path it tested, and
-# gives it a PATH with no relative entry and no entry inside the repository.
+# resolves inside the repository, and runs the tool by the path it tested.
+#
+# Before it runs any program, the reader removes from PATH every relative
+# entry and every entry inside the directory it runs in, and exports the
+# result: its own programs and the render tools all come from it. A program
+# it needs and cannot then find stops it with exit code 2.
 
 set -u
 LC_ALL=C
@@ -2005,23 +2010,6 @@ tool_path() {
   dir_part "$tp_c"
   tp_d=$(phys "$DIR") || refuse "tool inside the repository"
   TOOLRUN="${tp_d%/}/$BASE"
-  clean_path
-}
-
-# The PATH a render tool gets, in CLEANPATH: the caller's, without an
-# empty entry, ".", an entry that does not start with "/", an entry that is
-# not a directory, and an entry that resolves inside the repository, so
-# that no program the repository supplies is reachable by name.
-clean_path() {
-  cl_rest=$PATH:; CLEANPATH=
-  while [ -n "$cl_rest" ]; do
-    cl_e=${cl_rest%%:*}; cl_rest=${cl_rest#*:}
-    case "$cl_e" in /*) ;; *) continue ;; esac  # a relative PATH entry
-    [ -d "$cl_e" ] || continue
-    cl_p=$(phys "$cl_e") || continue
-    if inside_root "$cl_p"; then continue; fi  # a PATH entry inside the repository
-    CLEANPATH=${CLEANPATH:+$CLEANPATH:}$cl_e
-  done
 }
 
 render_helm() {
@@ -2086,7 +2074,7 @@ $1" ;;
   set -- "$@" --namespace "$ns"
   REMOTES=$(remotes_of "$ROOTP")
   status=0
-  rendered=$(cd "$ROOTP" && env -i PATH="$CLEANPATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" "$@" 2>/dev/null) || status=$?  # helm: drop standard error
+  rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" "$@" 2>/dev/null) || status=$?  # helm: drop standard error
   if [ "$status" -ne 0 ]; then
     echo "$me: helm template exited with status $status" >&2
     refuse "render failed"
@@ -2183,9 +2171,9 @@ EOF
   dp=$(phys "$dir")
   status=0
   if [ "$tool" = kustomize ]; then
-    rendered=$(cd "$ROOTP" && env -i PATH="$CLEANPATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
+    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" build "$dp" 2>/dev/null) || status=$?  # kustomize: drop standard error
   else
-    rendered=$(cd "$ROOTP" && env -i PATH="$CLEANPATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
+    rendered=$(cd "$ROOTP" && env -i PATH="$PATH" HOME=/nonexistent LC_ALL=C "$TOOLRUN" kustomize "$dp" 2>/dev/null) || status=$?  # kubectl: drop standard error
   fi
   if [ "$status" -ne 0 ]; then
     echo "$me: $tool exited with status $status" >&2
@@ -2209,9 +2197,49 @@ emit_render() {
   fi
 }
 
+# ---- The PATH ----
+
+# Before the reader runs any program, it cleans PATH and exports it, so
+# that its own awk, find, sed, sort, grep, and git, and every render tool,
+# come from the cleaned PATH: the caller's, without an empty entry, ".",
+# an entry that does not start with "/", an entry that is not a directory,
+# and an entry that resolves inside the directory the reader runs in, so
+# that no program the repository supplies is reachable by name. A program
+# the reader needs and then cannot find stops it with exit code 2.
+clean_path() {
+  cl_here=$(phys .) || cl_here=
+  cl_rest=$PATH:; cl_out=
+  while [ -n "$cl_rest" ]; do
+    cl_e=${cl_rest%%:*}; cl_rest=${cl_rest#*:}
+    case "$cl_e" in /*) ;; *) continue ;; esac  # a relative PATH entry
+    [ -d "$cl_e" ] || continue
+    cl_p=$(phys "$cl_e") || continue
+    if [ -n "$cl_here" ]; then
+      case "$cl_p" in "$cl_here" | "$cl_here"/*) continue ;; esac  # a PATH entry inside the directory the reader runs in
+    fi
+    cl_out=${cl_out:+$cl_out:}$cl_e
+  done
+  PATH=$cl_out
+  export PATH  # the cleaned PATH
+}
+
+# $@ = the programs a mode needs.
+need_programs() {
+  for np in "$@"; do
+    command -v "$np" >/dev/null 2>&1 || die2 "$np is not on the PATH once relative entries and entries inside this directory are removed"  # a program the reader needs
+  done
+}
+
 # ---- Arguments ----
 
 for arg in "$@"; do no_ctl "$arg"; done
+clean_path
+case "${1:-}" in
+  -h | --help) need_programs sed ;;
+  --render) need_programs awk sed find sort grep git env dirname basename ;;
+  --fields | --values) need_programs awk sed find sort grep git ;;
+  *) need_programs awk sed find sort grep git test ;;
+esac
 
 [ $# -gt 0 ] || { list_mode .; exit 0; }
 case "$1" in

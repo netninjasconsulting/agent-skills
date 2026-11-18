@@ -2944,20 +2944,35 @@ x"
   ln -sf "$tr_/helm" "$work/linkbin/helm"
   ln -sf "$tr_/kustomize" "$work/linkbin/kustomize"
   cwd=$tr_
-  for entry in . bin "$tr_/bin" "$work/linkbin"; do
+  # The PATH the reader cleans at its start holds no relative entry and no
+  # entry inside the repository, so with ".", "bin", or an absolute
+  # directory inside the repository, the tool the repository supplies is
+  # never found: the next one on PATH (the stand-in outside, which fails)
+  # runs instead. A link outside the repository to a tool inside it is
+  # found, and refused.
+  for entry in . bin "$tr_/bin"; do
     RPATH="$entry:$work/fake:$PATH"
-    refuse "chart:chart:tool inside the repository" "render with a helm the repository supplies, PATH with $entry" \
-      --render helm chart chart/values.yaml
-    refuse "ov:overlay:tool inside the repository" "render with a kustomize the repository supplies, PATH with $entry" \
-      --render kustomize ov
+    for args in "helm chart chart/values.yaml" "kustomize ov"; do
+      rm -f "$work/fake-calls"
+      # shellcheck disable=SC2086 # the words of the arguments
+      rd --render $args
+      [ "$code" -eq 3 ] || fail "render with a tool the repository supplies, PATH with $entry, $args: expected exit 3, got $code"
+      if grep -q -- '-in-repo' "$work/fake-calls" 2>/dev/null; then fail "render with a tool the repository supplies, PATH with $entry, $args: the tool of the repository ran"; fi
+    done
   done
+  rm -f "$work/fake-calls"
+  RPATH="$work/linkbin:$work/fake:$PATH"
+  refuse "chart:chart:tool inside the repository" "render with a helm linked from outside to one the repository supplies" \
+    --render helm chart chart/values.yaml
+  refuse "ov:overlay:tool inside the repository" "render with a kustomize linked from outside to one the repository supplies" \
+    --render kustomize ov
   # With no kustomize on PATH, the reader would run kubectl kustomize.
   for t in sh unshare awk find sed sort grep git env cat readlink dirname basename; do
     tp=$(command -v "$t") && ln -sf "$tp" "$work/nokz/$t"
   done
   rm -f "$tr_/kustomize" "$tr_/helm"
   RPATH=".:$work/nokz"
-  refuse "ov:overlay:tool inside the repository" "render with a kubectl the repository supplies" \
+  refuse "ov:overlay:tool not installed" "render with a kubectl the repository supplies on a relative entry only" \
     --render kustomize ov
   # The PATH a render tool gets holds no relative entry and no entry inside
   # the repository: a plugin-shaped program there is not reachable. The
@@ -3377,17 +3392,16 @@ pins() {
   pin "a render tool inside the repository is refused" '# a tool inside the repository' '/# a tool inside the repository$/s/if inside_root "$RP"; then refuse "tool inside the repository"; fi/:/' refusals "render with a helm the repository supplies, PATH with .: the render tool ran before the refusal"
   pin "hostProcess at the pod level" '"pod|securityContext>windowsOptions>hostProcess|' '/"pod|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:9:Pod/-/win:-:host-process=true"
   pin "hostProcess at the container level" '"c|securityContext>windowsOptions>hostProcess|' '/"c|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:15:Pod/-/win:init:host-process=false"
-  pin "a relative PATH entry is not passed to a render tool" '# a relative PATH entry' '/# a relative PATH entry$/s/\*) continue ;;/*) ;;/' refusals "a plugin on PATH with '../plugout': helm found"
-  pin "a PATH entry inside the repository is not passed to a render tool" '# a PATH entry inside the repository' '/# a PATH entry inside the repository$/s/then continue; fi/then :; fi/' refusals "helm found [/"
-  # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "helm gets the cleaned PATH" '# helm: drop standard error' '/# helm: drop standard error$/s/PATH="\$CLEANPATH"/PATH="$PATH"/' refusals "a plugin on PATH with '.': helm found"
-  # shellcheck disable=SC2016 # literal text, not an expansion
-  pin "kustomize gets the cleaned PATH" '# kustomize: drop standard error' '/# kustomize: drop standard error$/s/PATH="\$CLEANPATH"/PATH="$PATH"/' refusals "a plugin on PATH with '.': kustomize found"
   if command -v bash >/dev/null 2>&1; then
     pin_behind "a command -v answer that is not a path" '# a command -v answer that is not a path' '/# a tool that does not resolve$/s/|| refuse "tool inside the repository"/|| :/' '/# a command -v answer that is not a path$/s/\*) refuse "tool inside the repository" ;;/*) ;;/' refusals "a helm that is a shell function: expected chart:chart:tool inside the repository"
   fi
   pin "the reason of a file listed by its look" '# listed by its look' '/# listed by its look$/s/= maybe \]/= never ]/' links "standard error does not say the file only looks like a manifest"
   pin "hostProcess in a values file" '|runAsNonRoot|hostProcess)$/) sid = "bool"' 's/|runAsNonRoot|hostProcess)\$\/) sid = "bool"/|runAsNonRoot)$\/) sid = "bool"/' fields "missing line values.yaml:3:Values/-/-:-:values.securityContext.windowsOptions.hostProcess=true"
+  pin "a relative PATH entry is removed at the start" '# a relative PATH entry' '/# a relative PATH entry$/s/\*) continue ;;/*) ;;/' refusals "a plugin on PATH with '../plugout': helm found"
+  pin "a PATH entry inside the directory the reader runs in is removed" '# a PATH entry inside the directory the reader runs in' '/# a PATH entry inside the directory the reader runs in$/s/) continue ;;/) ;;/' refusals "helm found [/"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "the cleaned PATH is the PATH" '  PATH=$cl_out' '/^  PATH=\$cl_out$/d' refusals "a PATH with . that holds an awk and a git: the reader ran"
+  pin "a program the reader needs and cannot find" '# a program the reader needs' '/# a program the reader needs$/s/|| die2 /|| : /' refusals "an awk on a relative PATH entry only: expected exit 2"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
