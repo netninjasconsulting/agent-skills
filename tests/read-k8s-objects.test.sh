@@ -148,6 +148,7 @@ image-pull-policy pull-policy other
 ephemeral-storage-request qty-mem
 ephemeral-storage-limit qty-mem
 privileged bool
+host-process bool
 allow-privilege-escalation bool
 read-only-root-fs bool
 cap-drop cap-name other
@@ -403,7 +404,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/toolrepo" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/hostproc" "$work/toolrepo" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -723,6 +724,23 @@ $out"
     "mixed.yaml:55:ReplicationController/shop/web:-:object=present" "mixed.yaml:60:ReplicationController/shop/web:-:replicas=3" \
     "mixed.yaml:66:ReplicationController/shop/web:-:host-network=true" "mixed.yaml:72:ReplicationController/shop/web:web:privileged=true"; do
     expect_line "$out" "$want" "a ReplicaSet and a ReplicationController in a file with other objects"
+  done
+
+  # 5c. The Windows hostProcess setting, at the pod level and at the level
+  # of a container, an init container included, with the bool shape.
+  mkdir -p "$work/hostproc"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: win\nspec:\n  hostNetwork: true\n  securityContext:\n    windowsOptions:\n      hostProcess: true\n  initContainers:\n  - name: init\n    image: registry.example.com/init:1.0\n    securityContext:\n      windowsOptions:\n        hostProcess: false\n  containers:\n  - name: app\n    image: registry.example.com/app:1.0\n    securityContext:\n      windowsOptions:\n        hostProcess: "true"\n' > "$work/hostproc/pod.yaml"
+  printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: win\nspec:\n  template:\n    spec:\n      securityContext:\n        windowsOptions:\n          hostProcess: yes\n      containers:\n      - name: app\n        image: registry.example.com/app:1.0\n        securityContext:\n          windowsOptions:\n            hostProcess: true\n' > "$work/hostproc/dep.yaml"
+  cwd=$work/hostproc
+  rd --fields pod.yaml
+  [ "$code" -eq 0 ] || fail "hostProcess: exit $code"
+  for want in "pod.yaml:9:Pod/-/win:-:host-process=true" "pod.yaml:15:Pod/-/win:init:host-process=false" \
+    "pod.yaml:21:Pod/-/win:app:host-process=other"; do
+    expect_line "$out" "$want" "hostProcess"
+  done
+  rd --fields dep.yaml
+  for want in "dep.yaml:10:Deployment/-/win:-:host-process=other" "dep.yaml:16:Deployment/-/win:app:host-process=true"; do
+    expect_line "$out" "$want" "hostProcess"
   done
 
   fi
