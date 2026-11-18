@@ -3429,6 +3429,7 @@ pins() {
   pin "a PATH entry inside the directory the reader runs in is removed" '# a PATH entry inside the directory the reader runs in' '/# a PATH entry inside the directory the reader runs in$/s/) continue ;;/) ;;/' refusals "helm found [/"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "the cleaned PATH is the PATH" '  PATH=$cl_out' '/^  PATH=\$cl_out$/d' refusals "a PATH with . that holds an awk and a git: the reader ran"
+  pin "a PATH entry inside the directory the list was given is removed" '# a PATH entry inside the directory the list was given' '/# a PATH entry inside the directory the list was given$/s/) continue ;;/) ;;/' refusals "a PATH entry inside the listed directory: the reader ran its awk"
   pin "a program the reader needs and cannot find" '# a program the reader needs' '/# a program the reader needs$/s/|| die2 /|| : /' refusals "an awk on a relative PATH entry only: expected exit 2"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion

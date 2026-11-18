@@ -51,9 +51,10 @@
 # resolves inside the repository, and runs the tool by the path it tested.
 #
 # Before it runs any program, the reader removes from PATH every relative
-# entry and every entry inside the directory it runs in, and exports the
-# result: its own programs and the render tools all come from it. A program
-# it needs and cannot then find stops it with exit code 2.
+# entry and every entry inside the directory it runs in (and, for a list
+# with a path, inside that path), and exports the result: its own programs
+# and the render tools all come from it. awk, find, sed, sort, or grep
+# missing from it stops the reader with exit code 2; git is optional.
 
 set -u
 LC_ALL=C
@@ -2203,11 +2204,16 @@ emit_render() {
 # that its own awk, find, sed, sort, grep, and git, and every render tool,
 # come from the cleaned PATH: the caller's, without an empty entry, ".",
 # an entry that does not start with "/", an entry that is not a directory,
-# and an entry that resolves inside the directory the reader runs in, so
-# that no program the repository supplies is reachable by name. A program
-# the reader needs and then cannot find stops it with exit code 2.
+# and an entry that resolves inside the directory the reader runs in or,
+# for a list with a path argument, inside that path, so that no program the
+# repository supplies is reachable by name. awk, find, sed, sort, and grep
+# are needed: one the reader then cannot find stops it with exit code 2.
+# git stays optional: without it, every state is no-git.
+# $1 = the directory a list was given, or nothing.
 clean_path() {
   cl_here=$(phys .) || cl_here=
+  cl_arg=
+  if [ -n "${1:-}" ] && [ -d "$1" ]; then cl_arg=$(phys "$1") || cl_arg=; fi  # the directory a list was given
   cl_rest=$PATH:; cl_out=
   while [ -n "$cl_rest" ]; do
     cl_e=${cl_rest%%:*}; cl_rest=${cl_rest#*:}
@@ -2216,6 +2222,9 @@ clean_path() {
     cl_p=$(phys "$cl_e") || continue
     if [ -n "$cl_here" ]; then
       case "$cl_p" in "$cl_here" | "$cl_here"/*) continue ;; esac  # a PATH entry inside the directory the reader runs in
+    fi
+    if [ -n "$cl_arg" ]; then
+      case "$cl_p" in "$cl_arg" | "$cl_arg"/*) continue ;; esac  # a PATH entry inside the directory the list was given
     fi
     cl_out=${cl_out:+$cl_out:}$cl_e
   done
@@ -2233,12 +2242,13 @@ need_programs() {
 # ---- Arguments ----
 
 for arg in "$@"; do no_ctl "$arg"; done
-clean_path
+case "${1:-}" in
+  -*) clean_path ;;
+  *) clean_path "${1:-}" ;;
+esac
 case "${1:-}" in
   -h | --help) need_programs sed ;;
-  --render) need_programs awk sed find sort grep git env dirname basename ;;
-  --fields | --values) need_programs awk sed find sort grep git ;;
-  *) need_programs awk sed find sort grep git test ;;
+  *) need_programs awk find sed sort grep ;;
 esac
 
 [ $# -gt 0 ] || { list_mode .; exit 0; }
