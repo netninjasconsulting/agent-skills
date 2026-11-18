@@ -2923,6 +2923,34 @@ x"
   rd .
   [ "$code" -eq 2 ] || fail "an awk on a relative PATH entry only: expected exit 2, got $code"
   grep -q 'awk' "$work/err" || fail "an awk on a relative PATH entry only: the message does not name awk"
+  # git is optional: with no git on PATH, the list prints no-git states
+  # and exits 0, also inside a Git repository.
+  mkdir -p "$work/nogit/bin" "$work/nogit/repo"
+  for t in sh unshare awk find sed sort grep readlink env test; do
+    tp=$(command -v "$t") && ln -sf "$tp" "$work/nogit/bin/$t"
+  done
+  git -C "$work/nogit/repo" init -q
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\n' > "$work/nogit/repo/pod.yaml"
+  cwd=$work/nogit/repo
+  RPATH="$work/nogit/bin"
+  rd .
+  [ "$code" -eq 0 ] || fail "a PATH with no git: the list exit $code"
+  expect_line "$out" "pod.yaml:manifest:no-git" "a PATH with no git"
+  # With a path argument, the list cleans PATH against that directory too:
+  # an awk inside the listed directory, on a PATH entry that points there,
+  # is not called.
+  mkdir -p "$work/argcwd" "$work/argdir"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: a\n' > "$work/argdir/pod.yaml"
+  printf '#!/bin/sh\necho awk-of-the-listed-directory >> "%s"\nexec "%s" "$@"\n' "$work/repo-programs" "$(command -v awk)" > "$work/argdir/awk"
+  chmod +x "$work/argdir/awk"
+  rm -f "$work/repo-programs"
+  cwd=$work/argcwd
+  RPATH="$work/argdir:$PATH"
+  rd "$work/argdir"
+  [ "$code" -eq 0 ] || fail "a PATH entry inside the listed directory: the list exit $code"
+  expect_line "$out" "pod.yaml:manifest:no-git" "a PATH entry inside the listed directory"
+  [ ! -e "$work/repo-programs" ] || fail "a PATH entry inside the listed directory: the reader ran its awk"
+  rm -rf "$work/nogit" "$work/argcwd" "$work/argdir"
   RPATH="$work/fake:$PATH"
   rm -rf "$fa" "$work/noawk" "$work/repo-programs"
   cwd=$rr
