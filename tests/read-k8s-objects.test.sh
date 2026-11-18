@@ -403,7 +403,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -680,6 +680,50 @@ $out"
   expect_line "$out" "$f:9:$o:-:generator.1=other" "fields ApplicationSet"
   expect_line "$out" "$f:21:$o:-:source.1.path=kustomize/overlays/production" "fields ApplicationSet"
   expect_line "$out" "$f:24:$o:-:destination-namespace=fleetboard-production" "fields ApplicationSet"
+
+  # 5b. A ReplicaSet and a ReplicationController are read like a
+  # Deployment: the same field lines from the same body, alone and in a
+  # file with other objects. A ReplicationController's selector is a plain
+  # label map; no workload selector prints, so it comes last here.
+  mkdir -p "$work/rsrc"
+  body='metadata:\n  name: web\n  namespace: shop\nspec:\n  replicas: 3\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      hostNetwork: true\n      serviceAccountName: web\n      containers:\n      - name: web\n        image: registry.example.com/web:1.0\n        securityContext:\n          privileged: true\n'
+  # shellcheck disable=SC2059 # the body holds the escapes printf turns into lines
+  printf "apiVersion: apps/v1\nkind: Deployment\n$body  selector:\n    matchLabels:\n      app: web\n" > "$work/rsrc/dep.yaml"
+  # shellcheck disable=SC2059 # the body holds the escapes printf turns into lines
+  printf "apiVersion: apps/v1\nkind: ReplicaSet\n$body  selector:\n    matchLabels:\n      app: web\n" > "$work/rsrc/rs.yaml"
+  # shellcheck disable=SC2059 # the body holds the escapes printf turns into lines
+  printf "apiVersion: v1\nkind: ReplicationController\n$body  selector:\n    app: web\n" > "$work/rsrc/rc.yaml"
+  { printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: cfg\ndata:\n  LOG_LEVEL: info\n---\n'
+    cat "$work/rsrc/dep.yaml"; echo '---'; cat "$work/rsrc/rs.yaml"; echo '---'; cat "$work/rsrc/rc.yaml"; } > "$work/rsrc/mixed.yaml"
+  cwd=$work/rsrc
+  same_as_dep() {
+    printf '%s\n' "$1" | grep -v ':api-version=' |
+      sed -e 's#^[a-z]*\.yaml:##' -e 's#:Deployment/#:W/#' -e 's#:ReplicaSet/#:W/#' -e 's#:ReplicationController/#:W/#'
+  }
+  rd --fields dep.yaml
+  dep=$(same_as_dep "$out")
+  for k in rs:ReplicaSet rc:ReplicationController; do
+    rd --fields "${k%%:*}.yaml"
+    [ "$code" -eq 0 ] || fail "${k#*:} read like a Deployment: exit $code"
+    [ "$(same_as_dep "$out")" = "$dep" ] || fail "${k#*:} read like a Deployment: the lines differ from the Deployment's:
+$out"
+    o="${k#*:}/shop/web"
+    for want in "2:$o:-:object=present" "7:$o:-:replicas=3" "13:$o:-:host-network=true" \
+      "14:$o:-:service-account=web" "11:$o:-:pod-label.app=web" "16:$o:web:container-kind=main" \
+      "19:$o:web:privileged=true"; do
+      expect_line "$out" "${k%%:*}.yaml:$want" "${k#*:} read like a Deployment"
+    done
+  done
+  rd --fields mixed.yaml
+  [ "$code" -eq 0 ] || fail "a ReplicaSet and a ReplicationController in a file with other objects: exit $code"
+  for want in "mixed.yaml:2:ConfigMap/-/cfg:-:object=present" \
+    "mixed.yaml:9:Deployment/shop/web:-:object=present" "mixed.yaml:20:Deployment/shop/web:-:host-network=true" \
+    "mixed.yaml:32:ReplicaSet/shop/web:-:object=present" "mixed.yaml:37:ReplicaSet/shop/web:-:replicas=3" \
+    "mixed.yaml:43:ReplicaSet/shop/web:-:host-network=true" "mixed.yaml:49:ReplicaSet/shop/web:web:privileged=true" \
+    "mixed.yaml:55:ReplicationController/shop/web:-:object=present" "mixed.yaml:60:ReplicationController/shop/web:-:replicas=3" \
+    "mixed.yaml:66:ReplicationController/shop/web:-:host-network=true" "mixed.yaml:72:ReplicationController/shop/web:web:privileged=true"; do
+    expect_line "$out" "$want" "a ReplicaSet and a ReplicationController in a file with other objects"
+  done
 
   fi
 
