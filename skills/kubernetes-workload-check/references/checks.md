@@ -41,6 +41,7 @@ An absent field is "not found" too, with the exceptions in this table. Each exce
 | R7 | `active-deadline-seconds` and `pod-active-deadline-seconds` | No deadline set | K7 |
 | R7 | `concurrency-policy` on a CronJob | `Allow`, the default | K8 |
 | K1 | `privileged` at the container | Not privileged (defaults to false) | K1 |
+| K1 | `host-process` at the container and at the pod | Not a HostProcess container | K1 |
 | K2 | `allow-privilege-escalation` | Escalation not blocked (defaults to true) | K3 |
 | K2 | `cap-drop` | Nothing dropped | K1 |
 | K3 | `read-only-root-fs` | Root filesystem writable (defaults to false) | K1 |
@@ -176,12 +177,12 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 
 ### K1. No container runs as root or privileged.
 
-- **Fields:** `privileged` on each container; `run-as-user`, `run-as-non-root`, and `run-as-group` at the container and at the pod (`<container>` is `-`); `container-kind`.
-- **The level that applies.** A container-level setting overrides the pod-level setting of the same name (K1, K3). For each container, use the container's `run-as-user` when it prints one, and the pod's otherwise. The same holds for `run-as-non-root` and `run-as-group`.
-- **Pass:** every container has `privileged` absent or `false`, and a `run-as-user` above 0 at the level that applies.
+- **Fields:** `privileged` on each container; `host-process`, `run-as-user`, `run-as-non-root`, and `run-as-group` at the container and at the pod (`<container>` is `-`); `container-kind`.
+- **The level that applies.** A container-level setting overrides the pod-level setting of the same name (K1, K3). For each container, use the container's `run-as-user` when it prints one, and the pod's otherwise. The same holds for `host-process`, `run-as-non-root`, and `run-as-group`, for init containers too.
+- **Pass:** every container has `privileged` absent or `false`, `host-process` absent or `false` at the level that applies, and a `run-as-user` above 0 at the level that applies.
 - **Warn:** every container passes on the user, and a `run-as-group=0` applies to one, so its files belong to the root group.
-- **Fail:** a container prints `privileged=true`, or `run-as-user=0` applies to it.
-- **Ask the team:** no `run-as-user` applies to a container (the user in the image decides, K1). This holds with `run-as-non-root=true` as well: how the kubelet checks the image's user was not read (verify). Also when `privileged` or a `run-as-user` that applies is `other`, or the workload is not read or not rendered. Such a part can never pass.
+- **Fail:** a container prints `privileged=true`, `host-process=true` applies to it (a Windows HostProcess container, which has privileged access to the node, K38), or `run-as-user=0` applies to it.
+- **Ask the team:** no `run-as-user` applies to a container (the user in the image decides, K1). This holds with `run-as-non-root=true` as well: how the kubelet checks the image's user was not read (verify). Also when `privileged`, a `host-process` that applies, or a `run-as-user` that applies is `other`, or the workload is not read or not rendered. Such a part can never pass.
 - **Question:** "Do the images of <containers> run as a user other than root?"
 
 ### K2. Every container drops all capabilities and blocks privilege escalation.

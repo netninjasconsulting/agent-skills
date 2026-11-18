@@ -1129,7 +1129,7 @@ BEGIN {
     "volume-name volume-type host-path emptydir-medium emptydir-size-limit secret-volume-name " \
     "configmap-volume-name container-kind image-repository image-pin image-registry image-pull-policy " \
     "ephemeral-storage-request ephemeral-storage-limit privileged allow-privilege-escalation " \
-    "read-only-root-fs cap-drop cap-add host-port mount. env. env-ref. env-from-secret env-from-configmap " \
+    "read-only-root-fs host-process cap-drop cap-add host-port mount. env. env-ref. env-from-secret env-from-configmap " \
     "env-other-count args-credential-like-count replicas workload-ref-kind workload-ref-name " \
     "workload-ref-scale-down active-deadline-seconds backoff-limit ttl-seconds-after-finished " \
     "concurrency-policy starting-deadline-seconds history-limit-successful history-limit-failed " \
@@ -1186,6 +1186,7 @@ BEGIN {
     "pod|automountServiceAccountToken|automount-sa-token|bool;" \
     "pod|securityContext>runAsNonRoot|run-as-non-root|bool;pod|securityContext>runAsUser|run-as-user|int;" \
     "pod|securityContext>runAsGroup|run-as-group|int;" \
+    "pod|securityContext>windowsOptions>hostProcess|host-process|bool;" \
     "pod|resources>requests>cpu|cpu-request|qty-cpu;pod|resources>requests>memory|memory-request|qty-mem;" \
     "pod|resources>limits>cpu|cpu-limit|qty-cpu;pod|resources>limits>memory|memory-limit|qty-mem;" \
     "pod|activeDeadlineSeconds|pod-active-deadline-seconds|int;pod|volumes>#>name|volume-name|dns-label;" \
@@ -1199,6 +1200,7 @@ BEGIN {
     "c|resources>requests>ephemeral-storage|ephemeral-storage-request|qty-mem;" \
     "c|resources>limits>ephemeral-storage|ephemeral-storage-limit|qty-mem;" \
     "c|securityContext>privileged|privileged|bool;" \
+    "c|securityContext>windowsOptions>hostProcess|host-process|bool;" \
     "c|securityContext>allowPrivilegeEscalation|allow-privilege-escalation|bool;" \
     "c|securityContext>readOnlyRootFilesystem|read-only-root-fs|bool;" \
     "c|securityContext>runAsNonRoot|run-as-non-root|bool;c|securityContext>runAsUser|run-as-user|int;" \

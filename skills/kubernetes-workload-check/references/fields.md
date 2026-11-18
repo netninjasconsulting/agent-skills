@@ -270,6 +270,7 @@ An entry of `initContainers` is a container like any other. The reader prints `c
 | `run-as-non-root` | pod template kinds | `P.securityContext.runAsNonRoot` | `bool` | K1, K3 | 15 Nov 2026 | checked |
 | `run-as-user` | pod template kinds | `P.securityContext.runAsUser` | `int` | K1, K3 | 15 Nov 2026 | checked |
 | `run-as-group` | pod template kinds | `P.securityContext.runAsGroup` | `int` | K1, K3 | 15 Nov 2026 | checked |
+| `host-process` | pod template kinds | `P.securityContext.windowsOptions.hostProcess`: the Windows settings of the pod apply to every container that does not set its own | `bool` | K1, K38 | 17 Nov 2026 | checked |
 | `cpu-request`, `memory-request`, `cpu-limit`, `memory-limit` | pod template kinds | `P.resources.requests.cpu`, `P.resources.requests.memory`, `P.resources.limits.cpu`, `P.resources.limits.memory` | `qty-cpu` for the two cpu fields, `qty-mem` for the two memory fields | K1, K2 | 15 Nov 2026 | verify |
 | `pod-active-deadline-seconds` | pod template kinds | `P.activeDeadlineSeconds` | `int` | K1 | 15 Nov 2026 | checked |
 | `pod-label.<key>` | pod template kinds | the template's `metadata.labels` (a Pod's own `metadata.labels`), for the keys in the label key list below | `label-value` | K4, K23 | 15 Nov 2026 | checked |
@@ -304,6 +305,7 @@ The volume field row for `volume-type` lists only the six source keys the pages 
 | `ephemeral-storage-request` | pod template kinds | `C.resources.requests.ephemeral-storage` | `qty-mem` | K2 | 15 Nov 2026 | checked |
 | `ephemeral-storage-limit` | pod template kinds | `C.resources.limits.ephemeral-storage` | `qty-mem` | K2 | 15 Nov 2026 | checked |
 | `privileged` | pod template kinds | `C.securityContext.privileged` | `bool` | K1 | 15 Nov 2026 | checked |
+| `host-process` | pod template kinds | `C.securityContext.windowsOptions.hostProcess`, which takes precedence over the pod's | `bool` | K1 | 17 Nov 2026 | checked |
 | `allow-privilege-escalation` | pod template kinds | `C.securityContext.allowPrivilegeEscalation` | `bool` | K1, K3 | 15 Nov 2026 | checked |
 | `read-only-root-fs` | pod template kinds | `C.securityContext.readOnlyRootFilesystem` | `bool` | K1 | 15 Nov 2026 | checked |
 | `run-as-non-root` | pod template kinds | `C.securityContext.runAsNonRoot` | `bool` | K1, K3 | 15 Nov 2026 | checked |
@@ -329,6 +331,7 @@ Notes on the container rows:
 - `runAsUser` defaults to the user in the image metadata when it is unset (K1). The reader cannot see the image, so an unset `run-as-user` is "not found", and K1 is "ask the team" at best.
 - `imagePullPolicy` defaults to `IfNotPresent` when the image has a digest or a tag other than `latest`, and to `Always` for `latest` or no tag (K26).
 - `hostPort`, when `hostNetwork` is true, has to match `containerPort` (K1).
+- `host-process` is a Windows setting. A HostProcess container runs as a process on the node, with privileged access to the Windows node and no isolation other than resource limits (K38). Every container of a pod has to have the same effective value, and when it is true `hostNetwork` has to be true too (K1). The Windows settings of the pod apply to each container that does not set its own, and a container's own setting takes precedence (K1). The baseline and restricted Pod Security policies disallow HostProcess pods (K38).
 
 ## Fields of each workload kind
 
@@ -563,7 +566,7 @@ For each of the eighteen checks and each column of the reach map, the fields tha
 | R6 Scratch space has a ceiling | `volume-name`, `volume-type`, `emptydir-size-limit`, `emptydir-medium`. Context: `ephemeral-storage-limit`, `quota-hard.*ephemeral-storage` | What happens when a `sizeLimit` is exceeded is not on the page read (verify). Container logs and image layers count against ephemeral storage and have no field |
 | R7 Batch work has an end | Job and CronJob: `active-deadline-seconds`, `backoff-limit`, `ttl-seconds-after-finished`, `concurrency-policy`, `starting-deadline-seconds`, `history-limit-successful`, `history-limit-failed`. Pod-level: `pod-active-deadline-seconds` (on a bare Pod, or in the template of any kind) | A workload that is a Deployment doing batch work has no field to say so. The application's own timeouts are in code, not in a file the reader reads |
 | R8 Requests match measured use | None in the repository. The requests (`cpu-request`, `memory-request`) are the repository's side of the comparison | The measured use is not in any file. The cluster pass is the only answer, and it follows "Command section 3" |
-| K1 No container runs as root or privileged | `privileged`, `run-as-non-root`, `run-as-user`, `run-as-group` at both levels, `container-kind` | The user in the image has no field, so an unset `run-as-user` is not a pass |
+| K1 No container runs as root or privileged | `privileged`, `host-process`, `run-as-non-root`, `run-as-user`, `run-as-group` at both levels, `container-kind` | The user in the image has no field, so an unset `run-as-user` is not a pass |
 | K2 Containers drop capabilities and block privilege escalation | `cap-drop`, `cap-add`, `allow-privilege-escalation`, `privileged` | A runtime default capability set (K1) has no field. The seccomp and AppArmor profiles have no field |
 | K3 The root filesystem is read-only | `read-only-root-fs`. Context: `mount.<volume-name>`, `volume-type`, `emptydir-size-limit` | Which paths a program writes has no field, so a read-only root with no writable volume is not proof that the program runs |
 | K4 No pod shares the host | `host-network`, `host-pid`, `host-ipc`, `volume-type` with `host-path`, `mount.<volume-name>` (the page says path restrictions on a hostPath hold only for read-only mounts, K15), `host-port` | A `hostUsers` setting and a `procMount` setting have no field |
@@ -876,7 +879,7 @@ The reader has no field for each of these, on purpose or because no check needs 
 - Secret and ConfigMap values, in every form.
 - A CronJob `schedule` and `timeZone`, a Job `completions`, `parallelism`, and `podFailurePolicy`.
 - `repoURL` and `destination.server`, other than the compared `source.<n>.repo`.
-- Pod `securityContext` settings other than the three user and group fields: `fsGroup`, `supplementalGroups`, `sysctls`, `seccompProfile`, `appArmorProfile`, `seLinuxOptions`. Container `procMount` and `appArmorProfile`.
+- Pod `securityContext` settings other than the three user and group fields and `windowsOptions.hostProcess`: the other `windowsOptions` fields, `fsGroup`, `supplementalGroups`, `sysctls`, `seccompProfile`, `appArmorProfile`, `seLinuxOptions`. Container `procMount` and `appArmorProfile`.
 - A container's `restartPolicy`, probes, lifecycle hooks, `terminationMessagePolicy`, and `resizePolicy`.
 - `hostUsers`, `shareProcessNamespace`, `nodeName`, `nodeSelector`, affinity, tolerations, `priorityClassName`, and `schedulerName`.
 - Services, Ingresses, PersistentVolumeClaims, PodDisruptionBudgets, and PriorityClasses.
@@ -953,6 +956,7 @@ Kubernetes, `kubernetes.io`:
 - K35 Using ABAC authorisation, the service account username: https://kubernetes.io/docs/reference/access-authn-authz/abac/ (read 16 Nov 2026)
 - K36 ReplicaSet: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/ (read 17 Nov 2026)
 - K37 ReplicationController: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/ (read 17 Nov 2026)
+- K38 Create a Windows HostProcess pod: https://kubernetes.io/docs/tasks/configure-pod-container/create-hostprocess-pod/ (read 17 Nov 2026). The `windowsOptions` and `hostProcess` definitions were read in K1 on the same date.
 - V1 Vertical Pod Autoscaler API types: https://raw.githubusercontent.com/kubernetes/autoscaler/master/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1/types.go
 
 Helm, `helm.sh`:

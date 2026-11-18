@@ -206,7 +206,7 @@ containers:
       privileged: false
 ```
 
-Note: A container-level setting overrides the pod-level one.
+Note: A container-level setting overrides the pod-level one. A Windows HostProcess container (`securityContext.windowsOptions.hostProcess: true`, at the pod or at the container) fails K1: remove the setting, or set it to `false` at the level that applies.
 
 ## K2. Capabilities and escalation
 

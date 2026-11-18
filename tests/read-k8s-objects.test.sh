@@ -3258,6 +3258,8 @@ pins() {
   pin "a ReplicaSet and a ReplicationController have a pod template" '# read like a Deployment' '/# read like a Deployment$/d' fields "missing line rs.yaml:13:ReplicaSet/shop/web:-:host-network=true"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a render tool inside the repository is refused" '# a tool inside the repository' '/# a tool inside the repository$/s/if inside_root "$RP"; then refuse "tool inside the repository"; fi/:/' refusals "render with a helm the repository supplies, PATH with .: the render tool ran before the refusal"
+  pin "hostProcess at the pod level" '"pod|securityContext>windowsOptions>hostProcess|' '/"pod|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:9:Pod/-/win:-:host-process=true"
+  pin "hostProcess at the container level" '"c|securityContext>windowsOptions>hostProcess|' '/"c|securityContext>windowsOptions>hostProcess|/d' fields "missing line pod.yaml:15:Pod/-/win:init:host-process=false"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"
