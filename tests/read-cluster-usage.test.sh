@@ -37,6 +37,10 @@ trap 'rm -rf "$work"' EXIT
 home="$work/home"
 mkdir "$home"
 total=0
+# The script refuses a kubectl inside the directory it runs in, and the
+# stand-in sits inside this repository, so every run starts outside it.
+mkdir "$work/cwd"
+cd "$work/cwd" || exit 1
 
 [ -f "$real_script" ] || { echo "FAIL: the script does not exist: $real_script"; exit 1; }
 [ -x "$fake/kubectl" ] || { echo "FAIL: the stand-in kubectl is not executable: $fake/kubectl"; exit 1; }
@@ -277,6 +281,25 @@ suite() {
   env -i PATH="$work/nokube" HOME="$home" FAKE_KUBECTL_LOG="$home/log" /bin/sh "$s" fleetboard-production > "$work/out" 2> "$work/err" || rc=$?
   [ "$rc" -eq 5 ] || fail "kubectl missing: expected exit 5, got $rc"
   grep -q "kubectl is not installed" "$work/err" || fail "kubectl missing: the message does not say kubectl is not installed"
+
+  # A kubectl inside the directory the script runs in is refused and never
+  # run: exit 5. PATH with ".", with a relative directory, with an absolute
+  # directory inside it, and with a link outside it to a kubectl inside it.
+  mkdir -p "$work/cwd-repo/bin" "$work/klink"
+  cp "$fake/kubectl" "$work/cwd-repo/kubectl"
+  cp "$fake/kubectl" "$work/cwd-repo/bin/kubectl"
+  ln -sf "$work/cwd-repo/kubectl" "$work/klink/kubectl"
+  for entry in . bin "$work/cwd-repo/bin" "$work/klink"; do
+    for mode in --context fleetboard-production; do
+      rm -f "$home/log"
+      rc=0
+      (cd "$work/cwd-repo" && env -i PATH="$entry:$PATH" HOME="$home" FAKE_KUBECTL_LOG="$home/log" sh "$s" "$mode") > "$work/out" 2> "$work/err" < /dev/null || rc=$?
+      [ "$rc" -eq 5 ] || fail "a kubectl inside the current directory, PATH with $entry, $mode: expected exit 5, got $rc"
+      grep -q "inside the current directory" "$work/err" || fail "a kubectl inside the current directory, PATH with $entry, $mode: the message does not say so"
+      [ ! -s "$home/log" ] || fail "a kubectl inside the current directory, PATH with $entry, $mode: kubectl ran"
+    done
+  done
+  rm -rf "$work/cwd-repo" "$work/klink"
 
   # The fixture's namespaces.
   # shellcheck disable=SC2086 # the namespace list

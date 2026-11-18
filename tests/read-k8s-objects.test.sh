@@ -403,7 +403,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/toolrepo" "$work/rsrc" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -2833,6 +2833,41 @@ x"
   front "read a file under a directory whose name ends in a line break" --fields "g
 /app.yaml"
   case "$out" in *source.1.repo=this*) fail "read a file under a directory whose name ends in a line break: the remotes of another directory were read" ;; esac
+  cwd=$rr
+
+  # A render tool that the scanned repository supplies is refused and never
+  # run: PATH with ".", with a relative directory, with an absolute
+  # directory inside the repository, and with a link outside the
+  # repository to a tool inside it. Each stand-in records a call.
+  tr_=$work/toolrepo
+  mkdir -p "$tr_/ov" "$tr_/bin" "$work/linkbin" "$work/nokz"
+  cp -R "$rr/chart" "$tr_/chart"
+  printf 'resources:\n  - cm.yaml\n' > "$tr_/ov/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: ov\n' > "$tr_/ov/cm.yaml"
+  for tool in helm kustomize kubectl; do
+    printf '#!/bin/sh\necho %s-in-repo >> "%s"\nexit 0\n' "$tool" "$work/fake-calls" > "$tr_/$tool"
+    chmod +x "$tr_/$tool"
+  done
+  cp "$tr_/helm" "$tr_/kustomize" "$tr_/bin/"
+  ln -sf "$tr_/helm" "$work/linkbin/helm"
+  ln -sf "$tr_/kustomize" "$work/linkbin/kustomize"
+  cwd=$tr_
+  for entry in . bin "$tr_/bin" "$work/linkbin"; do
+    RPATH="$entry:$work/fake:$PATH"
+    refuse "chart:chart:tool inside the repository" "render with a helm the repository supplies, PATH with $entry" \
+      --render helm chart chart/values.yaml
+    refuse "ov:overlay:tool inside the repository" "render with a kustomize the repository supplies, PATH with $entry" \
+      --render kustomize ov
+  done
+  # With no kustomize on PATH, the reader would run kubectl kustomize.
+  for t in sh unshare awk find sed sort grep git env cat readlink dirname basename; do
+    tp=$(command -v "$t") && ln -sf "$tp" "$work/nokz/$t"
+  done
+  rm -f "$tr_/kustomize" "$tr_/helm"
+  RPATH=".:$work/nokz"
+  refuse "ov:overlay:tool inside the repository" "render with a kubectl the repository supplies" \
+    --render kustomize ov
+  rm -rf "$tr_" "$work/linkbin" "$work/nokz"
   cwd=$rr
   RPATH=$PATH
   fi
