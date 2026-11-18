@@ -2885,6 +2885,48 @@ x"
   case "$out" in *source.1.repo=this*) fail "read a file under a directory whose name ends in a line break: the remotes of another directory were read" ;; esac
   cwd=$rr
 
+  # The reader cleans PATH before it runs any program: a "." entry that
+  # holds an awk and a git of the repository's own is never used, by the
+  # list, by --fields, or by a render. Each stand-in records a call and
+  # then runs the real program.
+  fa=$work/fakeawk
+  mkdir -p "$fa/ov"
+  printf 'resources:\n  - cm.yaml\n' > "$fa/ov/kustomization.yaml"
+  printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: ov\n' > "$fa/ov/cm.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\nspec:\n  hostNetwork: true\n' > "$fa/pod.yaml"
+  for t in awk git; do
+    printf '#!/bin/sh\necho %s-of-the-repository >> "%s"\nexec "%s" "$@"\n' "$t" "$work/repo-programs" "$(command -v "$t")" > "$fa/$t"
+    chmod +x "$fa/$t"
+  done
+  rm -f "$work/repo-programs"
+  cwd=$fa
+  RPATH=".:$PATH"
+  rd .
+  [ "$code" -eq 0 ] || fail "a PATH with . that holds an awk and a git: the list exit $code"
+  expect_line "$out" "pod.yaml:manifest:no-git" "a PATH with . that holds an awk and a git"
+  rd --fields pod.yaml
+  expect_line "$out" "pod.yaml:6:Pod/-/p:-:host-network=true" "a PATH with . that holds an awk and a git"
+  if [ "$have_kustomize" -eq 1 ]; then
+    rd --render kustomize ov
+    [ "$code" -eq 0 ] || fail "a PATH with . that holds an awk and a git: the render exit $code"
+  fi
+  [ ! -e "$work/repo-programs" ] || fail "a PATH with . that holds an awk and a git: the reader ran $(sort -u "$work/repo-programs" | tr '\n' ' ')"
+  # With the cleaned PATH, a program the reader needs and cannot find
+  # stops it with exit 2, and the message names the program.
+  mkdir -p "$work/noawk"
+  for t in sh unshare find sed sort grep git env readlink dirname basename test; do
+    tp=$(command -v "$t") && ln -sf "$tp" "$work/noawk/$t"
+  done
+  mkdir -p "$fa/rel"
+  ln -sf "$(command -v awk)" "$fa/rel/awk"
+  RPATH="rel:$work/noawk"
+  rd .
+  [ "$code" -eq 2 ] || fail "an awk on a relative PATH entry only: expected exit 2, got $code"
+  grep -q 'awk' "$work/err" || fail "an awk on a relative PATH entry only: the message does not name awk"
+  RPATH="$work/fake:$PATH"
+  rm -rf "$fa" "$work/noawk" "$work/repo-programs"
+  cwd=$rr
+
   # A render tool that the scanned repository supplies is refused and never
   # run: PATH with ".", with a relative directory, with an absolute
   # directory inside the repository, and with a link outside the
