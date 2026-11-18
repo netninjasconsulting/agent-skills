@@ -348,10 +348,11 @@ while [ -L "$kp" ]; do
   kt=$(readlink -- "$kp") || die 5 "the kubectl on PATH is a symbolic link that does not resolve; it was not run"
   case $kt in /*) kp=$kt ;; *) kp=${kp%/*}/$kt ;; esac
 done
-kd=$(cd -P -- "${kp%/*}" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
+kd=$(cd -P -- "${kp%/*}/" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
 here=$(pwd -P) || die 5 "the current directory does not resolve"
 case $kd/${kp##*/} in "$here" | "$here"/*) die 5 "the kubectl on PATH resolves inside the current directory, so the repository may supply it; it was not run" ;; esac  # a kubectl inside the current directory: exit 5
-KUBECTL=$(cd -P -- "${kc%/*}" && pwd -P)/${kc##*/}
+kcd=$(cd -P -- "${kc%/*}/" 2>/dev/null && pwd -P) || die 5 "the kubectl on PATH does not resolve; it was not run"
+KUBECTL=${kcd%/}/${kc##*/}
 
 kube "$CMD_CONTEXT" "" || die 5 "kubectl config current-context failed"  # no context: exit 5
 raw=$(printf '%s' "$KOUT")
