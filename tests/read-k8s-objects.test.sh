@@ -403,7 +403,7 @@ suite() {
   : > "$work/stdout.all"
   : > "$work/stderr.all"
   RPATH=$PATH
-  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
+  rm -rf "$work/fx" "$work/rr" "$work/attack" "$work/att-out" "$work/unread" "$work/unread-out" "$work/unread-links" "$work/links" "$work/links-outside" "$work/links-git" "$work/links-ctl" "$work/nrl" "$work/big" "$work/c1out" "$work/rgit" "$work/lx" "$work/fake" "$work/fake-calls"
 
   sh "$fixture/make-repo.sh" "$work/fx" >/dev/null
   repo="$work/fx"
@@ -2119,6 +2119,58 @@ $out"
   expect_no "$out" 'nested\.yaml' "indented root mappings"
   rd --fields ind.yaml
   expect_line "$out" "ind.yaml:6:Pod/-/ind:-:host-network=true" "indented root mappings"
+
+  # A file that looks like a manifest, whose top-level keys the list cannot
+  # see, goes to the extractor. A file the extractor cannot read is listed
+  # as a manifest, so that --fields reports it not read (exit 4); a file it
+  # reads is a manifest only when its root holds apiVersion and kind.
+  # kubectl v1.37.2 reads each layout below as a Pod, except docflow.yaml,
+  # which it refuses; the list lists that one as well, as not read.
+  mkdir -p "$work/unread/chart/templates"
+  u=$work/unread
+  printf '{"apiVersion":"v1","kind":"Pod","metadata":{"name":"j"},"spec":{"hostNetwork":true}}\n' > "$u/json-in-yaml.yaml"
+  printf '{"apiVersion":"v1","kind":"Pod","metadata":{"name":"j"},"spec":{"hostNetwork":true}}\n' > "$u/pod.json"
+  printf '{\n  "apiVersion": "v1",\n  "kind": "Pod",\n  "metadata": {"name": "p"}\n}\n' > "$u/pretty.json"
+  printf '\357\273\277apiVersion: v1\nkind: Pod\nmetadata:\n  name: bom\nspec:\n  hostNetwork: true\n' > "$u/bom.yaml"
+  printf 'apiVersion : v1\nkind : Pod\nmetadata:\n  name: sc\nspec:\n  hostNetwork: true\n' > "$u/spacecolon.yaml"
+  printf '? apiVersion\n: v1\n? kind\n: Pod\nmetadata:\n  name: q\nspec:\n  hostNetwork: true\n' > "$u/complexkey.yaml"
+  printf '"api\\u0056ersion": v1\n"kin\\u0064": Pod\nmetadata:\n  name: esc\nspec:\n  hostNetwork: true\n' > "$u/esckey.yaml"
+  printf '"api\\x56ersion": v1\n"kin\\x64": Pod\nmetadata:\n  name: xesc\n' > "$u/xesc.yml"
+  printf '"api\\U00000056ersion": v1\n"kin\\U00000064": Pod\nmetadata:\n  name: uesc\n' > "$u/uesc.yaml"
+  printf -- '--- {apiVersion: v1, kind: Pod, metadata: {name: f}, spec: {hostNetwork: true}}\n' > "$u/docflow.yaml"
+  # Not manifests: a package file, a CI file whose kind is nested, a file
+  # with an escape the extractor reads, a chart's schema, and a JSON file in
+  # a chart's templates.
+  printf '{"name": "web", "version": "1.0.0", "scripts": {"build": "tsc"}}\n' > "$u/package.json"
+  printf 'jobs:\n  deploy:\n    kind: Pod\n    apiVersion: v1\n    script: "kubectl apply -f pod.yaml"\n' > "$u/ci.yml"
+  printf 'name: build\npath: "C:\\\\Users\\\\x"\nmatch: "\\x41"\n' > "$u/win-ci.yaml"
+  printf 'apiVersion: v2\nname: c\nversion: 0.1.0\n' > "$u/chart/Chart.yaml"
+  printf '{"properties": {"apiVersion": {"type": "string"}, "kind": {"type": "string"}}}\n' > "$u/chart/values.schema.json"
+  printf '{"apiVersion": "v1", "kind": "Pod"}\n' > "$u/chart/templates/pod.json"
+  cwd=$u
+  rd .
+  [ "$code" -eq 0 ] || fail "files that look like manifests: the list exit $code"
+  for f in json-in-yaml.yaml pod.json pretty.json bom.yaml spacecolon.yaml complexkey.yaml esckey.yaml xesc.yml uesc.yaml docflow.yaml; do
+    expect_line "$out" "$f:manifest:no-git" "files that look like manifests"
+  done
+  expect_no "$out" '^(package\.json|ci\.yml|win-ci\.yaml|chart/values\.schema\.json|chart/templates/pod\.json):' "files that look like manifests"
+  list_u=$out
+  for f in json-in-yaml.yaml pod.json pretty.json bom.yaml spacecolon.yaml complexkey.yaml esckey.yaml xesc.yml uesc.yaml docflow.yaml; do
+    rd --fields "$f"
+    [ "$code" -eq 4 ] && [ -z "$out" ] || fail "files that look like manifests: --fields $f exit $code, printed $out"
+  done
+  printf '%s\n' "$list_u" | grep -qxF -e "chart:chart:no-git" || fail "files that look like manifests: missing line chart:chart:no-git"
+  # A JSON file through a link that points outside is a link line, and a
+  # JSON file with a path the list cannot carry is counted.
+  mkdir -p "$work/unread-out" "$work/unread-links"
+  printf '{"apiVersion": "v1", "kind": "Pod"}\n' > "$work/unread-out/pod.json"
+  ln -s "$work/unread-out/pod.json" "$work/unread-links/out.json"
+  printf '{"apiVersion": "v1", "kind": "Pod"}\n' > "$work/unread-links/has space.json"
+  cwd=$work/unread-links
+  rd .
+  [ "$code" -eq 4 ] || fail "a JSON link outside and a JSON path the list cannot carry: expected exit 4, got $code"
+  expect_line "$out" "out.json:link:points outside the repository, not read" "a JSON link outside"
+  grep -q 'not listed: 1 paths' "$work/err" || fail "a JSON path the list cannot carry: standard error does not count it"
 
   # Usage.
   cwd=$repo
