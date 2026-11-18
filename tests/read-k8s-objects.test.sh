@@ -3458,6 +3458,11 @@ pins() {
   pin "the cleaned PATH is the PATH" '  PATH=$cl_out' '/^  PATH=\$cl_out$/d' refusals "a PATH with . that holds an awk and a git: the reader ran"
   pin "a PATH entry inside the directory the list was given is removed" '# a PATH entry inside the directory the list was given' '/# a PATH entry inside the directory the list was given$/s/) continue ;;/) ;;/' refusals "a PATH entry inside the listed directory: the reader ran its awk"
   pin "a program the reader needs and cannot find" '# a program the reader needs' '/# a program the reader needs$/s/|| die2 /|| : /' refusals "an awk on a relative PATH entry only: expected exit 2"
+  pin "no program from the repository's Git config" '# no program from the repository'"'"'s Git config' 's/git -c core.fsmonitor=false -c core.hooksPath=\/dev\/null "\$@"/git "$@"/' refusals "a repository whose Git config names an fsmonitor: the reader ran it"
+  pin "a line that ends in a backslash is an escape" '# a line that ends in a backslash' '/# a line that ends in a backslash$/s/LE = 1/LE = 0/' links "missing line lb1.yaml:manifest:no-git"
+  pin "only an escape that spells a letter" '# An escape in s that decodes to an ASCII letter.' 's/^\( *\)if (c == "x" \&\& hexl(substr(s, i + 2, 2))) return 1$/\1if (c == "x") return 1/' links "a line matches ^locale"
+  # shellcheck disable=SC2016 # literal text, not an expansion
+  pin "a values.schema.json inside a chart is left out" '# a chart'"'"'s schema' '/# a chart'"'"'s schema$/s/if \[ "\$base" = values.schema.json \]/if false/' links "a line matches ^(package"
   pin "a token is not a label value" '# a token is not a label value' '/# a token is not a label value$/s/t = "token"/t = t/' attacks "missing line labels-tok.yaml:9:Deployment/-/labels-tok:-:pod-label.app=other"
   # shellcheck disable=SC2016 # literal text, not an expansion
   pin "a base outside the repository" '# a base outside the repository' 's/refuse "remote base"  # a base outside the repository/:/' refusals "render an overlay with a base outside the repository: the render tool ran before the refusal"

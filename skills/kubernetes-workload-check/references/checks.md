@@ -41,7 +41,7 @@ An absent field is "not found" too, with the exceptions in this table. Each exce
 | R7 | `active-deadline-seconds` and `pod-active-deadline-seconds` | No deadline set | K7 |
 | R7 | `concurrency-policy` on a CronJob | `Allow`, the default | K8 |
 | K1 | `privileged` at the container | Not privileged (defaults to false) | K1 |
-| K1 | `host-process` at the container and at the pod | Not a HostProcess container (verify: the pages read state no default) | K1 |
+| K1 | `host-process` at the container and at the pod | Not a HostProcess container | K1, K39 |
 | K2 | `allow-privilege-escalation` | Escalation not blocked (defaults to true) | K3 |
 | K2 | `cap-drop` | Nothing dropped | K1 |
 | K3 | `read-only-root-fs` | Root filesystem writable (defaults to false) | K1 |
@@ -124,7 +124,7 @@ A check marked "ask the team" in an environment carries one yes or no question, 
 
 - **Fields, HorizontalPodAutoscaler:** `scale-target-api-version`, `scale-target-kind`, `scale-target-name`, `min-replicas`, `max-replicas`, `metric-type`, `metric-resource`, `metric-target-type`, `metric-average-utilization`. `min-replicas` defaults to 1 (K9).
 - **Fields, VerticalPodAutoscaler:** `scale-target-kind`, `scale-target-name`, `update-mode`.
-- **Fields, the target:** the workload with that kind and name in the same namespace of the environment (`object=present`), and the `cpu-request` and `memory-request` of every container in its pod template. A `Rollout` is a valid target, and with `workloadRef` its pod template is the Deployment's (A1, A3). A ReplicaSet is a valid target too (K36).
+- **Fields, the target:** the workload with that kind and name in the same namespace of the environment (`object=present`), and the `cpu-request` and `memory-request` of every container in its pod template. A `Rollout` is a valid target, and with `workloadRef` its pod template is the Deployment's (A1, A3). A ReplicaSet is a valid target too (K36), and so is a ReplicationController, whose `replicas` an external autoscaler changes (K37).
 - **Pass:** every autoscaler names a target that is in the environment; every HorizontalPodAutoscaler has `min-replicas` below `max-replicas`; and for every metric with `metric-type=Resource` and `metric-target-type=Utilization`, every container of the target prints a request for that `metric-resource`. A `Utilization` target is a percentage of the request (K9).
 - **Warn:** `min-replicas` is equal to or above `max-replicas`, so the autoscaler cannot scale out; or a `Utilization` target on `cpu` or `memory` meets a container of the target with no request for it, and a LimitRange in its namespace in the environment prints the matching `limit-default-request`. The request is filled in at admission (K12), as in R1.
 - **Fail:** an autoscaler names a target that is not in the environment; or a `Utilization` target on `cpu` or `memory` meets a container of the target with no request for it, and no LimitRange in the environment fills it.

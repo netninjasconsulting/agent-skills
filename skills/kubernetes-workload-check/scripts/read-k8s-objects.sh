@@ -1537,6 +1537,15 @@ inside_root() {
   return 1
 }
 
+# Every git command of the reader. A repository's own Git config can name
+# a program that git runs: core.fsmonitor runs one for ls-files and
+# check-ignore (git 2.43, tested), and core.hooksPath names hooks, which
+# none of these commands was seen to run. Both are set off on the command
+# line, which wins over every config file.
+git_r() {
+  git -c core.fsmonitor=false -c core.hooksPath=/dev/null "$@"  # no program from the repository's Git config
+}
+
 git_state() {
   # $1 = a path relative to the list root. A path through a link takes the
   # state of the file it reaches.
@@ -1544,11 +1553,11 @@ git_state() {
   if resolve "$1" && inside_root "$RP"; then
     gs=${RP#"$ROOTP"}; gs=${gs#/}; [ -n "$gs" ] || gs=.
   fi
-  if ! git -C "$LROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if ! git_r -C "$LROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo no-git
-  elif git -C "$LROOT" ls-files --error-unmatch -- "$gs" >/dev/null 2>&1; then
+  elif git_r -C "$LROOT" ls-files --error-unmatch -- "$gs" >/dev/null 2>&1; then
     echo tracked
-  elif git -C "$LROOT" check-ignore -q -- "$gs" 2>/dev/null; then
+  elif git_r -C "$LROOT" check-ignore -q -- "$gs" 2>/dev/null; then
     echo ignored
   else
     echo untracked
@@ -1556,7 +1565,7 @@ git_state() {
 }
 
 remotes_of() {
-  git -C "$1" config --get-regexp '^remote\..*\.url$' 2>/dev/null | sed 's/^[^ ]* //'
+  git_r -C "$1" config --get-regexp '^remote\..*\.url$' 2>/dev/null | sed 's/^[^ ]* //'
 }
 
 kfile_in() {
@@ -1628,14 +1637,39 @@ repo_like() {
 # top_kind FILE: "argo-application" or "manifest" when the file has
 # top-level apiVersion and kind keys, each bare or in quotes, at the indent
 # of its document's root mapping. Otherwise "maybe" when the file looks
-# like a manifest: its bytes hold both words, or a backslash escape \u, \U,
-# or \x, which can spell either word. Nothing otherwise.
+# like a manifest: its bytes hold both words, or an escape that can spell a
+# letter of either word (\u00XX, \U000000XX, or \xXX whose code is an
+# ASCII letter, its hex in either case), or a line that ends in a
+# backslash, which joins two lines of a double-quoted key. Nothing
+# otherwise.
 top_kind() {
   awk '
+    # Two hex digits, in either case, whose code is an ASCII letter.
+    function hexl(h,    a, b) {
+      if (length(h) != 2) return 0
+      a = index("0123456789abcdef", tolower(substr(h, 1, 1))) - 1
+      b = index("0123456789abcdef", tolower(substr(h, 2, 1))) - 1
+      if (a < 0 || b < 0) return 0
+      a = a * 16 + b
+      return (a >= 65 && a <= 90) || (a >= 97 && a <= 122)
+    }
+    # An escape in s that decodes to an ASCII letter.
+    function letteresc(s,    i, c) {
+      while ((i = index(s, "\\")) > 0) {
+        c = substr(s, i + 1, 1)
+        if (c == "u" && substr(s, i + 2, 2) == "00" && hexl(substr(s, i + 4, 2))) return 1
+        if (c == "U" && substr(s, i + 2, 6) == "000000" && hexl(substr(s, i + 8, 2))) return 1
+        if (c == "x" && hexl(substr(s, i + 2, 2))) return 1
+        s = substr(s, i + ((c == "\\") ? 2 : 1))
+      }
+      return 0
+    }
     {
       if (index($0, "apiVersion")) LA = 1
       if (index($0, "kind")) LK = 1
-      if (index($0, "\\u") || index($0, "\\U") || index($0, "\\x")) LE = 1  # an escape can spell a key
+      if (letteresc($0)) LE = 1  # an escape can spell a key
+      l = $0; sub(/\r$/, "", l)
+      if (substr(l, length(l), 1) == "\\") LE = 1  # a line that ends in a backslash
     }
     function key(line, name) {
       return line ~ ("^(" name "|\"" name "\"|\047" name "\047):")  # a quoted top-level key
@@ -1717,13 +1751,13 @@ list_mode() {
   # is counted and reported, and the run ends with exit code 4.
   set -f
   unsafe_path='*[!A-Za-z0-9._/@+-]*'
-  # The candidates: *.yaml, *.yml, *.json (not a chart's values.schema.json),
-  # and Kustomization.
-  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -name values.schema.json ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)  # the candidates
-  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -name values.schema.json -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
+  # The candidates: *.yaml, *.yml, *.json, and Kustomization. A
+  # values.schema.json inside a chart directory is left out below.
+  files=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) ! -path "$unsafe_path" -print | sed 's#^\./##' | sort)  # the candidates
+  unsafe=$(find . -name .git -prune -o -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization \) -path "$unsafe_path" -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
   # A symbolic link with such a path, named like a candidate or to a
   # directory, is counted with them.
-  ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o \( -name '*.json' ! -name values.schema.json \) -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
+  ulinks=$(find . -name .git -prune -o -type l -path "$unsafe_path" \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' -o -name Kustomization -o -exec test -d {} \; \) -exec printf . \; | awk '{ n += length($0) } END { print n + 0 }')
   unsafe=$((unsafe + ulinks))
   # Every other symbolic link is followed when it stays inside the list
   # root, and every path that reaches a file inside it is listed at its own
@@ -1739,7 +1773,7 @@ list_mode() {
   recs=
   for l in $links; do
     named=0
-    case "${l##*/}" in values.schema.json) ;; *.yaml | *.yml | *.json | Kustomization) named=1 ;; esac
+    case "${l##*/}" in *.yaml | *.yml | *.json | Kustomization) named=1 ;; esac
     rs=0
     resolve "$l" || rs=$?
     if [ "$rs" -eq 2 ]; then
@@ -1865,6 +1899,9 @@ list_mode() {
       for c in $top; do
         if in_chart "$f" "$c"; then skip=1; fi
         [ "$(dir_of "$f")" = "$c" ] && home=$c
+        if [ "$base" = values.schema.json ]; then  # a chart's schema
+          case "$c" in .) skip=1 ;; *) case "$f" in "$c"/*) skip=1 ;; esac ;; esac
+        fi
       done
       [ "$skip" -eq 0 ] || continue
       kind=

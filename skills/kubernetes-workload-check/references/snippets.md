@@ -95,8 +95,8 @@ metadata:
   namespace: <namespace>
 spec:
   scaleTargetRef:
-    apiVersion: <apps/v1, or argoproj.io/v1alpha1 for a Rollout>
-    kind: <Deployment, ReplicaSet, StatefulSet, or Rollout>
+    apiVersion: <apps/v1, v1 for a ReplicationController, or argoproj.io/v1alpha1 for a Rollout>
+    kind: <Deployment, ReplicaSet, ReplicationController, StatefulSet, or Rollout>
     name: <workload in this environment>
   minReplicas: <minimum>
   maxReplicas: <maximum, above the minimum>
