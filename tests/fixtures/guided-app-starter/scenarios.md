@@ -1,6 +1,6 @@
 # Scenarios: guided-app-starter
 
-This skill writes files and creates remote resources, so its fixture is a set of scenarios, not a repository. Each scenario gives the user's answers and the result the skill has to reach. Scenarios 1 to 3, 6, and 13 to 15 test the recommendation (steps 1 to 4). Scenarios 4, 5, 7 to 12, and 16 test ground rules, the build, and the pipeline.
+This skill writes files and creates remote resources, so its fixture is a set of scenarios, not a repository. Each scenario gives the user's answers and the result the skill has to reach. Scenarios 1 to 3, 6, and 13 to 15 test the recommendation (steps 1 to 4). Scenarios 4, 5, 7 to 12, 16, and 17 test ground rules, the build, the pipeline, and email.
 
 How to run one: give the agent the answers in one message, ask it to stop after step 4 (or after the behaviour under test), and compare.
 
@@ -156,9 +156,9 @@ The United States is the default, so EU residency is not a need and scores nothi
 | W8 | 8 | (2 + 2 + 3) / 3 = 2.33 | 12.67 |
 | W9 | 8 | (2 + 0 + 3) / 3 = 1.67 | 11.33 |
 
-**Must.** Ask the comfort check with eight providers, Convex last. Recommend W8: Next.js on Vercel with Convex, in `aws-us-east-1` and `iad1`. Name Convex cron jobs, the Convex Workflow component, Convex search indexes, and Convex vector indexes on their lines. Say that Convex Auth is in beta. Name Resend for email, sending from `us-east-1`. Mark offline sync "extra provider". Rule out W9 on comfort (Cloudflare is rated 0).
+**Must.** Ask the comfort check with eight providers, Convex last. Recommend W8: Next.js on Vercel with Convex, in `aws-us-east-1` and `iad1`. Name Convex cron jobs, the Convex Workflow component, Convex search indexes, and Convex vector indexes on their lines. Say that Convex Auth is in beta. Name Resend for email, sending from `us-east-1`, because the user named no email provider. Mark offline sync "extra provider". Rule out W9 on comfort (Cloudflare is rated 0).
 
-**Must never.** Count email for any row, or name an email provider other than Resend.
+**Must never.** Count email for any row, or pick SendGrid when the user did not ask for it.
 
 ## Scenario 14: mobile, needs offline use
 
@@ -203,6 +203,14 @@ M2 and M4 tie, with two providers each, so M2, the first in the table, wins. Its
 **Must.** Keep two keys: the production deploy key on the production trigger only, and a preview deploy key on the preview trigger. Give the preview trigger `--preview-name "$WORKERS_CI_BRANCH"`. Say in one sentence that one shared key would let a pull request deploy its backend to production. If the user cannot scope variables per trigger, connect only the production branch and record "No Convex preview deployments".
 
 **Must never.** Put the production deploy key where a non-production build can read it. Ask for, read, or pass either key.
+
+## Scenario 17: SendGrid in the EU
+
+**Answers.** As scenario 1, except Email: yes, through SendGrid.
+
+**Must.** Keep the scores and the recommendation of scenario 1: email scores nothing. Put SendGrid on the email line. Say that its data stays in the EU only through an EU subuser that sends through `https://api.eu.sendgrid.com` from an EU dedicated IP address, and that this needs the Pro or Premier plan. Count the plan against the €20 budget and say that it does not fit. Name the EU subuser, its IP address, and the sending domain as the user's steps.
+
+**Must never.** Send through the global endpoint for this user, or switch the user to Resend without asking.
 
 ## Attribution
 

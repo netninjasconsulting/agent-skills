@@ -23,7 +23,7 @@ The eight work as one kit. Each one also gives a complete result alone.
 
 Version 0.3.0 changes one skill, the guided app starter. It now asks how well you know Convex, and it has three Convex stacks for web and mobile apps. Its recommendation names a part for each job of the backend: data, sign-in, files, functions, background work, real-time, offline sync, search, and email. Each stack says where it needs an extra provider.
 
-Email goes through Resend on every stack. The other seven skills change only their version number. See [CHANGELOG.md](CHANGELOG.md) for the details and for what isn't tested yet.
+Email goes through Resend by default, or through SendGrid if you prefer it. The other seven skills change only their version number. See [CHANGELOG.md](CHANGELOG.md) for the details and for what isn't tested yet.
 
 ## Release 0.2.0
 

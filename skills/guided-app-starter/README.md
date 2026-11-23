@@ -10,8 +10,8 @@ I'm starting to see a lot of first products stall on the same early choice. The 
 
 1. **Platform.** Mobile, web, or desktop.
 2. **Comfort check.** One rating from 0 to 3 for each of GitHub, Vercel, Cloudflare, AWS, Neon, Supabase, Firebase, and Convex: never used, tried it, shipped with it, run it in production.
-3. **Needs.** Sign-in, data shape, real-time, file storage, payments, the region (the US or the EU), and monthly budget. Then it asks which background work and search the app needs: scheduled jobs, workflows, queues, pub/sub, offline use, full-text search, and vector search. It also asks whether the app sends email.
-4. **Recommendation.** One stack with the reasons, and one line on what was ruled out and why. Comfort and fit both count. The recommendation names a part of the stack for each job, from the database to search, and says where the stack needs an extra provider. Email goes through Resend on every stack. The skill asks "US or EU?", and the US is the default.
+3. **Needs.** Sign-in, data shape, real-time, file storage, payments, the region (the US or the EU), and monthly budget. Then it asks which background work and search the app needs: scheduled jobs, workflows, queues, pub/sub, offline use, full-text search, and vector search. It also asks whether the app sends email, and through Resend or SendGrid.
+4. **Recommendation.** One stack with the reasons, and one line on what was ruled out and why. Comfort and fit both count. The recommendation names a part of the stack for each job, from the database to search, and says where the stack needs an extra provider. Email goes through Resend by default, or through SendGrid if you prefer it. The skill asks "US or EU?", and the US is the default.
 5. **Product questions.** Superpowers asks the clarifying questions and writes the plan.
 6. **Build.** Ponytail keeps the build to the smallest complete version. UI UX Pro Max guides the interface.
 7. **Security pass.** Cloudflare's security-audit skill runs before the first deploy.

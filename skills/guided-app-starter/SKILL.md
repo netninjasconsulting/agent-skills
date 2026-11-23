@@ -94,7 +94,7 @@ Ask these in one message. Short answers are fine.
 6. Region: the United States or the EU? The United States is the default. For the EU: must the data stay in the EU, or is the EU a preference?
 7. Monthly budget for hosting, in US dollars or euros.
 8. Background work and search: which of these does the app need? Scheduled jobs (runs on a timetable), workflows (several steps that survive a crash, with retries and waits), queues (background jobs with retries), pub/sub (one event to several listeners), offline use (works without a network and syncs later), full-text search, vector search (search by meaning, for AI features). "None" is a fine answer.
-9. Email: will the app send email, such as sign-in links or receipts?
+9. Email: will the app send email, such as sign-in links or receipts? If so, through Resend (the default) or SendGrid?
 
 An item with no answer counts as "no".
 
@@ -117,7 +117,7 @@ Recommended stack: <name>
 - Offline sync: <offline>.
 - Full-text search: <full-text search>.
 - Vector search: <vector search>.
-- Email: Resend, sending from <us-east-1 | eu-west-1>, when the app sends email.
+- Email: <Resend, sending from us-east-1 or eu-west-1 | SendGrid, through the global endpoint or an EU subuser>, when the app sends email.
 Why:
 - Fit: <the needs it meets without an extra provider>.
 - Comfort: <the ratings that carried it>.
@@ -221,7 +221,7 @@ Credit only the skills that ran. A skill that was missing goes under "Skipped". 
 | Scoring a capability that the row reaches only through another vendor | A cell that says "Extra provider" scores nothing. |
 | Recommending a stack whose sign-in or workflow is in beta without saying so | Mark each beta part "(beta)" and name it under "Facts checked". |
 | Adding Convex to a stack without its comfort rating | Convex is in the comfort check. A missing rating counts as 0. |
-| Picking an email provider per stack | Every stack sends email through Resend. |
+| Picking the email provider for the user | Resend is the default. Use SendGrid when the user asks for it. In the EU, say where each one keeps email data. |
 | Crediting all four third-party skills when two were missing | Credit what ran. List the rest under "Skipped". |
 | Writing a request body to a temporary file so that `gh` can read it | Rule 1. Send the body on standard input. |
 | Downloading a workflow from a web page | Rule 7. Copy `assets/ci.yml` and fit it to the stack. |

@@ -32,7 +32,7 @@ Platform by provider, to framework, data layer, capabilities, and deploy target.
      - EU residency.
    - A relational or document-relational row meets either data shape. EU residency is a need only when the user chose the EU. It then counts for "must stay" and for "a preference" alike, and a row marked "not for strict EU residency" does not meet it. For the United States it is not a need, so it scores nothing for any row.
    - A cell marked "(beta)" meets the need. The recommendation names every beta part that the choice rests on.
-   - Functions, payments, and email score nothing. Every row runs server functions. Every row takes payments the same way, through a payment provider's webhook. Every row sends email the same way, through Resend (see [Email](#email)).
+   - Functions, payments, and email score nothing. Every row runs server functions. Every row takes payments the same way, through a payment provider's webhook. Every row sends email the same way, through Resend or SendGrid (see [Email](#email)).
    - Comfort: the average of the user's ratings (0 to 3) for the providers in the row's "Rated providers" column.
    - Score = fit + 2 × comfort.
 4. **Pick the highest score.** On a tie, take the row with fewer providers. If still tied, take the first row in the table.
@@ -124,13 +124,15 @@ Notes on the cells:
 
 ## Email
 
-Every row sends email through Resend, the kit's choice for email since 0.3.0. Email scores nothing, because every row uses it the same way.
+Every row sends email through Resend by default, or through SendGrid when the user asks for it. Email scores nothing, because every row can use either one the same way. Do not pick SendGrid for the user. When the user chose the EU, say where each one keeps email data (the region tables below), and let the user decide.
 
-- Resend needs its own account. It is not in the comfort list, so it does not change the score.
-- The API key is a stored secret. The user adds it as `RESEND_API_KEY` in the secret store of the place that sends the email: Vercel, Cloudflare (`wrangler secret put`), Supabase, Firebase, AWS, or the Convex deployment's environment variables. The skill never sees it (SKILL.md, rule 3).
-- On W8, W9, and M4, Convex has a Resend component, `@convex-dev/resend` (checked). On the other rows, the app calls Resend from its own server functions.
-- The sending region is set per domain in Resend: `us-east-1` (N. Virginia) for the United States, or `eu-west-1` (Ireland) for the EU (checked).
-- Verifying the sending domain (its DNS records) is the user's step. The skill names it in the closing summary under "Next three steps".
+- Each one needs its own account. Neither is in the comfort list, so neither changes the score.
+- The API key is a stored secret. The user adds it as `RESEND_API_KEY` or `SENDGRID_API_KEY` in the secret store of the place that sends the email: Vercel, Cloudflare (`wrangler secret put`), Supabase, Firebase, AWS, or the Convex deployment's environment variables. The skill never sees it (SKILL.md, rule 3).
+- On W8, W9, and M4, Convex has a Resend component, `@convex-dev/resend` (checked). With SendGrid, or on the other rows, the app calls the provider's API from its own server functions (on Convex, from an action).
+- Resend: the sending region is set per domain, `us-east-1` (N. Virginia) for the United States or `eu-west-1` (Ireland) for the EU (checked).
+- SendGrid: the free plans were retired in 2025, and a new account gets a 60-day trial (checked). Essentials starts at 19.95 US dollars a month and Pro at 89.95 (checked). Count the plan against the user's monthly budget.
+- SendGrid in the EU: data stays in the EU only through an EU subuser, the EU API endpoint `https://api.eu.sendgrid.com`, and an EU dedicated IP address (checked). This is on the Pro and Premier plans (checked). Sending through the global endpoint routes data outside the EU (checked).
+- Verifying the sending domain (its DNS records), and for SendGrid in the EU the EU subuser and its IP address, are the user's steps. The skill names them in the closing summary under "Next three steps".
 
 ## US regions
 
@@ -148,6 +150,7 @@ Use these values when the user chose the United States or gave no answer. Each o
 | AWS | Region `us-east-1` (N. Virginia), or `us-east-2` (Ohio), `us-west-2` (Oregon) | Global services such as IAM, CloudFront, and Route 53 are not regional |
 | Convex | Region `aws-us-east-1` (N. Virginia). The CLI takes `us` as a short form | Checked. All of the deployment's infrastructure runs in its region. The region is chosen when the deployment is created. Moving it later takes a backup and a restore into a new deployment. US usage is billed at the standard rate |
 | Resend | Sending region `us-east-1` (N. Virginia), set when the domain is added | Checked. Account data, email metadata, and logs are stored in the United States |
+| SendGrid | The global API endpoint `https://api.sendgrid.com` | Checked. The global endpoint processes and stores data in SendGrid's global infrastructure, not only in the United States |
 
 A US region is a location, not a legal guarantee. Where a provider offers only a hint, say so on the card.
 
@@ -168,8 +171,9 @@ Use these values when the user chose the EU. Each one goes on the confirmation c
 | AWS | Region `eu-central-1` (Frankfurt), or `eu-west-1` (Ireland), `eu-west-3` (Paris), `eu-north-1` (Stockholm) | Global services such as IAM, CloudFront, and Route 53 are not regional |
 | Convex | Region `aws-eu-west-1` (Ireland). The CLI takes `eu` as a short form | Checked. All of the deployment's infrastructure runs in its region. EU regions are on every plan, including the free plan. Usage outside the United States is billed at 1.3 times the standard rate. Moving a deployment between regions takes a backup and a restore |
 | Resend | Sending region `eu-west-1` (Ireland), set when the domain is added | Checked. The region controls where email is sent from, not where data is stored. Account data, email metadata, and logs are stored in the United States, under Standard Contractual Clauses and the EU-U.S. Data Privacy Framework |
+| SendGrid | An EU subuser that sends through `https://api.eu.sendgrid.com` from an EU dedicated IP address | Checked. Email sent this way is processed in the EU, and recipient personal data and email event data are stored in the EU. It needs the Pro or Premier plan. A parent account or a global subuser sends through the global endpoint, which routes data outside the EU |
 
-Every row sends some data outside the chosen region: provider account data, billing data, logs and metrics the provider keeps, email data held by Resend, and anything the app sends to a third party (payments, LLM providers). Say so in the recommendation. Whether a setup meets a legal requirement is a question for the user's own counsel.
+Every row sends some data outside the chosen region: provider account data, billing data, logs and metrics the provider keeps, email data held by Resend or by SendGrid's global endpoint, and anything the app sends to a third party (payments, LLM providers). Say so in the recommendation. Whether a setup meets a legal requirement is a question for the user's own counsel.
 
 ## What each GitHub plan allows
 
@@ -229,6 +233,8 @@ Read on 23 November 2026:
 - Convex and offline sync: https://www.convex.dev/sync
 - Convex Resend component: https://docs.convex.dev/config/convex.config.ts
 - Resend regions and data residency: https://resend.com/docs/dashboard/domains/regions and https://resend.com/security/gdpr
+- SendGrid Data Residency for Email (EU): https://www.twilio.com/en-us/changelog/data-residency, https://www.twilio.com/en-us/blog/products/data-residency-for-email-eu, and https://www.twilio.com/docs/sendgrid/data-residency/faq
+- SendGrid plans and the retired free plans: https://www.twilio.com/en-us/pricing/email-api and https://www.twilio.com/en-us/changelog/changes-coming-to-sendgrid-s-free-plans
 - Vercel Queues: https://vercel.com/docs/queues and https://vercel.com/docs/queues/concepts
 - Vercel Workflows: https://vercel.com/docs/workflows
 - Vercel Blob: https://vercel.com/docs/vercel-blob and https://vercel.com/docs/vercel-blob/private-storage

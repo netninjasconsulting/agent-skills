@@ -190,7 +190,7 @@ The goal is the same everywhere: every pull request gets a preview, only the pip
   - The preview trigger (every other branch) holds `CONVEX_DEPLOY_KEY` set to a preview deploy key. Its build command is `npx convex deploy --preview-name "$WORKERS_CI_BRANCH" --cmd '<the build command>'`. Workers Builds sets `WORKERS_CI_BRANCH` to the branch name (checked). Convex names a preview deployment by itself only on Vercel, Netlify, GitHub, and GitLab (checked), so Workers Builds passes the name.
   - Both keys are stored tokens (section 8). The user generates each one in the Convex dashboard and adds it to its own trigger in Cloudflare's interface. Verify that the dashboard sets variables per trigger. If the user cannot keep the production key away from preview builds, connect only the production branch, and record "No Convex preview deployments" in the closing summary.
 - On Expo (M4): the app reads `EXPO_PUBLIC_CONVEX_URL`. Convex functions deploy from a GitHub Actions job in the `production` environment that runs `npx convex deploy` with `CONVEX_DEPLOY_KEY` as an environment secret (section 8).
-- Environment variables for Convex functions, such as `RESEND_API_KEY`, are set by the user in the Convex dashboard or with `npx convex env set <NAME>`, entering the value when prompted (verify that the CLI prompts). Never pass a value on the command line.
+- Environment variables for Convex functions, such as `RESEND_API_KEY` or `SENDGRID_API_KEY`, are set by the user in the Convex dashboard or with `npx convex env set <NAME>`, entering the value when prompted (verify that the CLI prompts). Never pass a value on the command line.
 
 ### Expo (M1, M2, M3, M4)
 
@@ -229,7 +229,7 @@ OIDC or a provider Git integration comes first. When neither exists for a step, 
 - The skill never sees it, and the workflow reads it only in the job that needs it.
 - The closing summary lists it under "Stored tokens" with the reason and a date to rotate it.
 
-Some secrets sit outside GitHub by design. Convex deploy keys that Workers Builds or Vercel read at build time live in that provider's own secret store. On Workers, the production key and the preview key sit on separate triggers. For W8, the Vercel Marketplace integration manages them. The Resend API key lives in the secret store of whatever sends the email (stack matrix, "Email"). All of them go under "Stored tokens" in the closing summary.
+Some secrets sit outside GitHub by design. Convex deploy keys that Workers Builds or Vercel read at build time live in that provider's own secret store. On Workers, the production key and the preview key sit on separate triggers. For W8, the Vercel Marketplace integration manages them. The Resend or SendGrid API key lives in the secret store of whatever sends the email (stack matrix, "Email"). All of them go under "Stored tokens" in the closing summary.
 
 ## 9. What stays for the user
 
@@ -239,4 +239,4 @@ Name these in the closing summary. They complete the ten checks, and this skill 
 - A second person as code owner and reviewer, when there is one.
 - The provider's spending alert or budget cap.
 - A restore test for the database.
-- Verifying the Resend sending domain, when the app sends email: the DNS records that Resend shows for the domain.
+- Verifying the sending domain, when the app sends email: the DNS records that Resend or SendGrid shows for the domain. For SendGrid in the EU, also the EU subuser, its EU dedicated IP address, and an API key on that subuser.
