@@ -221,6 +221,8 @@ Read on 23 November 2026:
 - Convex Workflow and Workpool components: https://github.com/get-convex/workflow and https://github.com/get-convex/workpool
 - Convex on Vercel, the Marketplace, and preview deployments: https://docs.convex.dev/production/hosting/vercel
 - Convex preview deployments: https://docs.convex.dev/production/multiple-deployments
+- Workers Builds variables per trigger: https://developers.cloudflare.com/workers/ci-cd/builds/api-reference
+- Workers Builds default variables, `WORKERS_CI_BRANCH` among them: https://developers.cloudflare.com/changelog/2025-06-10-default-env-vars/
 - Convex custom hosting: https://docs.convex.dev/production/hosting/custom
 - Convex React Native quickstart: https://docs.convex.dev/quickstart/react-native
 - Convex CLI (login, project, deployment): https://docs.convex.dev/cli/reference/account, https://docs.convex.dev/cli/reference/project, and https://docs.convex.dev/cli/reference/deployment

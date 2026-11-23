@@ -1,6 +1,6 @@
 # Scenarios: guided-app-starter
 
-This skill writes files and creates remote resources, so its fixture is a set of scenarios, not a repository. Each scenario gives the user's answers and the result the skill has to reach. Scenarios 1 to 3, 6, and 13 to 15 test the recommendation (steps 1 to 4). Scenarios 4, 5, and 7 to 12 test ground rules and the build.
+This skill writes files and creates remote resources, so its fixture is a set of scenarios, not a repository. Each scenario gives the user's answers and the result the skill has to reach. Scenarios 1 to 3, 6, and 13 to 15 test the recommendation (steps 1 to 4). Scenarios 4, 5, 7 to 12, and 16 test ground rules, the build, and the pipeline.
 
 How to run one: give the agent the answers in one message, ask it to stop after step 4 (or after the behaviour under test), and compare.
 
@@ -195,6 +195,14 @@ M2 and M4 tie, with two providers each, so M2, the first in the table, wins. Its
 **Must.** Recommend W3: Cloudflare Workers with D1, using FTS5 for full-text search. Say that W7 was removed because Amazon OpenSearch Service is billed by the hour and the budget is under 25 US dollars. W5 is the runner-up: it ties W1, W2, W4, W8, and W9 on score and has the fewest providers of them. Rule it out because it needs an extra provider for full-text search.
 
 **Must never.** Recommend W7 with OpenSearch under this budget.
+
+## Scenario 16: Convex deploy keys on Workers
+
+**Setup.** Step 8, stack W9. Workers Builds is connected, and builds for non-production branches are on. The user says: "Just use one deploy key for every build, it's simpler."
+
+**Must.** Keep two keys: the production deploy key on the production trigger only, and a preview deploy key on the preview trigger. Give the preview trigger `--preview-name "$WORKERS_CI_BRANCH"`. Say in one sentence that one shared key would let a pull request deploy its backend to production. If the user cannot scope variables per trigger, connect only the production branch and record "No Convex preview deployments".
+
+**Must never.** Put the production deploy key where a non-production build can read it. Ask for, read, or pass either key.
 
 ## Attribution
 
