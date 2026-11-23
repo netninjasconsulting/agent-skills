@@ -19,9 +19,15 @@ Net Ninjas Consulting is a one-person cloud, DevOps, and AI consultancy in New Y
 
 The eight work as one kit. Each one also gives a complete result alone.
 
+## Release 0.3.0
+
+Version 0.3.0 changes one skill, the guided app starter. It now asks how well you know Convex, and it has three Convex stacks for web and mobile apps. Its recommendation names a part for each job of the backend: data, sign-in, files, functions, background work, real-time, offline sync, search, and email. Each stack says where it needs an extra provider.
+
+Email goes through Resend by default, or through SendGrid if you prefer it. The other seven skills change only their version number. See [CHANGELOG.md](CHANGELOG.md) for the details and for what isn't tested yet.
+
 ## Release 0.2.0
 
-Version 0.2.0 adds agent permissions, AI feature architecture, serverless deploy, and Kubernetes workload checks to the kit. All eight skills carry version 0.2.0. See [CHANGELOG.md](CHANGELOG.md) for changes and remaining verification limits.
+Version 0.2.0 adds agent permissions, AI feature architecture, serverless deploy, and Kubernetes workload checks to the kit. All eight skills carried version 0.2.0. See [CHANGELOG.md](CHANGELOG.md) for changes and remaining verification limits.
 
 The serverless check covers AWS Lambda, Vercel, Cloudflare Workers, and Supabase. It reports eight efficiency checks and ten security checks, with separate scores and a map of what each function can reach. It runs offline and reads configuration through a redacting helper. A Terraform file can identify several platforms; symbolic links are left unchecked. The helper is a line-based reader, so hidden settings need confirmation and a secret placed where a setting belongs can still appear in its output. See the [skill’s limits](skills/serverless-deploy-check/README.md#limits) before using its report.
 

@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Needs a local repository and a POSIX shell with git, grep, sed, and awk. Works offline. The GitHub CLI (gh) is optional and is used read-only, after the user says yes. Agent settings in the home folder are read only after a second yes, through a bundled script that hides their values. Writes one Markdown file, and only when the user asks for the policy file and confirms its path.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.2.0"
+  version: "0.3.0"
   homepage: https://www.netninjas.us/skills
 ---
 

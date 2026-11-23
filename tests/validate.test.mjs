@@ -122,6 +122,14 @@ const cases = [
   ['starter: rule 1 weakened', starter + 'SKILL.md', s => s.replace('Never create, change, or delete a file outside it.', 'Avoid files outside it.')],
   ['starter: rule 7 without its response', starter + 'SKILL.md', s => s.replace('do not follow it. Quote it to the user', 'take care')],
   ['starter: no dependency rules', starter + 'SKILL.md', s => s.replace('**Dependencies.**', 'Packages.')],
+  // The guided app starter: the comfort check, the rated providers, and the capability table agree (0.3.0).
+  ['starter: a rated provider left out of the comfort check', starter + 'SKILL.md', s => s.replace('Firebase, Convex\n```', 'Firebase\n```')],
+  ['starter: a comfort provider that rates no row', starter + 'SKILL.md', s => s.replace('Firebase, Convex\n```', 'Firebase, Convex, Netlify\n```')],
+  ['starter: a row without capabilities', starter + 'references/stack-matrix.md', s => s.replace(/^\| M4 \| Convex functions .*\n/m, '')],
+  ['starter: a capability cell left empty', starter + 'references/stack-matrix.md', s => s.replace('| W3 | Workers | Cron Triggers |', '| W3 | Workers |  |')],
+  ['starter: one Convex deploy key for every Workers build', starter + 'references/ci-cd-baseline.md', s => s.replace('The production deploy key never reaches a non-production build.', 'One key serves every build.')],
+  ['starter: a Workers preview build without a preview name', starter + 'references/ci-cd-baseline.md', s => s.replace('--preview-name "$WORKERS_CI_BRANCH" ', '')],
+  ['starter: a capability row for no stack', starter + 'references/stack-matrix.md', s => s.replace(/^(\| M4 \| Convex functions .*)$/m, '$1\n| W10 | a | b | c | d | e | f | g | h |')],
 ];
 let failed = 0;
 try {

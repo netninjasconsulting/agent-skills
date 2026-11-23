@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Needs a local repository and a POSIX shell with git, grep, sed, awk, find, sort, and readlink (POSIX base tools). The first pass works offline, writes nothing, and installs, builds, and deploys nothing. helm, kustomize, and kubectl are optional and run only after a yes. Rendering evaluates the project's chart templates and Kustomize files on this machine and needs no network. The cluster pass makes read requests through kubectl with the user's own settings. Nothing else makes a network request.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.2.0"
+  version: "0.3.0"
   homepage: https://www.netninjas.us/skills
 ---
 

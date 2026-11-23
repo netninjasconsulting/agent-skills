@@ -2,6 +2,39 @@
 
 Every skill carries the same version number. Dates are in day, month, year order.
 
+## 0.3.0 (23 November 2026)
+
+The guided app starter adds Convex, and its recommendation now covers every part of a backend. The other seven skills change only their version number.
+
+### Added
+
+- `guided-app-starter`: Convex is in the comfort check, which now lists eight providers.
+- `guided-app-starter`: three Convex stacks in the stack matrix. W8 is Next.js on Vercel with Convex. W9 is a framework on Cloudflare Workers with Convex. M4 is Expo with Convex. M3 can now take any web row from W1 to W9.
+- `guided-app-starter`: a "Capabilities by row" table in the stack matrix. For every stack it names the functions, scheduled jobs, workflows, queues, pub/sub, offline sync, full-text search, and vector search that the stack offers with no extra provider, or says "extra provider".
+- `guided-app-starter`: step 3 asks two more questions: which of scheduled jobs, workflows, queues, pub/sub, offline use, full-text search, and vector search the app needs, and whether it sends email. Each of the seven capabilities scores one point of fit when a stack meets it with no extra provider. A need with no answer counts as "no", so the old scenarios keep their scores, apart from the correction below.
+- `guided-app-starter`: email goes through Resend by default, or through SendGrid when the user asks for it. Email scores nothing, because every stack can use either one the same way. The stack matrix has an "Email" section, and the US and EU region tables have rows for Convex, Resend, and SendGrid. In the EU, the recommendation says where each one keeps email data: Resend stores it in the United States, and SendGrid keeps it in the EU only through an EU subuser on the Pro or Premier plan.
+- `guided-app-starter`: the CI/CD baseline has a Convex section (project and deployment cards with the region, the Vercel Marketplace integration that syncs deploy keys, a deploy key for Workers Builds, and a deploy job for Expo), Convex's sign-in commands, and a note on the two secrets that live outside GitHub.
+- `guided-app-starter`: scenarios 13 to 16, the last after review: a web app that needs background work and search, a mobile app that needs offline use (a tie that the tie-break settles), a capability that is billed by the hour under a small budget, and Convex deploy keys on Workers. Scenario 17 covers SendGrid in the EU.
+- `scripts/validate.mjs` checks that the comfort check of the guided app starter, the rated providers of its stack matrix, and its "Capabilities by row" table agree. `tests/validate.test.mjs` gains five mutation cases for it.
+- `guided-app-starter`: on Workers (W9), the production and preview builds get different Convex deploy keys, one per Workers Builds trigger, and preview builds name their Convex deployment after the branch. A review of the pull request found that the first draft gave every build one key, so a pull request could deploy its backend to production. Scenario 16 and two mutation cases cover it.
+
+### Changed
+
+- `guided-app-starter`: step 4 answers in a longer shape with one line per part of the stack: hosting, database, sign-in, file storage, functions, scheduled jobs, workflows, queues, pub/sub, real-time, offline sync, full-text search, vector search, and email. It names every extra provider and every part in beta.
+- `guided-app-starter`: "How to choose" removes a row under a budget below 25 US dollars or euros when a capability the user needs is billed by the hour there. Today that is full-text search on W7 (Amazon OpenSearch Service).
+- `guided-app-starter`: W1's file storage is Vercel Blob. Version 0.2.0 listed it as "extra provider", which was wrong. In scenario 2, W1's fit rises from 3 to 4 and its score from 4.33 to 5.33. The recommendation does not change.
+- `guided-app-starter`: scenarios 1, 2, 3, and 6 score the new rows. In scenarios 1 and 6 the runner-up is now W8, ruled out on comfort, where it was W3.
+- Every skill carries version 0.3.0.
+
+### Verified for this release (23 November 2026)
+
+- Convex, Resend, SendGrid, Vercel, Neon, Supabase, Cloudflare, Firebase, and AWS facts marked "checked" in `skills/guided-app-starter/references/stack-matrix.md`, read in each provider's documentation, changelog, or Context7's copy of the Convex documentation on 23 November 2026. The sources are listed at the end of the file. Facts marked "verify" were not confirmed.
+- The scores of scenarios 1 to 3, 6, and 13 to 15 were worked by a script that follows "How to choose", and they match the tables in `scenarios.md`.
+
+### Not tested
+
+- No fresh agent has run the new scenarios, the Convex steps of the CI/CD baseline, or a Convex build.
+
 ## 0.2.0 (18 November 2026)
 
 Four new skills. The four skills from 0.1.0 keep their checks.

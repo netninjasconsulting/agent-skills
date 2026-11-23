@@ -1,11 +1,11 @@
 ---
 name: guided-app-starter
-description: Use when someone wants to start a new web, mobile, or desktop app and needs help choosing a provider stack, says "I want to build an app", asks which of Vercel, Cloudflare, AWS, Neon, Supabase, or Firebase fits them, or wants a new project scaffolded with a repository, CI/CD, preview deploys, and a protected production environment. Not read-only. It writes local files, and it creates remote resources only after the user confirms each one by name.
+description: Use when someone wants to start a new web, mobile, or desktop app and needs help choosing a provider stack, says "I want to build an app", asks which of Vercel, Cloudflare, AWS, Neon, Supabase, Firebase, or Convex fits them, or wants a new project scaffolded with a repository, CI/CD, preview deploys, and a protected production environment. Not read-only. It writes local files, and it creates remote resources only after the user confirms each one by name.
 license: Apache-2.0
 compatibility: Needs git and a POSIX shell. Remote steps need the GitHub CLI (gh) and the chosen provider's own CLI, each signed in by the user. Four third-party skills are optional dependencies and are never bundled. Network access is needed to install the app's dependencies, for the remote steps, and to re-check provider facts.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.2.0"
+  version: "0.3.0"
   homepage: https://www.netninjas.us/skills
 ---
 
@@ -77,7 +77,7 @@ Ask for one rating per provider, in one message:
 
 ```text
 How well do you know each of these? 0 = never used, 1 = tried it, 2 = shipped with it, 3 = run it in production.
-GitHub, Vercel, Cloudflare, AWS, Neon, Supabase, Firebase
+GitHub, Vercel, Cloudflare, AWS, Neon, Supabase, Firebase, Convex
 ```
 
 A provider with no answer counts as 0.
@@ -93,20 +93,38 @@ Ask these in one message. Short answers are fine.
 5. Payments: will the app charge money?
 6. Region: the United States or the EU? The United States is the default. For the EU: must the data stay in the EU, or is the EU a preference?
 7. Monthly budget for hosting, in US dollars or euros.
+8. Background work and search: which of these does the app need? Scheduled jobs (runs on a timetable), workflows (several steps that survive a crash, with retries and waits), queues (background jobs with retries), pub/sub (one event to several listeners), offline use (works without a network and syncs later), full-text search, vector search (search by meaning, for AI features). "None" is a fine answer.
+9. Email: will the app send email, such as sign-in links or receipts? If so, through Resend (the default) or SendGrid?
+
+An item with no answer counts as "no".
 
 ### 4. Recommendation
 
-Read [references/stack-matrix.md](references/stack-matrix.md) and follow its section "How to choose". Then answer in this shape:
+Read [references/stack-matrix.md](references/stack-matrix.md) and follow its section "How to choose". Then answer in this shape. Fill every line from the winning row and its line in "Capabilities by row". Mark each need from step 3 that the row does not meet as "extra provider", and mark each part in beta as "(beta)".
 
 ```text
 Recommended stack: <name>
-- <Framework> on <hosting>, <data layer>, <auth>, <files>, in <the US or EU region>.
+- Hosting: <framework> on <hosting>, in <the US or EU region>.
+- Database: <data layer>.
+- Sign-in: <auth>.
+- File storage: <files>.
+- Functions: <server functions>.
+- Scheduled jobs: <cron>.
+- Workflows: <workflows>.
+- Queues: <queues>.
+- Pub/sub: <pub/sub>.
+- Real-time: <real-time>.
+- Offline sync: <offline>.
+- Full-text search: <full-text search>.
+- Vector search: <vector search>.
+- Email: <Resend, sending from us-east-1 or eu-west-1 | SendGrid, through the global endpoint or an EU subuser>, when the app sends email.
 Why:
 - Fit: <the needs it meets without an extra provider>.
 - Comfort: <the ratings that carried it>.
 - Region: <the US or the EU, where the data sits, and what still leaves that region>.
+- Extra providers: <each need the row cannot meet alone, or "None">.
 Ruled out: <the nearest alternative and the one reason it lost>.
-Facts checked on <matrix date>. <Any "verify" fact the choice rests on.>
+Facts checked on <matrix date>. <Any "verify" fact or beta part the choice rests on.>
 ```
 
 One stack, not a menu. If the user disagrees, take their choice and say what it costs them.
@@ -199,6 +217,11 @@ Credit only the skills that ran. A skill that was missing goes under "Skipped". 
 | Recommending the stack with the best fit to someone who rated every part of it 0 | Follow "How to choose". Comfort is half the decision. |
 | Taking the provider's default region without asking | Rule 4. Ask "US or EU?" first. With no answer, use the US values from the stack matrix and say so. |
 | Offering three stacks and asking the user to pick | One recommendation, with one line on what was ruled out. |
+| Leaving queues, search, or offline sync out of the recommendation because the user did not ask about them | Fill every line of the step 4 shape. A need the row cannot meet alone says "extra provider". |
+| Scoring a capability that the row reaches only through another vendor | A cell that says "Extra provider" scores nothing. |
+| Recommending a stack whose sign-in or workflow is in beta without saying so | Mark each beta part "(beta)" and name it under "Facts checked". |
+| Adding Convex to a stack without its comfort rating | Convex is in the comfort check. A missing rating counts as 0. |
+| Picking the email provider for the user | Resend is the default. Use SendGrid when the user asks for it. In the EU, say where each one keeps email data. |
 | Crediting all four third-party skills when two were missing | Credit what ran. List the rest under "Skipped". |
 | Writing a request body to a temporary file so that `gh` can read it | Rule 1. Send the body on standard input. |
 | Downloading a workflow from a web page | Rule 7. Copy `assets/ci.yml` and fit it to the stack. |
