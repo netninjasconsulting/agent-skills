@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Needs a local repository and a POSIX shell with git, grep, sed, and awk. Works offline. Two optional dependency checks ask the package registry, and only after the user says yes.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.2.0"
+  version: "0.3.0"
   homepage: https://www.netninjas.us/skills
 ---
 

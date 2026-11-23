@@ -31,6 +31,7 @@ Check each sign-in with a status command. Never run a sign-in command for the us
 | Neon | `neonctl me` | `neonctl auth` |
 | Supabase | `supabase projects list` | `supabase login` |
 | Firebase | `firebase login:list` | `firebase login` |
+| Convex | `npx convex login status` | `npx convex login` |
 | Expo | `eas whoami` | `eas login` |
 
 If a CLI is not installed, name it and its install page, and wait. Do not install it.
@@ -136,14 +137,15 @@ Fallback: on a private repository without GitHub Secret Protection, push protect
 
 The goal is the same everywhere: every pull request gets a preview, only the pipeline deploys production, and the repository holds no long-lived cloud key. The first choice is the provider's own Git integration, because it keeps every credential out of GitHub. Facts marked "verify" need a look at the provider's current documentation first.
 
-### Vercel (W1, W2)
+### Vercel (W1, W2, W8)
 
 - Local: `vercel.json` with `"regions": ["iad1"]` for the United States, or `"regions": ["fra1"]` for the EU.
+- W1 file storage: one card for the Vercel Blob store, in the same region as the functions.
 - Card: the Vercel project, linked to the GitHub repository (`vercel link`, then `vercel git connect`).
 - Result: a preview deployment for every pull request and a production deployment from `main`. No Vercel token sits in GitHub.
 - Environment variables are added by the user in Vercel's interface or with `vercel env add`, which prompts them. Never pass a value on the command line.
 
-### Cloudflare (W3, W4)
+### Cloudflare (W3, W4, W9)
 
 - Local: `wrangler.jsonc` with the Worker's name, the bindings, and for R2 the bucket's jurisdiction.
 - Cards, one each: the D1 database (`wrangler d1 create <name> --location enam` for the United States, or `wrangler d1 create <name> --jurisdiction eu` for the EU), the R2 bucket (`wrangler r2 bucket create <name> --location enam`, or `wrangler r2 bucket create <name> --jurisdiction eu`), and the Worker's connection to the repository through Workers Builds.
@@ -176,7 +178,18 @@ The goal is the same everywhere: every pull request gets a preview, only the pip
 - Any job in GitHub Actions that touches AWS uses OIDC: GitHub's identity provider in the account, and a role whose trust policy accepts only `repo:<owner>/<name>:environment:production`. Creating the identity provider and the role are two more cards. No access key is created.
 - A database billed by the hour goes on its card as "billed by the hour".
 
-### Expo (M1, M2, M3)
+### Convex (W8, W9, M4)
+
+- Cards, one each: the Convex project (`npx convex project create <name>`), then its production deployment (`npx convex deployment create <name> --type prod --region us` for the United States, or `--region eu` for the EU). Put on the card that moving the deployment to another region later takes a backup and a restore, and that EU usage on a paid plan is billed at 1.3 times the US rate (stack matrix).
+- Local: the `convex/` folder with `schema.ts`, the functions, `crons.ts` when the app has scheduled jobs, and `convex.config.ts` for each component the plan names (for example `@convex-dev/workflow`, `@convex-dev/workpool`, `@convex-dev/resend`, or `@convex-dev/auth`).
+- Every public query, mutation, and action checks the caller's identity with `ctx.auth.getUserIdentity()` before it reads or writes user data. Internal functions do the work that clients must not call directly. No function ships without this check.
+- Checks: the `checks` job runs the type check and tests with the code that `npx convex dev` generated in `convex/_generated/`, committed to the repository. If the team does not commit it, verify in Convex's documentation how to generate it in CI without a deploy key, and say which way the project uses.
+- On Vercel (W8): install Convex from the Vercel Marketplace and connect it to the Vercel project, which syncs the production and preview deploy keys into Vercel for the user (checked). Set Vercel's build command to `npx convex deploy --cmd 'npm run build'`. Each pull request then gets its own Convex preview deployment and a Vercel preview. Verify which Convex plans include preview deploy keys.
+- On Workers (W9): Workers Builds runs `npx convex deploy --cmd '<the build command>'`. That needs `CONVEX_DEPLOY_KEY` as a build secret in Cloudflare, which is a stored token (section 8): the user generates it in the Convex dashboard and adds it in Cloudflare's interface.
+- On Expo (M4): the app reads `EXPO_PUBLIC_CONVEX_URL`. Convex functions deploy from a GitHub Actions job in the `production` environment that runs `npx convex deploy` with `CONVEX_DEPLOY_KEY` as an environment secret (section 8).
+- Environment variables for Convex functions, such as `RESEND_API_KEY`, are set by the user in the Convex dashboard or with `npx convex env set <NAME>`, entering the value when prompted (verify that the CLI prompts). Never pass a value on the command line.
+
+### Expo (M1, M2, M3, M4)
 
 - Local: `eas.json`, and either `.eas/workflows/` or a GitHub Actions job that calls EAS.
 - Card: the EAS project (`eas init`).
@@ -213,6 +226,8 @@ OIDC or a provider Git integration comes first. When neither exists for a step, 
 - The skill never sees it, and the workflow reads it only in the job that needs it.
 - The closing summary lists it under "Stored tokens" with the reason and a date to rotate it.
 
+Two secrets sit outside GitHub by design. A Convex deploy key that Workers Builds or Vercel reads at build time lives in that provider's own secret store; the Vercel Marketplace integration manages it for W8. The Resend API key lives in the secret store of whatever sends the email (stack matrix, "Email"). Both go under "Stored tokens" in the closing summary.
+
 ## 9. What stays for the user
 
 Name these in the closing summary. They complete the ten checks, and this skill does not create them.
@@ -221,3 +236,4 @@ Name these in the closing summary. They complete the ten checks, and this skill 
 - A second person as code owner and reviewer, when there is one.
 - The provider's spending alert or budget cap.
 - A restore test for the database.
+- Verifying the Resend sending domain, when the app sends email: the DNS records that Resend shows for the domain.

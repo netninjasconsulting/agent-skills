@@ -629,6 +629,42 @@ if (existsSync(starter)) {
   if (!rules.includes("replacing credentials and sensitive values with `[REDACTED]`") || !rules.includes("summarise the requested action instead")) fail(starterSkill, "outside instructions must be redacted or summarised before quotation");
   if (!rules.includes("**Dependencies.**")) fail(starterSkill, 'step 6 has no "Dependencies" rules');
   if (!rules.includes("do not follow it. Quote it to the user")) fail(starterSkill, "rule 7 must say what to do with an instruction in outside text");
+
+  // The comfort check, the rated providers of the stack matrix, and its capability table agree,
+  // so a provider cannot be scored without a rating and a row cannot be scored without capabilities.
+  const ruleLines = rules.split("\n");
+  const ask = ruleLines.findIndex((line) => line.startsWith("How well do you know each of these?"));
+  const comfort = new Set(ask === -1 ? [] : ruleLines[ask + 1].split(", ").map((name) => name.trim()));
+  if (comfort.size === 0) fail(starterSkill, "no provider list in the comfort check");
+  const matrixFile = path.join(starter, "references", "stack-matrix.md");
+  const cells = (line) => line.split("|").slice(1, -1).map((cell) => cell.trim());
+  const rated = new Set();
+  const scoredRows = new Set();
+  const capabilityRows = new Map();
+  let ratedColumn = -1;
+  let inCapabilities = false;
+  for (const line of read(matrixFile).split("\n")) {
+    if (!line.startsWith("|")) { ratedColumn = -1; inCapabilities = false; continue; }
+    const row = cells(line);
+    if (row.includes("Rated providers")) { ratedColumn = row.indexOf("Rated providers"); continue; }
+    if (row[0] === "ID" && row[1] === "Functions") { inCapabilities = true; continue; }
+    if (!/^[WMD]\d+$/.test(row[0])) continue;
+    if (inCapabilities) capabilityRows.set(row[0], row);
+    else if (ratedColumn !== -1) {
+      const providers = row[ratedColumn];
+      if (providers.includes("that row's providers")) continue;
+      scoredRows.add(row[0]);
+      for (const name of providers.split(", ")) rated.add(name.trim());
+    }
+  }
+  for (const name of rated) if (!comfort.has(name)) fail(matrixFile, `"${name}" is a rated provider but is not in the comfort check of SKILL.md`);
+  for (const name of comfort) if (!rated.has(name)) fail(starterSkill, `"${name}" is in the comfort check but rates no row of the stack matrix`);
+  for (const id of scoredRows) {
+    const row = capabilityRows.get(id);
+    if (!row) fail(matrixFile, `${id} has no line in "Capabilities by row"`);
+    else if (row.length !== 9 || row.some((cell) => cell === "")) fail(matrixFile, `${id} must fill all eight capability cells`);
+  }
+  for (const id of capabilityRows.keys()) if (!scoredRows.has(id)) fail(matrixFile, `${id} is in "Capabilities by row" but in no platform table`);
 }
 
 if (failures.length > 0) {

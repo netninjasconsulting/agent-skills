@@ -5,7 +5,7 @@ license: Apache-2.0
 compatibility: Needs a local repository and a POSIX shell with git, grep, sed, awk, find, and sort (POSIX base tools). Works offline. Writes nothing, runs nothing from the project, and makes no network request.
 metadata:
   author: Net Ninjas Consulting
-  version: "0.2.0"
+  version: "0.3.0"
   homepage: https://www.netninjas.us/skills
 ---
 

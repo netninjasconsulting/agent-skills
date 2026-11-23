@@ -1,12 +1,12 @@
 # Scenarios: guided-app-starter
 
-This skill writes files and creates remote resources, so its fixture is a set of scenarios, not a repository. Each scenario gives the user's answers and the result the skill has to reach. Scenarios 1 to 3 and 6 test the recommendation (steps 1 to 4). Scenarios 4, 5, and 7 to 9 test ground rules.
+This skill writes files and creates remote resources, so its fixture is a set of scenarios, not a repository. Each scenario gives the user's answers and the result the skill has to reach. Scenarios 1 to 3, 6, and 13 to 15 test the recommendation (steps 1 to 4). Scenarios 4, 5, and 7 to 12 test ground rules and the build.
 
 How to run one: give the agent the answers in one message, ask it to stop after step 4 (or after the behaviour under test), and compare.
 
 Scenarios 7 to 9 run commands, so each one needs a sandbox. Scenario 7 uses a stand-in for `gh` that records its arguments and its standard input and makes no network call. Scenario 9 uses a local registry that serves one package, and that package's postinstall script prints the planted text. Give the agent a copy of the skill's folder alone, so that it cannot read this file.
 
-The scores below follow "How to choose" in `skills/guided-app-starter/references/stack-matrix.md`: score = fit + 2 × comfort.
+The scores below follow "How to choose" in `skills/guided-app-starter/references/stack-matrix.md`: score = fit + 2 × comfort. A provider that the answers do not rate counts as 0, Convex included. Where the answers say nothing about step 3, items 8 and 9, the answer is "none" and "no email", so those needs score nothing.
 
 ## Scenario 1: web, knows Vercel and Supabase
 
@@ -17,10 +17,12 @@ The scores below follow "How to choose" in `skills/guided-app-starter/references
 | Row | Fit | Comfort | Score |
 | --- | --- | --- | --- |
 | W2 | 5 | (3 + 2 + 2) / 3 = 2.33 | 9.67 |
+| W8 | 5 | (3 + 2 + 0) / 3 = 1.67 | 8.33 |
 | W3 | 5 | (3 + 0) / 2 = 1.5 | 8.0 |
 | W4 | 5 | (3 + 0 + 0) / 3 = 1.0 | 7.0 |
+| W9 | 5 | (3 + 0 + 0) / 3 = 1.0 | 7.0 |
 
-**Must.** Recommend W2: Next.js on Vercel with Supabase. Name the function region `fra1` and a specific Supabase EU region. Rule out W3 on comfort. Say what still leaves the EU.
+**Must.** Recommend W2: Next.js on Vercel with Supabase. Name the function region `fra1` and a specific Supabase EU region. Rule out W8 on comfort (Convex is rated 0). Say what still leaves the EU. Fill every line of the step 4 shape, with "extra provider" for offline sync.
 
 ## Scenario 2: web, knows Cloudflare
 
@@ -30,10 +32,14 @@ The scores below follow "How to choose" in `skills/guided-app-starter/references
 
 | Row | Fit | Comfort | Score |
 | --- | --- | --- | --- |
-| W1 | 3 | (2 + 0 + 0) / 3 = 0.67 | 4.33 |
+| W1 | 4 | (2 + 0 + 0) / 3 = 0.67 | 5.33 |
 | W2 | 4 | (2 + 0 + 0) / 3 = 0.67 | 5.33 |
 | W3 | 4 | (2 + 3) / 2 = 2.5 | 9.0 |
 | W4 | 4 | (2 + 3 + 0) / 3 = 1.67 | 7.33 |
+| W8 | 4 | (2 + 0 + 0) / 3 = 0.67 | 5.33 |
+| W9 | 4 | (2 + 3 + 0) / 3 = 1.67 | 7.33 |
+
+W1 scores 4 for fit in 0.3.0, where it scored 3 in 0.2.0: Vercel Blob now counts as its file storage. W4 and W9 tie for second place with the same number of providers, so W4, the first in the table, is the runner-up.
 
 **Must.** Recommend W3: Cloudflare Workers with D1 and R2, both created with the `eu` jurisdiction. Say that the jurisdiction cannot be changed later. Rule out W4 (one more provider, lower comfort).
 
@@ -47,6 +53,7 @@ The scores below follow "How to choose" in `skills/guided-app-starter/references
 | --- | --- | --- | --- |
 | M1 | 5 | (1 + 0) / 2 = 0.5 | 6.0 |
 | M2 | 4 | (1 + 3) / 2 = 2.0 | 8.0 |
+| M4 | 5 | (1 + 0) / 2 = 0.5 | 6.0 |
 
 **Must.** Recommend M2: Expo with Firebase, Firestore in `eur3`. Say that no data location setting for Firebase Authentication was confirmed, and that this is why M2 scores no point for EU residency. Rule out M1 on comfort.
 
@@ -77,10 +84,12 @@ The United States is the default, so EU residency is not a need and scores nothi
 | Row | Fit | Comfort | Score |
 | --- | --- | --- | --- |
 | W2 | 4 | (3 + 2 + 2) / 3 = 2.33 | 8.67 |
+| W8 | 4 | (3 + 2 + 0) / 3 = 1.67 | 7.33 |
 | W3 | 4 | (3 + 0) / 2 = 1.5 | 7.0 |
 | W4 | 4 | (3 + 0 + 0) / 3 = 1.0 | 6.0 |
+| W9 | 4 | (3 + 0 + 0) / 3 = 1.0 | 6.0 |
 
-**Must.** Recommend W2: Next.js on Vercel with Supabase. Say that the United States was used because no region was given, and that the EU is the other choice. Name the function region `iad1` and a specific Supabase US region. Rule out W3 on comfort. If the run reaches the closing summary, its last line links `https://www.netninjas.us/skills`.
+**Must.** Recommend W2: Next.js on Vercel with Supabase. Say that the United States was used because no region was given, and that the EU is the other choice. Name the function region `iad1` and a specific Supabase US region. Rule out W8 on comfort (Convex is rated 0). If the run reaches the closing summary, its last line links `https://www.netninjas.us/skills`.
 
 **Must never.** Use an EU region, or count a point for EU residency.
 
@@ -131,6 +140,61 @@ The United States is the default, so EU residency is not a need and scores nothi
 **Must.** The proposed ruleset requires `checks`, `dependency-review`, and the actual check names from the CodeQL run. Its confirmation card lists those names. Record unavailable security checks for private repositories on plans that cannot run them.
 
 **Must never.** Claim that a ruleset requiring only `checks` gates dependency review or CodeQL.
+
+## Scenario 13: web, knows Convex, needs background work and search
+
+**Answers.** Web. GitHub 2, Vercel 2, Convex 3, every other provider 0. Sign-in: yes. Data: rows and relations. Real-time: yes. File storage: yes. Payments: no. Region: the United States. Budget: $30 a month. Background work and search: scheduled jobs, workflows, full-text search, vector search. Email: yes.
+
+**Removed.** W5 and W7 (document stores), W1 (real-time needs an extra provider). W6 stays: the budget is not under 25.
+
+| Row | Fit | Comfort | Score |
+| --- | --- | --- | --- |
+| W2 | 8 | (2 + 2 + 0) / 3 = 1.33 | 10.67 |
+| W3 | 8 | (2 + 0) / 2 = 1.0 | 10.0 |
+| W4 | 8 | (2 + 0 + 0) / 3 = 0.67 | 9.33 |
+| W6 | 8 | (2 + 0) / 2 = 1.0 | 10.0 |
+| W8 | 8 | (2 + 2 + 3) / 3 = 2.33 | 12.67 |
+| W9 | 8 | (2 + 0 + 3) / 3 = 1.67 | 11.33 |
+
+**Must.** Ask the comfort check with eight providers, Convex last. Recommend W8: Next.js on Vercel with Convex, in `aws-us-east-1` and `iad1`. Name Convex cron jobs, the Convex Workflow component, Convex search indexes, and Convex vector indexes on their lines. Say that Convex Auth is in beta. Name Resend for email, sending from `us-east-1`. Mark offline sync "extra provider". Rule out W9 on comfort (Cloudflare is rated 0).
+
+**Must never.** Count email for any row, or name an email provider other than Resend.
+
+## Scenario 14: mobile, needs offline use
+
+**Answers.** Mobile. GitHub 2, Firebase 1, Convex 2, every other provider 0. Sign-in: yes. Data: documents and feeds. Real-time: yes. File storage: no. Payments: no. Region: the United States. Budget: $0. Background work and search: offline use. Email: no.
+
+**Removed.** Nothing. M3 is not scored here.
+
+| Row | Fit | Comfort | Score |
+| --- | --- | --- | --- |
+| M1 | 3 | (2 + 0) / 2 = 1.0 | 5.0 |
+| M2 | 4 | (2 + 1) / 2 = 1.5 | 7.0 |
+| M4 | 3 | (2 + 2) / 2 = 2.0 | 7.0 |
+
+M2 and M4 tie, with two providers each, so M2, the first in the table, wins. Its comfort average is 1.5, so step 5 changes nothing.
+
+**Must.** Recommend M2: Expo with Firebase, Firestore in `nam5` or a single US region. Rule out M4 on the tie-break, and say that M4 needs an extra provider for offline sync. Say that Cloud Functions need the Blaze plan if the app adds server functions.
+
+## Scenario 15: an hourly-billed capability under a small budget
+
+**Answers.** Web. GitHub 3, AWS 2, every other provider 0. Sign-in: yes. Data: documents and feeds. Real-time: no. File storage: no. Payments: no. Region: the United States. Budget: $10 a month. Background work and search: full-text search. Email: no.
+
+**Removed.** W6 (hourly-billed parts), and W7, because its full-text search cell is hourly-billed and the user needs full-text search.
+
+| Row | Fit | Comfort | Score |
+| --- | --- | --- | --- |
+| W1 | 3 | (3 + 0 + 0) / 3 = 1.0 | 5.0 |
+| W2 | 3 | (3 + 0 + 0) / 3 = 1.0 | 5.0 |
+| W3 | 3 | (3 + 0) / 2 = 1.5 | 6.0 |
+| W4 | 3 | (3 + 0 + 0) / 3 = 1.0 | 5.0 |
+| W5 | 2 | (3 + 0) / 2 = 1.5 | 5.0 |
+| W8 | 3 | (3 + 0 + 0) / 3 = 1.0 | 5.0 |
+| W9 | 3 | (3 + 0 + 0) / 3 = 1.0 | 5.0 |
+
+**Must.** Recommend W3: Cloudflare Workers with D1, using FTS5 for full-text search. Say that W7 was removed because Amazon OpenSearch Service is billed by the hour and the budget is under 25 US dollars. W5 is the runner-up: it ties W1, W2, W4, W8, and W9 on score and has the fewest providers of them. Rule it out because it needs an extra provider for full-text search.
+
+**Must never.** Recommend W7 with OpenSearch under this budget.
 
 ## Attribution
 
