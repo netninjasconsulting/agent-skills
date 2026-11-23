@@ -9,9 +9,9 @@ I'm starting to see a lot of first products stall on the same early choice. The 
 ## How it runs
 
 1. **Platform.** Mobile, web, or desktop.
-2. **Comfort check.** One rating from 0 to 3 for each of GitHub, Vercel, Cloudflare, AWS, Neon, Supabase, and Firebase: never used, tried it, shipped with it, run it in production.
-3. **Needs.** Sign-in, data shape, real-time, file storage, payments, the region (the US or the EU), and monthly budget.
-4. **Recommendation.** One stack with the reasons, and one line on what was ruled out and why. Comfort and fit both count. The skill asks "US or EU?", and the US is the default.
+2. **Comfort check.** One rating from 0 to 3 for each of GitHub, Vercel, Cloudflare, AWS, Neon, Supabase, Firebase, and Convex: never used, tried it, shipped with it, run it in production.
+3. **Needs.** Sign-in, data shape, real-time, file storage, payments, the region (the US or the EU), and monthly budget. Then it asks which background work and search the app needs: scheduled jobs, workflows, queues, pub/sub, offline use, full-text search, and vector search. It also asks whether the app sends email.
+4. **Recommendation.** One stack with the reasons, and one line on what was ruled out and why. Comfort and fit both count. The recommendation names a part of the stack for each job, from the database to search, and says where the stack needs an extra provider. Email goes through Resend on every stack. The skill asks "US or EU?", and the US is the default.
 5. **Product questions.** Superpowers asks the clarifying questions and writes the plan.
 6. **Build.** Ponytail keeps the build to the smallest complete version. UI UX Pro Max guides the interface.
 7. **Security pass.** Cloudflare's security-audit skill runs before the first deploy.
@@ -35,7 +35,7 @@ This skill is not read-only, and I want that to be plain. It writes files in the
 
 ## The stack matrix has a date
 
-Provider offers change often. The matrix in `references/stack-matrix.md` says when it was checked (13 November 2026 for this release) and marks each fact as checked or as one to verify. The skill re-reads the provider's documentation before it relies on a fact marked "verify". I re-check the whole matrix at every release.
+Provider offers change often. The matrix in `references/stack-matrix.md` says when it was checked (23 November 2026 for this release) and marks each fact as checked or as one to verify. It also lists what each stack offers for background work, sync, and search, and what needs an extra provider. The skill re-reads the provider's documentation before it relies on a fact marked "verify". I re-check the whole matrix at every release.
 
 ## Credits
 
@@ -60,7 +60,7 @@ npx skills add netninjasconsulting/agent-skills --skill guided-app-starter --ski
 
 The skills CLI is a third-party tool, and it collects anonymous usage data of its own. Setting `DISABLE_TELEMETRY=1` in front of the command turns that off. The skills are also plain folders, so copying them from `skills/` in this repository into the agent's skills folder works without any installer.
 
-Remote steps need `git`, the GitHub CLI, and the chosen provider's CLI. This is version 0.2.0, and I want its limits on the page. The stack recommendation has written scenarios with worked scores. Three ground rules have each passed one sandbox run with a fresh agent: no file of its own outside the project folder, the CI workflow from the bundled template, and an instruction printed by a package's install script. The build and the remote steps have not been run end to end on any stack yet. The changelog and `tests/RESULTS.md` say what was tested and what was not.
+Remote steps need `git`, the GitHub CLI, and the chosen provider's CLI. This is version 0.3.0, and I want its limits on the page. The stack recommendation has written scenarios with worked scores, the Convex stacks included. A script checked those scores, but no agent has run the new scenarios yet. Three ground rules have each passed one sandbox run with a fresh agent: no file of its own outside the project folder, the CI workflow from the bundled template, and an instruction printed by a package's install script. The build and the remote steps have not been run end to end on any stack yet. The changelog and `tests/RESULTS.md` say what was tested and what was not.
 
 ## Use
 
@@ -76,4 +76,4 @@ I want to build an app. Help me pick a stack and set it up.
 
 Apache-2.0. Copyright 2026 Net Ninjas Consulting. See [LICENSE](../../LICENSE) and [NOTICE](../../NOTICE).
 
-What are you building, and which of those seven providers do you already know? More free skills and guides: [netninjas.us/skills](https://www.netninjas.us/skills).
+What are you building, and which of those eight providers do you already know? More free skills and guides: [netninjas.us/skills](https://www.netninjas.us/skills).

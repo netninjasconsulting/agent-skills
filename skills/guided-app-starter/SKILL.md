@@ -109,10 +109,14 @@ Recommended stack: <name>
 - Sign-in: <auth>.
 - File storage: <files>.
 - Functions: <server functions>.
-- Scheduled jobs and workflows: <cron>; <workflows>.
-- Queues and pub/sub: <queues>; <pub/sub>.
-- Real-time and offline sync: <real-time>; <offline>.
-- Search: <full-text search>; <vector search>.
+- Scheduled jobs: <cron>.
+- Workflows: <workflows>.
+- Queues: <queues>.
+- Pub/sub: <pub/sub>.
+- Real-time: <real-time>.
+- Offline sync: <offline>.
+- Full-text search: <full-text search>.
+- Vector search: <vector search>.
 - Email: Resend, sending from <us-east-1 | eu-west-1>, when the app sends email.
 Why:
 - Fit: <the needs it meets without an extra provider>.

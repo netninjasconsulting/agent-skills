@@ -2,7 +2,7 @@
 
 Platform by provider, to framework, data layer, capabilities, and deploy target.
 
-**Checked on 23 November 2026.** Each provider fact below is marked "checked" (read in the provider's own documentation on that date, or on 13 November 2026 for facts carried over from 0.2.0; sources at the end) or "verify" (not confirmed on that date: read the current documentation before relying on it). Provider offers change often. This file is re-checked at every release of the skill.
+**Checked on 23 November 2026.** Each provider fact below is marked "checked" (read in the provider's own documentation on that date, or on 13 November 2026 for facts carried over from 0.2.0, with sources at the end) or "verify" (not confirmed on that date: read the current documentation before relying on it). Provider offers change often. This file is re-checked at every release of the skill.
 
 ## Contents
 
@@ -27,8 +27,8 @@ Platform by provider, to framework, data layer, capabilities, and deploy target.
    - A monthly budget under 25 US dollars or euros removes rows marked "hourly-billed parts", and rows whose cell in [Capabilities by row](#capabilities-by-row) is marked "hourly-billed" for a capability the user needs.
 3. **Score what is left.**
    - Fit: one point for each of these needs that the user has and that the row meets with no extra provider:
-     - sign-in, the data shape, real-time, and file storage (from the platform table);
-     - scheduled jobs, workflows, queues, pub/sub, offline sync, full-text search, and vector search (from [Capabilities by row](#capabilities-by-row));
+     - sign-in, the data shape, real-time, and file storage (from the platform table)
+     - scheduled jobs, workflows, queues, pub/sub, offline sync, full-text search, and vector search (from [Capabilities by row](#capabilities-by-row))
      - EU residency.
    - A relational or document-relational row meets either data shape. EU residency is a need only when the user chose the EU. It then counts for "must stay" and for "a preference" alike, and a row marked "not for strict EU residency" does not meet it. For the United States it is not a need, so it scores nothing for any row.
    - A cell marked "(beta)" meets the need. The recommendation names every beta part that the choice rests on.
@@ -114,11 +114,11 @@ What the words mean here:
 
 Notes on the cells:
 
-- Vercel: Queues is in beta (checked). Workflow runs on Vercel Functions and Queues (checked); verify whether it is still in beta. Vercel Cron Jobs: verify plan limits.
+- Vercel: Queues is in beta (checked). Workflow runs on Vercel Functions and Queues (checked). Verify whether it is still in beta. Vercel Cron Jobs: verify plan limits.
 - Neon: `pg_cron` runs only while the compute is active, so W1 and W4 schedule jobs on the host (Vercel Cron Jobs, Cron Triggers), not in Neon (checked). pgvector on Neon: verify.
 - Supabase: Queues is built on the `pgmq` extension and stores messages in Postgres (checked). Realtime has Broadcast, Presence, and Postgres Changes (checked). Supabase Cron: checked. Edge Functions and pgvector: verify.
 - Cloudflare: D1 supports the FTS5 module for full-text search (checked). Vectorize is generally available (checked). Workflows, Queues, and Durable Objects: verify which of them need the Workers Paid plan, which starts at 5 US dollars a month (checked).
-- Firebase: Cloud Functions, and so scheduled functions, task queues, and Pub/Sub triggers, need the pay-as-you-go Blaze plan (checked). Firestore offline persistence is on by default on Android and Apple platforms and off by default on the web (checked). Firestore vector search runs exact nearest-neighbour queries (checked); verify whether it is still in preview. Full-text search needs an extension backed by another vendor, such as Algolia (checked). Text search in Firestore Enterprise edition is in preview (checked), so it does not count. Google Cloud Workflows and Pub/Sub run in the Firebase project's own Google Cloud project, with no other account (verify).
+- Firebase: Cloud Functions, and so scheduled functions, task queues, and Pub/Sub triggers, need the pay-as-you-go Blaze plan (checked). Firestore offline persistence is on by default on Android and Apple platforms and off by default on the web (checked). Firestore vector search runs exact nearest-neighbour queries (checked). Verify whether it is still in preview. Full-text search needs an extension backed by another vendor, such as Algolia (checked). Text search in Firestore Enterprise edition is in preview (checked), so it does not count. Google Cloud Workflows and Pub/Sub run in the Firebase project's own Google Cloud project, with no other account (verify).
 - AWS: DataStore, Amplify's offline layer, is not part of Amplify Gen 2, and Gen 1 reaches end of life on 1 May 2027 (checked). S3 Vectors is generally available in 14 regions, among them N. Virginia and Frankfurt (checked). OpenSearch Service and pgvector on RDS: verify.
 - Convex: cron jobs, the scheduler, file storage, search indexes, and vector indexes are part of Convex (checked). The Workflow and Workpool components are packages maintained by Convex (`@convex-dev/workflow`, `@convex-dev/workpool`) that run inside the deployment (checked), so they go in the plan by name (SKILL.md, step 6). Convex does not provide full offline sync (checked).
 
@@ -146,7 +146,7 @@ Use these values when the user chose the United States or gave no answer. Each o
 | Cloudflare Durable Objects | The `us` jurisdiction | Checked. Durable Objects have three jurisdictions: `eu`, `us`, and `fedramp`. A jurisdiction is a guarantee. The location hints `enam` and `wnam` are a best effort and not a guarantee |
 | Firebase | Firestore location `nam5` (United States multi-region) or a single US region such as `us-east4` (Northern Virginia). App Hosting in `us-east4` (N. Virginia), `us-central1` (Iowa), or `us-east5` (Columbus) | Checked. The Firestore location cannot be changed later. App Hosting has six regions: these three, `europe-west4`, `asia-east1`, and `asia-southeast1` |
 | AWS | Region `us-east-1` (N. Virginia), or `us-east-2` (Ohio), `us-west-2` (Oregon) | Global services such as IAM, CloudFront, and Route 53 are not regional |
-| Convex | Region `aws-us-east-1` (N. Virginia). The CLI takes `us` as a short form | Checked. All of the deployment's infrastructure runs in its region. The region is chosen when the deployment is created; moving it later takes a backup and a restore into a new deployment. US usage is billed at the standard rate |
+| Convex | Region `aws-us-east-1` (N. Virginia). The CLI takes `us` as a short form | Checked. All of the deployment's infrastructure runs in its region. The region is chosen when the deployment is created. Moving it later takes a backup and a restore into a new deployment. US usage is billed at the standard rate |
 | Resend | Sending region `us-east-1` (N. Virginia), set when the domain is added | Checked. Account data, email metadata, and logs are stored in the United States |
 
 A US region is a location, not a legal guarantee. Where a provider offers only a hint, say so on the card.

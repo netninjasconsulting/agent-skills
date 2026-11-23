@@ -226,7 +226,7 @@ OIDC or a provider Git integration comes first. When neither exists for a step, 
 - The skill never sees it, and the workflow reads it only in the job that needs it.
 - The closing summary lists it under "Stored tokens" with the reason and a date to rotate it.
 
-Two secrets sit outside GitHub by design. A Convex deploy key that Workers Builds or Vercel reads at build time lives in that provider's own secret store; the Vercel Marketplace integration manages it for W8. The Resend API key lives in the secret store of whatever sends the email (stack matrix, "Email"). Both go under "Stored tokens" in the closing summary.
+Two secrets sit outside GitHub by design. A Convex deploy key that Workers Builds or Vercel reads at build time lives in that provider's own secret store. For W8, the Vercel Marketplace integration manages it. The Resend API key lives in the secret store of whatever sends the email (stack matrix, "Email"). Both go under "Stored tokens" in the closing summary.
 
 ## 9. What stays for the user
 

@@ -19,7 +19,7 @@ The guided app starter adds Convex, and its recommendation now covers every part
 
 ### Changed
 
-- `guided-app-starter`: step 4 answers in a longer shape with one line per part of the stack: hosting, database, sign-in, file storage, functions, scheduled jobs and workflows, queues and pub/sub, real-time and offline sync, search, and email. It names every extra provider and every part in beta.
+- `guided-app-starter`: step 4 answers in a longer shape with one line per part of the stack: hosting, database, sign-in, file storage, functions, scheduled jobs, workflows, queues, pub/sub, real-time, offline sync, full-text search, vector search, and email. It names every extra provider and every part in beta.
 - `guided-app-starter`: "How to choose" removes a row under a budget below 25 US dollars or euros when a capability the user needs is billed by the hour there. Today that is full-text search on W7 (Amazon OpenSearch Service).
 - `guided-app-starter`: W1's file storage is Vercel Blob. Version 0.2.0 listed it as "extra provider", which was wrong. In scenario 2, W1's fit rises from 3 to 4 and its score from 4.33 to 5.33. The recommendation does not change.
 - `guided-app-starter`: scenarios 1, 2, 3, and 6 score the new rows. In scenarios 1 and 6 the runner-up is now W8, ruled out on comfort, where it was W3.
